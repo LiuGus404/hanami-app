@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createSaasAdminClient();
     const { searchParams } = new URL(request.url);
-    
+
     // 解析查詢參數
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const sort_direction = searchParams.get('sort_order') || 'desc';
     const phone = searchParams.get('phone');
     const orgId = searchParams.get('orgId');
-    const userEmail = searchParams.get('userEmail');
+    const userRole = searchParams.get('userRole'); // passed from client
 
     // 構建查詢
     let query = supabase
@@ -42,66 +42,70 @@ export async function GET(request: NextRequest) {
     if (status && status.length > 0) {
       query = query.in('status', status);
     }
-    
+
     if (priority && priority.length > 0) {
       query = query.in('priority', priority);
     }
-    
+
     if (category && category.length > 0) {
       query = query.overlaps('category', category);
     }
-    
+
     if (created_date && created_date.length > 0) {
-      console.log('Date filter:', { 
-        selectedDates: created_date, 
-        totalDates: created_date.length 
+      console.log('Date filter:', {
+        selectedDates: created_date,
+        totalDates: created_date.length
       });
-      
+
       // 簡化邏輯：先獲取所有任務，然後在應用層篩選
       // 這樣可以避免複雜的 SQL 查詢問題
       const dateStrings = created_date.map(date => date);
-      
+
       // 暫時移除日期篩選，在獲取數據後再篩選
       // 這不是最佳實踐，但可以確保功能正常工作
     }
-    
+
     if (assigned_to) {
       // assigned_to 現在是陣列類型，使用 contains 查詢
       query = query.contains('assigned_to', [assigned_to]);
     }
-    
+
     if (project_id) {
       query = query.eq('project_id', project_id);
     }
-    
+
     if (due_date_from) {
       query = query.gte('due_date', due_date_from);
     }
-    
+
     if (due_date_to) {
       query = query.lte('due_date', due_date_to);
     }
-    
+
     if (is_public !== null) {
       query = query.eq('is_public', is_public === 'true');
     }
-    
+
     if (search) {
       query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
     }
 
     // 權限篩選 - 根據用戶角色決定可見任務
-    // 如果沒有 phone 參數，顯示所有任務（管理員模式）
-    // 如果有 phone 參數，只顯示該用戶的任務或公開任務
-    if (phone) {
-      // 檢查是否為管理員或特定角色（可以通過其他方式識別）
-      // 暫時先允許所有用戶看到所有任務，後續可以根據實際需求調整
-      // query = query.or(`phone.eq.${phone},assigned_to.cs.{${phone}},is_public.eq.true`);
+    if (userRole && userRole !== 'super_admin') { // Super admin sees all
+      // If visible_to_roles is NOT NULL, verify userRole is in it
+      // Logic: (original filters) AND (visible_to_roles IS NULL OR visible_to_roles @> {userRole})
+      // Note: supabase postgrest doesn't support complex OR with different columns easily in one chained call if mixed with ANDs
+      // But we can filter specifically for visibility. 
+      // Actually 'is' null check might be tricky combined with 'cs'.
+      // Best way using PostgREST syntax:
+      // or=(visible_to_roles.is.null,visible_to_roles.cs.{userRole})
+
+      query = query.or(`visible_to_roles.is.null,visible_to_roles.cs.{${userRole}}`);
     }
 
     // 應用排序
     const sortOrder = sort_direction === 'desc' ? { ascending: false } : { ascending: true };
-    
+
     if (sort_field === 'priority') {
       // 自定義優先級排序
       query = query.order('priority', sortOrder);
@@ -125,7 +129,7 @@ export async function GET(request: NextRequest) {
         let fallbackQuery = supabase
           .from('hanami_task_list')
           .select('*', { count: 'exact' });
-        
+
         // 重新應用其他篩選條件（與上面相同的邏輯）
         if (status && status.length > 0) {
           fallbackQuery = fallbackQuery.in('status', status);
@@ -154,18 +158,18 @@ export async function GET(request: NextRequest) {
         if (search) {
           fallbackQuery = fallbackQuery.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
         }
-        
+
         const sortOrder = sort_direction === 'desc' ? { ascending: false } : { ascending: true };
         if (sort_field === 'priority') {
           fallbackQuery = fallbackQuery.order('priority', sortOrder);
         } else {
           fallbackQuery = fallbackQuery.order(sort_field, sortOrder);
         }
-        
+
         const from = (page - 1) * limit;
         const to = from + limit - 1;
         fallbackQuery = fallbackQuery.range(from, to);
-        
+
         result = await fallbackQuery;
       } else {
         throw queryError;
@@ -191,10 +195,10 @@ export async function GET(request: NextRequest) {
         const taskDate = new Date(task.created_at).toISOString().split('T')[0];
         return created_date.includes(taskDate);
       });
-      console.log('Date filter applied:', { 
-        originalCount: tasks?.length || 0, 
+      console.log('Date filter applied:', {
+        originalCount: tasks?.length || 0,
         filteredCount: filteredTasks.length,
-        selectedDates: created_date 
+        selectedDates: created_date
       });
     }
 
@@ -242,7 +246,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createSaasAdminClient();
     const body: CreateTaskForm = await request.json();
-    
+
     // 驗證必填欄位
     if (!body.title || !body.priority) {
       return NextResponse.json(
@@ -259,14 +263,18 @@ export async function POST(request: NextRequest) {
       priority: body.priority,
       category: body.category,
       phone: body.phone,
-      assigned_to: body.assigned_to && typeof body.assigned_to === 'string' && (body.assigned_to as string).trim() !== '' ? 
-        (body.assigned_to as string).split(',').map(name => name.trim()).filter(name => name !== '') : 
-        null,
+      assigned_to: Array.isArray(body.assigned_to) ? body.assigned_to :
+        (body.assigned_to && typeof body.assigned_to === 'string' && (body.assigned_to as string).trim() !== '' ?
+          (body.assigned_to as string).split(',').map(name => name.trim()).filter(name => name !== '') : null),
       due_date: body.due_date && body.due_date.trim() !== '' ? body.due_date : null,
       time_block_start: body.time_block_start && body.time_block_start.trim() !== '' ? body.time_block_start : null,
       time_block_end: body.time_block_end && body.time_block_end.trim() !== '' ? body.time_block_end : null,
       is_public: body.is_public || false,
-      project_id: body.project_id && body.project_id.trim() !== '' ? body.project_id : null
+      project_id: body.project_id && body.project_id.trim() !== '' ? body.project_id : null,
+      points: (body as any).points || 0,
+      checklist: (body as any).checklist || [],
+      visible_to_roles: (body as any).visible_to_roles || null,
+      is_approved: false
     };
 
     // 如果提供了 org_id，添加到任務數據中

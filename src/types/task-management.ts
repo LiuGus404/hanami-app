@@ -26,7 +26,24 @@ export interface Task {
   difficulty_level: number; // 1-5
   progress_percentage: number; // 0-100
   is_public: boolean;
+  points?: number;
+  is_approved?: boolean;
+  checklist?: { id: string; text: string; is_checked: boolean }[];
+  approved_by?: string;
+  approved_at?: string;
   project_id?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  visible_to_roles?: string[];
+}
+
+// 任務模板介面
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  task_data: Partial<Task>;
   created_by?: string;
   created_at: string;
   updated_at: string;
@@ -92,6 +109,12 @@ export interface TaskStats {
   not_urgent_not_important_tasks: number;
   avg_progress: number;
   avg_actual_duration: number;
+  leaderboard?: {
+    user_name: string;
+    points: number;
+    rank: number;
+    avatar?: string;
+  }[];
 }
 
 // 用戶任務統計介面
@@ -129,8 +152,11 @@ export interface CreateTaskForm {
   time_block_end?: string;
   estimated_duration?: number;
   difficulty_level?: number;
+  points?: number;
   is_public?: boolean;
   project_id?: string;
+  checklist?: { id: string; text: string; is_checked: boolean }[];
+  visible_to_roles?: string[];
 }
 
 // 更新任務表單介面
@@ -150,8 +176,14 @@ export interface UpdateTaskForm {
   actual_duration?: number;
   difficulty_level?: number;
   progress_percentage?: number;
+  points?: number;
+  is_approved?: boolean;
+  approved_by?: string;
+  approved_at?: string;
   is_public?: boolean;
   project_id?: string;
+  checklist?: { id: string; text: string; is_checked: boolean }[];
+  visible_to_roles?: string[];
 }
 
 // 創建項目表單介面

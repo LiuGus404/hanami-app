@@ -35,11 +35,11 @@ export async function GET(request: NextRequest) {
         let fallbackQuery = supabase
           .from('hanami_task_list')
           .select('status, priority, progress_percentage, actual_duration', { count: 'exact' });
-        
+
         if (phone) {
           fallbackQuery = fallbackQuery.or(`phone.eq.${phone},assigned_to.cs.{${phone}},is_public.eq.true`);
         }
-        
+
         result = await fallbackQuery;
       } else {
         throw queryError;
@@ -68,13 +68,104 @@ export async function GET(request: NextRequest) {
       important_not_urgent_tasks: tasks?.filter((t: any) => t.priority === 'important_not_urgent').length || 0,
       urgent_not_important_tasks: tasks?.filter((t: any) => t.priority === 'urgent_not_important').length || 0,
       not_urgent_not_important_tasks: tasks?.filter((t: any) => t.priority === 'not_urgent_not_important').length || 0,
-      avg_progress: tasks?.length > 0 ? 
+      avg_progress: tasks?.length > 0 ?
         Math.round(tasks.reduce((sum: number, t: any) => sum + (t.progress_percentage || 0), 0) / tasks.length) : 0,
-      avg_actual_duration: tasks?.length > 0 ? 
+      avg_actual_duration: tasks?.length > 0 ?
         Math.round(tasks.reduce((sum: number, t: any) => sum + (t.actual_duration || 0), 0) / tasks.length) : 0
     };
 
-    return NextResponse.json(stats);
+    // 計算排行榜
+    // 1. 獲取該機構的所有老師/員工
+    let employeesQuery = supabase
+      .from('hanami_employee')
+      .select('teacher_fullname, teacher_nickname');
+
+    if (orgId) {
+      employeesQuery = employeesQuery.eq('org_id', orgId);
+    }
+
+    // 初始化积分映射
+    const userPointsMap = new Map<string, number>();
+
+    try {
+      const { data: employees } = await employeesQuery;
+      if (employees) {
+        employees.forEach((emp: any) => {
+          // 優先使用全名作為 key
+          const name = emp.teacher_fullname || emp.teacher_nickname;
+          if (name) {
+            userPointsMap.set(name, 0);
+          }
+        });
+      }
+    } catch (e) {
+      console.error('Error fetching employees:', e);
+    }
+
+    // 2. 獲取所有已批准的任務並計算積分
+
+    // 獲取所有已批准的任務
+    let leaderboardQuery = supabase
+      .from('hanami_task_list')
+      .select('assigned_to, points')
+      .eq('is_approved', true);
+
+    if (orgId) {
+      leaderboardQuery = leaderboardQuery.eq('org_id', orgId);
+    }
+
+    // 執行排行榜查詢
+    let leaderboardData: any[] = [];
+    try {
+      const { data } = await leaderboardQuery;
+      leaderboardData = data || [];
+    } catch (e) {
+      console.error('Error fetching leaderboard data:', e);
+      // Fallback
+      if (orgId) {
+        const { data } = await supabase
+          .from('hanami_task_list')
+          .select('assigned_to, points')
+          .eq('is_approved', true);
+        leaderboardData = data || [];
+      }
+    }
+
+    // Process leaderboard points
+    leaderboardData.forEach(task => {
+      if (task.assigned_to && Array.isArray(task.assigned_to) && task.points) {
+        task.assigned_to.forEach((user: string) => {
+          // 只更新已经在员工列表中的用户，或者如果允许非员工也在排行榜，则直接设置
+          // 这里我们假设任务可能分配给不在 hanami_employee 的人（如 admin），也应该显示
+          const currentPoints = userPointsMap.get(user) || 0;
+          userPointsMap.set(user, currentPoints + (task.points || 0));
+        });
+      } else if (typeof task.assigned_to === 'string' && task.points) {
+        const users = task.assigned_to.split(',').map((u: string) => u.trim()).filter((u: string) => u);
+        users.forEach((user: string) => {
+          const currentPoints = userPointsMap.get(user) || 0;
+          userPointsMap.set(user, currentPoints + (task.points || 0));
+        });
+      }
+    });
+
+    const leaderboard = Array.from(userPointsMap.entries())
+      .map(([user_name, points]) => ({
+        user_name,
+        points,
+        rank: 0,
+        avatar: undefined
+      }))
+      .sort((a, b) => b.points - a.points)
+      .map((entry, index) => ({
+        ...entry,
+        rank: index + 1
+      }));
+
+    return NextResponse.json({
+      ...stats,
+      leaderboard
+    });
 
   } catch (error) {
     console.error('Error in GET /api/tasks/stats:', error);

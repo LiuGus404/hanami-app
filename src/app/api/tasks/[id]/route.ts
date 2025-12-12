@@ -46,10 +46,10 @@ export async function PUT(
   try {
     const supabase = createSaasAdminClient();
     const body: UpdateTaskForm = await request.json();
-    
+
     // 構建更新物件
     const updateData: any = {};
-    
+
     if (body.title !== undefined) updateData.title = body.title;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.follow_up_content !== undefined) updateData.follow_up_content = body.follow_up_content;
@@ -57,12 +57,13 @@ export async function PUT(
     if (body.priority !== undefined) updateData.priority = body.priority;
     if (body.category !== undefined) updateData.category = body.category;
     if (body.phone !== undefined) updateData.phone = body.phone;
+    if (body.points !== undefined) updateData.points = body.points;
     if (body.assigned_to !== undefined) {
       // 處理 assigned_to 陣列
       if (typeof body.assigned_to === 'string') {
         // 如果是字串，轉換為陣列
-        updateData.assigned_to = (body.assigned_to as string).trim() !== '' ? 
-          (body.assigned_to as string).split(',').map(name => name.trim()).filter(name => name !== '') : 
+        updateData.assigned_to = (body.assigned_to as string).trim() !== '' ?
+          (body.assigned_to as string).split(',').map(name => name.trim()).filter(name => name !== '') :
           null;
       } else if (Array.isArray(body.assigned_to)) {
         // 如果已經是陣列，直接使用
@@ -88,7 +89,12 @@ export async function PUT(
       // 處理空字串或無效 UUID
       updateData.project_id = body.project_id && body.project_id.trim() !== '' ? body.project_id : null;
     }
-    
+
+    if (body.points !== undefined) updateData.points = body.points;
+    if (body.is_approved !== undefined) updateData.is_approved = body.is_approved;
+    if (body.approved_by !== undefined) updateData.approved_by = body.approved_by;
+    if (body.approved_at !== undefined) updateData.approved_at = body.approved_at;
+
     // 如果提供了 org_id，更新它
     // 如果字段不存在，更新會失敗，但我們會捕獲錯誤
     if ((body as any).org_id !== undefined) {

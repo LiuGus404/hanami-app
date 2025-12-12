@@ -1,21 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Task, CreateTaskForm, UpdateTaskForm, DEFAULT_PRIORITY_CONFIG, DEFAULT_CATEGORY_CONFIG } from '@/types/task-management';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Task, CreateTaskForm, UpdateTaskForm, DEFAULT_PRIORITY_CONFIG, DEFAULT_CATEGORY_CONFIG, TaskTemplate } from '@/types/task-management';
 import { supabase } from '@/lib/supabase';
 import CategoryIcon from './CategoryIcon';
+import TaskTemplateModal from './TaskTemplateModal';
 
 interface TaskFormProps {
   task?: Task;
   onSubmit: (data: CreateTaskForm | UpdateTaskForm) => void;
   onCancel: () => void;
   isLoading?: boolean;
+  canEditPoints?: boolean;
+  orgId?: string;
 }
 
-export default function TaskForm({ task, onSubmit, onCancel, isLoading = false }: TaskFormProps) {
-  // 用於避免瀏覽器自動填入日期時間欄位以及強制重新掛載輸入元素
+export default function TaskForm({ task, onSubmit, onCancel, isLoading = false, canEditPoints = false, orgId }: TaskFormProps) {
   const [formInstanceId] = useState<string>(() => `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`);
+
+  // Form State
   const [formData, setFormData] = useState<CreateTaskForm>({
     title: '',
     description: '',
@@ -28,9 +32,12 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false }
     time_block_start: '',
     time_block_end: '',
     is_public: false,
-    project_id: ''
+    project_id: '',
+    points: 0,
+    checklist: []
   });
 
+  // UI State
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [students, setStudents] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -38,57 +45,31 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false }
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [showAssignMenu, setShowAssignMenu] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
-  // 載入數據
+  // Checklist State Helper
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+
+  // Load Data
   useEffect(() => {
     const loadData = async () => {
       try {
-        // 載入學生數據
-        const { data: studentsData } = await supabase
-          .from('Hanami_Students')
-          .select('id, full_name, contact_number, nick_name')
-          .order('full_name');
+        const { data: studentsData } = await supabase.from('Hanami_Students').select('id, full_name, contact_number, nick_name').order('full_name');
 
-        // 載入員工數據
-        const { data: employeesData } = await supabase
-          .from('hanami_employee')
-          .select('id, teacher_fullname, teacher_nickname, teacher_email')
-          .order('teacher_fullname');
+        let employeesQuery = supabase.from('hanami_employee').select('id, teacher_fullname, teacher_nickname, teacher_email').order('teacher_fullname');
+        if (orgId) {
+          employeesQuery = employeesQuery.eq('org_id', orgId);
+        }
+        const { data: employeesData } = await employeesQuery;
 
-        // 載入管理員數據
-        const { data: adminsData } = await supabase
-          .from('hanami_admin')
-          .select('id, admin_name, admin_email')
-          .order('admin_name');
+        const { data: adminsData } = await supabase.from('hanami_admin').select('id, admin_name, admin_email').order('admin_name');
 
-        const typedStudentsData = (studentsData || []) as Array<{
-          id: string;
-          full_name?: string;
-          contact_number?: string;
-          nick_name?: string | null;
-          [key: string]: any;
-        }>;
-        const typedEmployeesData = (employeesData || []) as Array<{
-          id: string;
-          teacher_fullname?: string;
-          teacher_nickname?: string | null;
-          teacher_email?: string;
-          [key: string]: any;
-        }>;
-        const typedAdminsData = (adminsData || []) as Array<{
-          id: string;
-          admin_name?: string | null;
-          admin_email?: string | null;
-          [key: string]: any;
-        }>;
-        
-        setStudents(typedStudentsData);
-        setEmployees(typedEmployeesData);
-        setAdmins(typedAdminsData);
+        setStudents(studentsData || []);
+        setEmployees(employeesData || []);
+        setAdmins(adminsData || []);
 
-        // 如果有電話號碼，查找對應學生
         if (task?.phone) {
-          const student = typedStudentsData.find(s => s.contact_number === task.phone);
+          const student = (studentsData || []).find((s: any) => s.contact_number === task.phone);
           setSelectedStudent(student || null);
         }
       } catch (error) {
@@ -97,10 +78,10 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false }
         setLoadingData(false);
       }
     };
-
     loadData();
   }, [task?.phone]);
 
+  // Init Form
   useEffect(() => {
     if (task) {
       setFormData({
@@ -110,19 +91,19 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false }
         priority: task.priority || 'important_not_urgent',
         category: task.category || [],
         phone: task.phone || '',
-        assigned_to: Array.isArray(task.assigned_to) ? task.assigned_to : (task.assigned_to ? (task.assigned_to as string).split(',').map(name => name.trim()) : []),
+        assigned_to: Array.isArray(task.assigned_to) ? task.assigned_to :
+          (task.assigned_to && typeof task.assigned_to === 'string' ? (task.assigned_to as string).split(',') : []),
         due_date: task.due_date ? new Date(task.due_date).toISOString().slice(0, 16) : '',
         time_block_start: task.time_block_start ? new Date(task.time_block_start).toISOString().slice(0, 16) : '',
         time_block_end: task.time_block_end ? new Date(task.time_block_end).toISOString().slice(0, 16) : '',
         is_public: !!task.is_public,
-        project_id: task.project_id || ''
+        project_id: task.project_id || '',
+        points: task.points || 0,
+        checklist: (task as any).checklist || []
       });
     } else {
-      // 重置表單數據為初始狀態，截止日期設為24小時後
       const tomorrow = new Date();
       tomorrow.setHours(tomorrow.getHours() + 24);
-      const tomorrowISOString = tomorrow.toISOString().slice(0, 16);
-      
       setFormData({
         title: '',
         description: '',
@@ -131,615 +112,620 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false }
         category: [],
         phone: '',
         assigned_to: [],
-        due_date: tomorrowISOString,
+        due_date: tomorrow.toISOString().slice(0, 16),
         time_block_start: '',
         time_block_end: '',
         is_public: false,
-        project_id: ''
+        project_id: '',
+        points: 0,
+        checklist: []
       });
     }
   }, [task]);
 
+  // --- Handlers ---
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = '標題為必填項目';
-    }
-
-
+    if (!formData.title.trim()) newErrors.title = '標題為必填項目';
     if (formData.time_block_start && formData.time_block_end) {
-      const start = new Date(formData.time_block_start);
-      const end = new Date(formData.time_block_end);
-      if (start >= end) {
+      if (new Date(formData.time_block_start) >= new Date(formData.time_block_end)) {
         newErrors.time_block_end = '結束時間必須晚於開始時間';
       }
     }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
-    // 轉換時間格式
     const submitData = {
       ...formData,
       due_date: formData.due_date ? new Date(formData.due_date).toISOString() : undefined,
       time_block_start: formData.time_block_start ? new Date(formData.time_block_start).toISOString() : undefined,
       time_block_end: formData.time_block_end ? new Date(formData.time_block_end).toISOString() : undefined,
     };
-
     onSubmit(submitData);
   };
 
-  const handleCategoryChange = (category: string, checked: boolean) => {
+  // Checklist Logic
+  const addChecklistItem = () => {
+    if (!newChecklistItem.trim()) return;
+    const newItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: newChecklistItem.trim(),
+      is_checked: false
+    };
+    setFormData(prev => ({ ...prev, checklist: [...(prev.checklist || []), newItem] }));
+    setNewChecklistItem('');
+  };
+
+  const removeChecklistItem = (id: string) => {
+    setFormData(prev => ({ ...prev, checklist: (prev.checklist || []).filter(item => item.id !== id) }));
+  };
+
+  const toggleChecklistItem = (id: string) => {
     setFormData(prev => ({
       ...prev,
-      category: checked 
-        ? [...(prev.category || []), category as any]
-        : (prev.category || []).filter(c => c !== category)
+      checklist: (prev.checklist || []).map(item => item.id === id ? { ...item, is_checked: !item.is_checked } : item)
     }));
   };
 
-  const handlePhoneChange = (phone: string) => {
-    setFormData(prev => ({ ...prev, phone }));
-    
-    // 查找對應的學生
-    const student = students.find(s => s.contact_number === phone);
-    setSelectedStudent(student || null);
+  // Template Logic
+  // Template State
+  const [editingTemplate, setEditingTemplate] = useState<{ id: string, name: string } | null>(null);
+
+  const handleSaveTemplate = async () => {
+    // If editing existing, confirm update
+    if (editingTemplate) {
+      if (window.confirm(`Update existing template "${editingTemplate.name}"?`)) {
+        try {
+          const response = await fetch('/api/tasks/templates', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: editingTemplate.id,
+              name: editingTemplate.name,
+              description: formData.description,
+              task_data: {
+                checklist: formData.checklist,
+                follow_up_content: formData.follow_up_content
+              }
+            })
+          });
+          if (!response.ok) throw new Error('Failed');
+          alert('Template updated!');
+          setEditingTemplate(null); // Exit edit mode
+          return;
+        } catch (e) {
+          alert('Failed to update template');
+          return;
+        }
+      }
+    }
+
+    // Save New
+    const name = window.prompt("請輸入模板名稱:");
+    if (!name) return;
+
+    try {
+      const response = await fetch('/api/tasks/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          description: formData.description, // Optional description for the template itself
+          task_data: {
+            // Only save checklist and follow-up content
+            checklist: formData.checklist,
+            follow_up_content: formData.follow_up_content
+          }
+        })
+      });
+      if (!response.ok) throw new Error('Failed');
+      alert('模板已保存！');
+    } catch (e) {
+      alert('保存模板失敗');
+    }
+  };
+
+  const handleLoadTemplate = (template: TaskTemplate) => {
+    // Just load data for new task, don't set editing state
+    const data = template.task_data as any;
+    setFormData(prev => ({
+      ...prev,
+      follow_up_content: data.follow_up_content || '',
+      checklist: data.checklist || [],
+    }));
+    setShowTemplateModal(false);
+  };
+
+  const handleEditTemplate = (template: TaskTemplate) => {
+    // Load for EDITING the template itself
+    const data = template.task_data as any;
+    setFormData(prev => ({
+      ...prev,
+      follow_up_content: data.follow_up_content || '',
+      checklist: data.checklist || [],
+    }));
+    setEditingTemplate({ id: template.id, name: template.name });
+    setShowTemplateModal(false);
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="bg-gradient-to-br from-white to-[#FFF9F2] rounded-3xl p-8 shadow-xl border border-[#EADBC8] max-w-3xl mx-auto"
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="bg-[#FFF9F2] rounded-[2.5rem] p-8 shadow-2xl border border-[#EADBC8] max-w-4xl mx-auto relative overflow-hidden"
     >
-      {/* 標題區域 */}
-      <div className="flex items-center gap-4 mb-8">
-        <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-2xl flex items-center justify-center shadow-lg">
-          <svg className="w-6 h-6 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
-          </svg>
+      {/* Background Decoration */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#FFD59A]/20 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+
+      {/* Header */}
+      <div className="flex justify-between items-start mb-8 relative z-10">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-gradient-to-br from-[#2B3A3B] to-[#1a2324] rounded-2xl flex items-center justify-center shadow-lg text-white">
+            {task ? <span className="text-2xl">✏️</span> : <span className="text-2xl">✨</span>}
+          </div>
+          <div>
+            <h2 className="text-3xl font-extrabold text-[#2B3A3B] tracking-tight">
+              {task ? '編輯任務' : '創建新任務'}
+            </h2>
+            <p className="text-[#2B3A3B]/60 font-medium">
+              {task ? '更新任務詳情' : '擬定一個新任務'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-3xl font-bold text-[#2B3A3B]">
-            {task ? '編輯任務' : '創建新任務'}
-          </h2>
-          <p className="text-[#777] mt-1">
-            {task ? '修改任務詳情' : '設定任務資訊和優先級'}
-          </p>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setShowTemplateModal(true)}
+            className="px-4 py-2 bg-white border-2 border-[#EADBC8] text-[#2B3A3B] rounded-xl font-bold text-sm hover:bg-[#FFD59A]/10 hover:border-[#FFD59A] transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            載入模板
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveTemplate}
+            className={`px-4 py-2 border-2 rounded-xl font-bold text-sm transition-colors flex items-center gap-2 ${editingTemplate
+              ? 'bg-blue-100 border-blue-400 text-blue-700 hover:bg-blue-200'
+              : 'bg-[#FFD59A]/20 border-[#FFD59A] text-[#2B3A3B] hover:bg-[#FFD59A]/40'
+              }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            {editingTemplate ? '更新模板' : '存為模板'}
+          </button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 標題 */}
-        <div>
-          <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
-            任務標題 *
-          </label>
-          <input
-            type="text"
-            value={formData.title || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-            className={`w-full px-4 py-3 rounded-xl border ${
-              errors.title ? 'border-red-300' : 'border-[#EADBC8]'
-            } focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent`}
-            placeholder="輸入任務標題..."
-          />
-          {errors.title && (
-            <p className="mt-1 text-sm text-red-600">{errors.title}</p>
-          )}
+      {/* Banner for Editing Mode */}
+      {editingTemplate && (
+        <div className="bg-blue-50 border-b border-blue-100 px-8 py-2 flex justify-between items-center -mt-4 mb-6">
+          <span className="text-sm text-blue-700 font-bold">
+            編輯模板: "{editingTemplate.name}"
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditingTemplate(null)}
+            className="text-xs text-blue-500 hover:text-blue-700 underline"
+          >
+            取消編輯
+          </button>
         </div>
+      )}
 
-        {/* 截止日期 */}
-        <div>
-          <label className="block text-sm font-medium text-[#2B3A3B] mb-2 flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
-            </svg>
-            截止日期
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="datetime-local"
-              value={formData.due_date || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-              className="flex-1 px-4 py-3 rounded-xl border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent"
-              autoComplete="off"
-              inputMode="none"
-              name={`due_date_${formInstanceId}`}
-              key={`due_date_${formInstanceId}`}
-              placeholder=""
-            />
-            <button
-              type="button"
-              onClick={() => setFormData(prev => ({ ...prev, due_date: '' }))}
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl transition-colors"
-              title="清除日期"
-            >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-              </svg>
-            </button>
-          </div>
-          {/* 快速設定按鈕 */}
-          <div className="flex gap-2 mt-2">
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date();
-                now.setHours(now.getHours() + 1);
-                setFormData(prev => ({ ...prev, due_date: now.toISOString().slice(0, 16) }));
-              }}
-              className="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
-            >
-              1小時後
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const tomorrow = new Date();
-                tomorrow.setHours(tomorrow.getHours() + 24);
-                setFormData(prev => ({ ...prev, due_date: tomorrow.toISOString().slice(0, 16) }));
-              }}
-              className="px-3 py-1 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition-colors"
-            >
-              24小時後
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const nextWeek = new Date();
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                setFormData(prev => ({ ...prev, due_date: nextWeek.toISOString().slice(0, 16) }));
-              }}
-              className="px-3 py-1 text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition-colors"
-            >
-              一週後
-            </button>
-          </div>
-        </div>
+      <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
 
-        {/* 客戶資訊 */}
-        <div>
-          <label className="block text-lg font-semibold text-[#2B3A3B] mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-            </svg>
-            客戶資訊
-          </label>
-          <div className="bg-gradient-to-r from-[#FFF9F2] to-[#FFD59A]/10 rounded-2xl p-4 border border-[#EADBC8]">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-[#2B3A3B]" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              </div>
-              <div className="flex-1">
-                <input
-                  type="tel"
-                  value={formData.phone || ''}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
-                  className="hidden"
-                />
-                {selectedStudent ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 px-4 py-3 bg-green-100 text-green-800 rounded-xl">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-                      </svg>
-                      <span className="font-semibold text-lg">{selectedStudent.full_name}</span>
-                    </div>
-                    {selectedStudent.nick_name && (
-                      <span className="text-sm text-gray-500">({selectedStudent.nick_name})</span>
-                    )}
+        {/* Main Input Group */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column: Core Info */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* Points (Moved to Top) */}
+            {canEditPoints && (
+              <div className="bg-white rounded-3xl p-6 shadow-sm border border-orange-100 flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center text-orange-500">
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
                   </div>
-                ) : formData.phone ? (
-                  <div className="flex items-center gap-2 px-4 py-3 bg-orange-100 text-orange-800 rounded-xl">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                    <span className="font-semibold text-lg">新客戶</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 text-gray-600 rounded-xl">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                    <span className="font-semibold text-lg">未識別客戶</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 描述 */}
-        <div>
-          <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
-            任務描述
-          </label>
-          <textarea
-            value={formData.description || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-            rows={3}
-            className="w-full px-4 py-3 rounded-xl border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent"
-            placeholder="輸入任務描述..."
-          />
-        </div>
-
-        {/* 跟進內容/回覆內容 */}
-        <div>
-          <label className="block text-sm font-medium text-[#2B3A3B] mb-2 flex items-center gap-2">
-            <svg className="w-4 h-4 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
-            </svg>
-            跟進內容/回覆內容
-          </label>
-          <textarea
-            value={formData.follow_up_content || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, follow_up_content: e.target.value }))}
-            rows={4}
-            className="w-full px-4 py-3 rounded-xl border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent"
-            placeholder="輸入跟進內容或回覆內容..."
-          />
-        </div>
-
-        {/* 優先級 */}
-        <div>
-          <label className="block text-lg font-semibold text-[#2B3A3B] mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-            優先級 *
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            {DEFAULT_PRIORITY_CONFIG.map((priority) => (
-              <motion.label
-                key={priority.value}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`flex items-center p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 ${
-                  formData.priority === priority.value
-                    ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                    : 'border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-md'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="priority"
-                  value={priority.value}
-                  checked={formData.priority === priority.value}
-                  onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
-                  className="sr-only"
-                />
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-4 ${
-                  priority.value === 'urgent_important' 
-                    ? 'bg-red-100 text-red-600' 
-                    : priority.value === 'important_not_urgent'
-                    ? 'bg-orange-100 text-orange-600'
-                    : priority.value === 'urgent_not_important'
-                    ? 'bg-yellow-100 text-yellow-600'
-                    : 'bg-gray-100 text-gray-600'
-                }`}>
-                  {priority.value === 'urgent_important' ? (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                  ) : priority.value === 'important_not_urgent' ? (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                  ) : priority.value === 'urgent_not_important' ? (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <div className="font-semibold text-[#2B3A3B]">{priority.label}</div>
-                  <div className="text-sm text-gray-500">{priority.description}</div>
-                </div>
-              </motion.label>
-            ))}
-          </div>
-        </div>
-
-        {/* 類別 */}
-        <div>
-          <label className="block text-lg font-semibold text-[#2B3A3B] mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-            任務類別
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {DEFAULT_CATEGORY_CONFIG.map((category) => (
-              <motion.label
-                key={category.value}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-                  formData.category?.includes(category.value)
-                    ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-md'
-                    : 'border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-sm'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={formData.category?.includes(category.value) || false}
-                  onChange={(e) => handleCategoryChange(category.value, e.target.checked)}
-                  className="sr-only"
-                />
-                <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-lg flex items-center justify-center mr-3">
-                  <CategoryIcon category={category.value} className="w-4 h-4 text-[#2B3A3B]" />
-                </div>
-                <span className="text-sm font-semibold text-[#2B3A3B]">{category.label}</span>
-              </motion.label>
-            ))}
-          </div>
-        </div>
-
-        {/* 指派給 */}
-        <div>
-          <label className="block text-lg font-semibold text-[#2B3A3B] mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M16 4c0-1.11.89-2 2-2s2 .89 2 2-.89 2-2 2-2-.89-2-2zm4 18v-6h2.5l-2.54-7.63A1.5 1.5 0 0 0 18.54 8H17c-.8 0-1.54.37-2.01.99L14 10.5c-.47-.62-1.21-.99-2.01-.99H9.46c-.8 0-1.54.37-2.01.99L6 10.5c-.47-.62-1.21-.99-2.01-.99H2.46c-.8 0-1.54.37-2.01.99L0 10.5v9.5h2v6h2v-6h2v6h2v-6h2v6h2v-6h2v6h2z"/>
-            </svg>
-            指派給
-          </label>
-          
-          {/* 已選擇的負責人顯示 */}
-          {formData.assigned_to && formData.assigned_to.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-2">
-              {formData.assigned_to.map((name, index) => (
-                <span key={index} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-sm flex items-center gap-2">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                  </svg>
-                  {name}
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({
-                      ...prev,
-                      assigned_to: (prev.assigned_to || []).filter((_, i) => i !== index)
-                    }))}
-                    className="ml-1 text-blue-600 hover:text-blue-800"
-                  >
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                    </svg>
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* 自定義下拉選單 */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowAssignMenu(!showAssignMenu)}
-              className="w-full px-4 py-3 rounded-xl border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent bg-white text-left flex items-center justify-between"
-              disabled={loadingData}
-            >
-              <span className="text-gray-500">
-                {formData.assigned_to && formData.assigned_to.length > 0 
-                  ? `已選擇 ${formData.assigned_to.length} 人` 
-                  : '選擇指派對象...'}
-              </span>
-              <svg className={`w-5 h-5 text-[#FF8C42] transition-transform ${showAssignMenu ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 24 24">
-                <path d="M7 10l5 5 5-5z"/>
-              </svg>
-            </button>
-            
-            {/* 下拉選單內容 */}
-            {showAssignMenu && (
-              <div className="absolute top-full left-0 right-0 z-50 bg-white rounded-xl shadow-lg border border-[#EADBC8] mt-1 max-h-[400px] overflow-y-auto">
-                {/* 標題和操作按鈕 */}
-                <div className="px-4 py-2 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-[#2B3A3B]">選擇負責人</h4>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, assigned_to: [] }))}
-                        className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 rounded transition-colors"
-                      >
-                        清除
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAssignMenu(false)}
-                        className="px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
-                      >
-                        確認
-                      </button>
-                    </div>
-                  </div>
-                  {formData.assigned_to && formData.assigned_to.length > 0 && (
-                    <div className="mt-2 text-xs text-gray-500">
-                      已選擇: {formData.assigned_to.length} 人
-                    </div>
-                  )}
-                </div>
-                
-                {/* 人員列表 */}
-                <div className="py-2">
-                  {employees.map(employee => (
-                    <label
-                      key={employee.id}
-                      className="w-full px-4 py-2 text-left text-sm flex items-center gap-3 hover:bg-blue-50 transition-colors cursor-pointer"
-                    >
+                  <div>
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">任務積分</h3>
+                    <div className="flex items-baseline gap-1 mt-1">
                       <input
-                        type="checkbox"
-                        checked={formData.assigned_to?.includes(employee.teacher_fullname) || false}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              assigned_to: [...(prev.assigned_to || []), employee.teacher_fullname]
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              assigned_to: prev.assigned_to?.filter(name => name !== employee.teacher_fullname) || []
-                            }));
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                        type="number"
+                        value={formData.points}
+                        onChange={(e) => setFormData(p => ({ ...p, points: Math.max(0, parseInt(e.target.value) || 0) }))}
+                        className="text-3xl font-bold text-[#2B3A3B] bg-transparent border-b-2 border-transparent hover:border-gray-200 focus:border-orange-400 focus:outline-none w-24 p-0 transition-colors"
                       />
-                      <div className="w-5 h-5 rounded-lg flex items-center justify-center bg-blue-100">
-                        <svg className="w-3 h-3 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-[#2B3A3B]">{employee.teacher_fullname}</div>
-                        {employee.teacher_nickname && (
-                          <div className="text-xs text-gray-500">({employee.teacher_nickname})</div>
-                        )}
-                      </div>
-                      <div className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">
-                        教師
-                      </div>
-                    </label>
-                  ))}
-                  {admins.map(admin => (
-                    <label
-                      key={admin.id}
-                      className="w-full px-4 py-2 text-left text-sm flex items-center gap-3 hover:bg-blue-50 transition-colors cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.assigned_to?.includes(admin.admin_name) || false}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              assigned_to: [...(prev.assigned_to || []), admin.admin_name]
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              assigned_to: prev.assigned_to?.filter(name => name !== admin.admin_name) || []
-                            }));
-                          }
-                        }}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                      />
-                      <div className="w-5 h-5 rounded-lg flex items-center justify-center bg-orange-100">
-                        <svg className="w-3 h-3 text-orange-600" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-[#2B3A3B]">{admin.admin_name}</div>
-                      </div>
-                      <div className="text-xs px-2 py-1 rounded bg-orange-100 text-orange-700">
-                        管理員
-                      </div>
-                    </label>
-                  ))}
+                      <span className="text-sm font-normal text-gray-400">pts</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setFormData(p => ({ ...p, points: Math.max(0, (p.points || 0) - 10) }))} className="w-10 h-10 rounded-xl bg-gray-50 text-gray-600 font-bold hover:bg-gray-100 text-lg">-10</button>
+                  <button type="button" onClick={() => setFormData(p => ({ ...p, points: (p.points || 0) + 10 }))} className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 font-bold hover:bg-orange-100 text-lg">+10</button>
                 </div>
               </div>
             )}
+
+            {/* Title */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-[#2B3A3B]/80 uppercase tracking-wider ml-1">標題</label>
+              <input
+                type="text"
+                value={formData.title}
+                onChange={e => setFormData({ ...formData, title: e.target.value })}
+                placeholder="需要完成什麼工作？"
+                className="w-full text-2xl font-bold bg-white border-none rounded-2xl p-5 shadow-sm focus:ring-4 focus:ring-[#FFD59A]/50 placeholder-gray-300"
+              />
+              {errors.title && <p className="text-red-500 text-sm font-bold ml-2">{errors.title}</p>}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-[#2B3A3B]/80 uppercase tracking-wider ml-1">描述</label>
+              <textarea
+                value={formData.description}
+                onChange={e => setFormData({ ...formData, description: e.target.value })}
+                rows={3}
+                placeholder="添加詳細說明..."
+                className="w-full bg-white border-none rounded-2xl p-5 shadow-sm focus:ring-4 focus:ring-[#FFD59A]/50 resize-none"
+              />
+            </div>
+
+            {/* Follow-up & Checklist */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-orange-50 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-[#2B3A3B]">追蹤事項 & 檢查清單</h3>
+              </div>
+
+              <textarea
+                value={formData.follow_up_content}
+                onChange={e => setFormData({ ...formData, follow_up_content: e.target.value })}
+                rows={2}
+                placeholder="筆記或回覆內容..."
+                className="w-full bg-[#FAFAFA] border-none rounded-xl p-4 focus:ring-2 focus:ring-orange-200 text-sm"
+              />
+
+              {/* Checklist Items */}
+              <div className="space-y-2 mt-4">
+                {formData.checklist?.map(item => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-3 bg-[#FAFAFA] p-2 rounded-xl group"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleChecklistItem(item.id)}
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${item.is_checked ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}
+                    >
+                      {item.is_checked && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                    </button>
+                    <span className={`flex-1 text-sm font-medium ${item.is_checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                      {item.text}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeChecklistItem(item.id)}
+                      className="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      ✕
+                    </button>
+                  </motion.div>
+                ))}
+
+                {/* Add Item Input */}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="w-5 h-5 rounded-full border-2 border-gray-200 border-dashed" />
+                  <input
+                    type="text"
+                    value={newChecklistItem}
+                    onChange={(e) => setNewChecklistItem(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addChecklistItem())}
+                    placeholder="添加檢查項目..."
+                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm placeholder-gray-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      console.log('Clicked Add');
+                      addChecklistItem();
+                    }}
+                    className={`text-sm font-bold px-4 py-2 rounded-lg transition-all border-2 ${newChecklistItem.trim()
+                      ? 'bg-[#FFD59A] text-[#2B3A3B] border-[#FFD59A] cursor-pointer shadow-sm hover:shadow-md active:scale-95'
+                      : 'bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed'
+                      }`}
+                  >
+                    新增
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Settings */}
+          <div className="space-y-6">
+
+            {/* Teaching Task Type (Category) */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">教學任務類型</h3>
+              <div className="grid grid-cols-4 gap-2">
+                {DEFAULT_CATEGORY_CONFIG.map(cat => (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() => {
+                      const current = formData.category || [];
+                      const exists = current.includes(cat.value);
+                      setFormData({
+                        ...formData,
+                        category: exists ? current.filter(c => c !== cat.value) : [...current, cat.value]
+                      });
+                    }}
+                    title={cat.label}
+                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 transition-all border-2 ${(formData.category || []).includes(cat.value)
+                      ? 'border-[#FFD59A] bg-[#FFF9F2] shadow-sm'
+                      : 'border-transparent bg-gray-50 hover:bg-gray-100'
+                      }`}
+                  >
+                    <div className="text-xl">
+                      <CategoryIcon category={cat.value} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {/* Label display for selected */}
+              <div className="flex flex-wrap gap-2 mt-3 min-h-[24px]">
+                {(formData.category || []).map(c => {
+                  const cat = DEFAULT_CATEGORY_CONFIG.find(conf => conf.value === c);
+                  return cat ? (
+                    <span key={c} className="text-[10px] font-bold px-2 py-1 rounded-full bg-[#FFD59A]/30 text-[#2B3A3B]">
+                      {cat.label}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            </div>
+
+            {/* Assigned Member */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">負責成員</h3>
+              <div className="flex flex-wrap gap-2">
+                {employees.map(emp => {
+                  const isSelected = (formData.assigned_to || []).includes(emp.teacher_fullname || emp.teacher_nickname);
+                  return (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => {
+                        const current = formData.assigned_to || [];
+                        const name = emp.teacher_fullname || emp.teacher_nickname;
+                        if (current.includes(name)) {
+                          setFormData({ ...formData, assigned_to: current.filter(n => n !== name) });
+                        } else {
+                          setFormData({ ...formData, assigned_to: [...current, name] });
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${isSelected
+                        ? 'bg-[#2B3A3B] text-white border-[#2B3A3B]'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                        }`}
+                    >
+                      {emp.teacher_fullname || emp.teacher_nickname}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">優先級</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {DEFAULT_PRIORITY_CONFIG.map(p => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, priority: p.value })}
+                    className={`p-3 rounded-2xl border-2 text-left transition-all relative overflow-hidden group ${formData.priority === p.value ? 'border-[#FFD59A] bg-[#FFF9F2]' : 'border-transparent bg-gray-50 hover:bg-gray-100'}`}
+                  >
+                    <div className="text-xl mb-1 relative z-10">
+                      {p.value === 'urgent_important' && (
+                        <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                        </svg>
+                      )}
+                      {p.value === 'important_not_urgent' && (
+                        <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                        </svg>
+                      )}
+                      {p.value === 'urgent_not_important' && (
+                        <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                      {p.value === 'not_urgent_not_important' && (
+                        <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="text-xs font-bold text-[#2B3A3B] leading-tight relative z-10">{p.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Visibility / Permissions */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">顯示權限</h3>
+              <div className="space-y-3">
+                {[
+                  { label: 'Admin & Owner', value: ['owner', 'admin'] },
+                  { label: 'Teacher', value: ['teacher'] },
+                  { label: 'Member', value: ['member', 'student'] } // Assuming member/student are equivalent logic-wise for visibility group
+                ].map((group) => {
+                  // Check if all roles in this group are selected
+                  const isSelected = group.value.every(r => (formData.visible_to_roles || []).includes(r));
+
+                  return (
+                    <div key={group.label} className="flex items-center gap-3">
+                      <div className="relative flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`visibility-${group.label}`}
+                          className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-gray-200 transition-all checked:border-[#FFD59A] checked:bg-[#FFD59A]"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const currentRoles = formData.visible_to_roles || [];
+                            let newRoles = [...currentRoles];
+
+                            if (e.target.checked) {
+                              // Add roles that aren't already there
+                              group.value.forEach(r => {
+                                if (!newRoles.includes(r)) newRoles.push(r);
+                              });
+                            } else {
+                              // Remove roles
+                              newRoles = newRoles.filter(r => !group.value.includes(r));
+                            }
+                            setFormData({ ...formData, visible_to_roles: newRoles });
+                          }}
+                        />
+                        <svg
+                          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 transition-opacity peer-checked:opacity-100"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 12 12"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            d="M10 3L4.5 8.5L2 6"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                      <label htmlFor={`visibility-${group.label}`} className="text-sm font-medium text-[#2B3A3B] cursor-pointer select-none">
+                        {group.label}
+                      </label>
+                    </div>
+                  );
+                })}
+                <p className="text-xs text-gray-400 mt-2">
+                  * 未選擇任何權限時，預設對所有人可見
+                </p>
+              </div>
+            </div>
+
+            {/* Deadlines */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">時間安排</h3>
+              <div className="space-y-4">
+                {/* Due Date */}
+                <div>
+                  <label className="text-xs font-bold text-[#2B3A3B]/60 mb-1 block">截止日期</label>
+                  <input
+                    type="datetime-local"
+                    value={formData.due_date}
+                    onChange={e => setFormData({ ...formData, due_date: e.target.value })}
+                    className="w-full bg-[#FAFAFA] border-none rounded-xl p-3 text-sm font-medium text-[#2B3A3B]"
+                  />
+                </div>
+
+                {/* Estimated Duration */}
+                <div>
+                  <label className="text-xs font-bold text-[#2B3A3B]/60 mb-1 block">預計完成時間 (分鐘)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 30"
+                      value={formData.estimated_duration || ''}
+                      onChange={e => setFormData({ ...formData, estimated_duration: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-[#FAFAFA] border-none rounded-xl p-3 text-sm font-medium text-[#2B3A3B]"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold pointer-events-none">
+                      min
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Add Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => {
+                    const d = new Date(); d.setDate(d.getDate() + 1);
+                    setFormData({ ...formData, due_date: d.toISOString().slice(0, 16) })
+                  }} className="px-2 py-1 bg-green-50 text-green-600 text-xs font-bold rounded-lg hover:bg-green-100">+24小時</button>
+                  <button type="button" onClick={() => {
+                    const d = new Date(); d.setDate(d.getDate() + 7);
+                    setFormData({ ...formData, due_date: d.toISOString().slice(0, 16) })
+                  }} className="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100">+1週</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* 時間安排 */}
-        <div>
-          <label className="block text-lg font-semibold text-[#2B3A3B] mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5 text-[#FF8C42]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/>
-            </svg>
-            時間安排
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[#2B3A3B] mb-2">開始時間</label>
-              <input
-                type="datetime-local"
-                value={formData.time_block_start || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, time_block_start: e.target.value }))}
-                className="w-full px-4 py-3 rounded-xl border border-[#EADBC8] focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent"
-                autoComplete="off"
-                inputMode="none"
-                name={`time_block_start_${formInstanceId}`}
-                key={`time_block_start_${formInstanceId}`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#2B3A3B] mb-2">結束時間</label>
-              <input
-                type="datetime-local"
-                value={formData.time_block_end || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, time_block_end: e.target.value }))}
-                className={`w-full px-4 py-3 rounded-xl border ${
-                  errors.time_block_end ? 'border-red-300' : 'border-[#EADBC8]'
-                } focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:border-transparent`}
-                autoComplete="off"
-                inputMode="none"
-                name={`time_block_end_${formInstanceId}`}
-                key={`time_block_end_${formInstanceId}`}
-              />
-              {errors.time_block_end && (
-                <p className="mt-1 text-sm text-red-600">{errors.time_block_end}</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-
-        {/* 按鈕 */}
-        <div className="flex items-center justify-end gap-4 pt-8 border-t border-[#EADBC8]">
-          <motion.button
+        {/* Footer Actions */}
+        <div className="flex justify-between items-center pt-6 border-t border-[#EADBC8]/50">
+          <button
             type="button"
             onClick={onCancel}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-8 py-3 text-[#2B3A3B] border-2 border-[#EADBC8] rounded-2xl hover:border-[#FFD59A] hover:bg-[#FFF9F2] transition-all duration-200 font-semibold"
+            className="px-6 py-4 text-[#2B3A3B]/60 font-bold hover:text-[#2B3A3B] transition-colors"
             disabled={isLoading}
           >
             取消
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             type="submit"
             disabled={isLoading}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-8 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] rounded-2xl hover:from-[#EBC9A4] hover:to-[#FFD59A] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg"
+            className="px-10 py-4 bg-[#2B3A3B] text-white rounded-[20px] font-bold text-lg shadow-lg hover:scale-105 hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isLoading ? (
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 animate-spin" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-                </svg>
-                處理中...
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-                </svg>
-                {task ? '更新任務' : '創建任務'}
-              </div>
-            )}
-          </motion.button>
+            {isLoading && <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>}
+            {task ? '更新任務' : '創建任務'}
+          </button>
         </div>
+
       </form>
+
+      {/* Template Modal */}
+      <AnimatePresence>
+        {showTemplateModal && (
+          <TaskTemplateModal
+            onSelect={handleLoadTemplate}
+            onEdit={handleEditTemplate}
+            onClose={() => setShowTemplateModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
