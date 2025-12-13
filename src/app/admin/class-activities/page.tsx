@@ -692,6 +692,33 @@ export default function ClassActivitiesPage(
       }));
 
       // 重新載入數據以確保顯示最新結果
+      // 重要：先更新緩存，否則 loadClassGroupData 會讀取舊的緩存
+      const formatLocalDate = (date: Date) => {
+        const hongKongTime = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" }));
+        const year = hongKongTime.getFullYear();
+        const month = String(hongKongTime.getMonth() + 1).padStart(2, '0');
+        const day = String(hongKongTime.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      const dateStr = formatLocalDate(selectedDate);
+      const cacheKey = `${dateStr}_${validOrgId}`;
+      const cachedData = classGroupDataCache.current[cacheKey];
+
+      if (cachedData && cachedData.teacherInfoMap) {
+        console.log('🔄 手動更新緩存中的老師信息', cacheKey);
+        const currentInfo = cachedData.teacherInfoMap.get(selectedClassForTeacher.classId) || { teacherMainName: '', teacherAssistName: '' };
+
+        cachedData.teacherInfoMap.set(selectedClassForTeacher.classId, {
+          ...currentInfo,
+          [selectedClassForTeacher.teacherRole === 'main' ? 'teacherMainName' : 'teacherAssistName']: teacherName
+        });
+
+        // 不需要重新賦值回 classGroupDataCache.current，因為是對 Map 對象的引用修改
+        // 但為了保險起見，可以打印確認
+        console.log('✅ 緩存已更新:', cachedData.teacherInfoMap.get(selectedClassForTeacher.classId));
+      }
+
       await loadClassGroupData();
 
       const actionText = teacherId ? `為 ${teacherName}` : '為空';
