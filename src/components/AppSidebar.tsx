@@ -72,7 +72,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
   useEffect(() => {
     let cancelled = false;
     const resolveRole = async () => {
-      console.log('AppSidebar: resolveRole called', { userExists: !!user, email: user?.email });
+      // console.log('AppSidebar: resolveRole called', { userExists: !!user, email: user?.email });
 
       if (!user) {
         setIsSuperAdmin(false);
@@ -82,7 +82,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
 
       // 0. Hardcoded Owner Check (Fail-safe)
       if (user.email === 'tqfea12@gmail.com') {
-        console.log('AppSidebar: Detected Owner Email -> Force Super Admin');
+        // console.log('AppSidebar: Detected Owner Email -> Force Super Admin');
         setIsSuperAdmin(true);
         setRoleLoading(false);
         // We can still run the DB check for consistency logs, but return early to ensure UI shows

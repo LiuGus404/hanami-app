@@ -110,7 +110,7 @@ export default async function RootLayout({
     }
   }
 
-  console.log('[RootLayout] 包裹 children:', children);
+
 
   return (
     <html lang="zh-TW">

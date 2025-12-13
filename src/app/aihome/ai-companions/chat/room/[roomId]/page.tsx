@@ -487,7 +487,7 @@ const safeJsonParse = async (response: Response, context: string = 'API') => {
   }
 };
 export default function RoomChatPage() {
-  const { user, logout } = useSaasAuth();
+  const { user, logout, supabase } = useSaasAuth();
   const userId = user?.id;
   const router = useRouter();
   const params = useParams();
@@ -495,7 +495,8 @@ export default function RoomChatPage() {
   const roomId = params.roomId as string;
 
   // 使用 SaaS 系統的 Supabase 客戶端 (使用 useMemo 確保實例穩定，避免無限迴圈)
-  const saasSupabase = React.useMemo(() => createSaasClient(), []);
+  // FIX: 直接使用 Auth Hook 提供的已驗證客戶端，避免多重實例衝突
+  const saasSupabase = supabase;
   // 使用更可靠的方法獲取 URL 參數 - 使用 Next.js 的 useSearchParams
   const [urlParams, setUrlParams] = useState<{ initialRole?: string, companion?: string }>({});
 
@@ -1247,11 +1248,14 @@ export default function RoomChatPage() {
     setLoadingMoriModels(true);
     setLoadingHibiModels(true);
     try {
+      // 改為查詢 model_configs 表以確保獲取 metadata
+      console.log('🔍 [Load] Fetching model_configs...');
       const { data, error } = await saasSupabase
-        .from('available_models')
+        .from('model_configs')
         .select('*')
-        .order('is_free', { ascending: false })
-        .order('input_cost_usd', { ascending: true });
+        .eq('is_active', true)
+        .eq('is_available', true)
+        .order('input_cost_hkd', { ascending: true });
 
       if (error) {
         console.error('載入模型配置錯誤:', error);
@@ -1262,8 +1266,31 @@ export default function RoomChatPage() {
           { model_id: 'claude-3-5-haiku', display_name: 'Claude 3.5 Haiku', provider: 'Anthropic', is_free: false, input_cost_usd: 0.00025 }
         ]);
       } else {
-        console.log('✅ 成功載入模型配置:', data?.length || 0, '個模型');
-        setAvailableModels(data || []);
+        console.log('✅ 成功載入模型配置 (model_configs):', data?.length || 0, '個模型');
+
+        // Parse JSON fields if they are strings (Supabase sometimes returns JSONB as string depending on config)
+        const parsedData = (data || []).map((m: any) => {
+          let caps = m.capabilities;
+          if (typeof caps === 'string') {
+            try { caps = JSON.parse(caps); } catch (e) { caps = []; }
+          }
+          let meta = m.metadata;
+          if (typeof meta === 'string') {
+            try { meta = JSON.parse(meta); } catch (e) { meta = {}; }
+          }
+          return {
+            ...m,
+            capabilities: Array.isArray(caps) ? caps : [],
+            metadata: meta || {}
+          };
+        });
+
+        // Debug: Check metadata of first few items
+        if (parsedData.length > 0) {
+          console.log('[DEBUG] First model metadata (parsed):', parsedData[0].metadata);
+          console.log('[DEBUG] First model capabilities (parsed):', parsedData[0].capabilities);
+        }
+        setAvailableModels(parsedData);
       }
     } catch (error) {
       console.error('載入模型配置異常:', error);
@@ -1630,64 +1657,51 @@ export default function RoomChatPage() {
     await saveRoleModelSettings('hibi', modelId);
   };
 
-  // 根據角色過濾模型
+  // 根據角色過濾模型 - 針對 Pico (視覺/繪圖)
   const getFilteredPicoModels = () => {
     if (showAllPicoModels) return availableModels;
 
-    return availableModels.filter((m) => {
-      const caps: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
-      const hasVision = caps.includes('vision') || m.model_type === 'multimodal';
-      return hasVision;
+    // Filter for image generation / vision capable models
+    return availableModels.filter(m => {
+      const id = m.model_id.toLowerCase();
+
+      // Check explicit capabilities if available
+      if (m.capabilities?.includes('image_generation') || m.capabilities?.includes('text_to_image')) {
+        return true;
+      }
+
+      // Check model ID/provider for known image models
+      if (id.includes('flux') || id.includes('midjourney') || id.includes('dall-e') || id.includes('ideogram')) {
+        return true;
+      }
+
+      if (m.provider === 'Google' && (id.includes('image') || id.includes('vision'))) {
+        return true;
+      }
+
+      // Special case for Gemini Flash Image
+      if (id.includes('gemini') && id.includes('flash') && id.includes('image')) {
+        return true;
+      }
+
+      return false;
     });
   };
 
-  // 根據角色過濾模型（墨墨需要 search 能力，但也包含預設模型）
+  // 根據角色過濾模型 - 針對 Mori (研究/搜索)
+  // 用戶請求 Relax Filter: 只保留基礎分類
   const getFilteredMoriModels = () => {
-    // Debug log
-    // console.log('🔍 [Mori Filter] Checking models. Total:', availableModels.length);
     if (showAllMoriModels) return availableModels;
-
-    const defaults = moriRoleDefaultModel ? moriRoleDefaultModel.split(',').map(s => s.trim()) : [];
-
-    const filtered = availableModels.filter((m) => {
-      // 1. Always include defaults
-      if (defaults.includes(m.model_id)) return true;
-
-      // 2. Check capabilities
-      const caps: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
-      const hasSearch = caps.includes('web_search') || /perplexity|sonar|search/.test((m.provider || '') + ' ' + (m.model_name || '') + ' ' + (m.model_id || ''));
-
-      // 3. Temporarily allow 'chat' models too if the list is too small, or simply rely on defaults + search?
-      // Since the user wants to use generic models, let's allow strong chat models too or just rely on the user adding them via Show All.
-      // But "System Recommended" models MUST be visible.
-      return hasSearch;
-    });
-
-    // Debug result
-    if (filtered.length === 0 && availableModels.length > 0) {
-      console.warn('⚠️ [Mori Filter] Result is empty! Relaxing filter to include chat models fallback.');
-      // Fallback: Return all if strict filter fails? Or just return availableModels?
-      // Let's return defaults + search + chat to be safe.
-      return availableModels.filter(m => {
-        if (defaults.includes(m.model_id)) return true;
-        const caps = Array.isArray(m.capabilities) ? m.capabilities : [];
-        return caps.includes('web_search') || caps.includes('chat') || m.model_type === 'chat';
-      });
-    }
-    return filtered;
+    // 返回所有模型，依靠 UI 分組顯示
+    return availableModels;
   };
 
-  // 根據角色過濾模型（Hibi 需要 code 能力）
+  // 根據角色過濾模型 - 針對 Hibi (管理/代碼)
+  // 用戶請求 Relax Filter: 只保留基礎分類
   const getFilteredHibiModels = () => {
     if (showAllHibiModels) return availableModels;
-
-    return availableModels.filter((m) => {
-      const caps: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
-      // Allow code, chat, and text-generation models for Hibi (Manager)
-      const hasCode = caps.includes('code') || m.model_type === 'code';
-      const isChat = m.model_type === 'chat' || m.model_type === 'text-generation' || caps.includes('chat');
-      return hasCode || isChat;
-    });
+    // 返回所有模型，依靠 UI 分組顯示
+    return availableModels;
   };
 
   // 移除所有 free 相關字樣的通用函數
@@ -1703,49 +1717,95 @@ export default function RoomChatPage() {
       .trim();
   };
 
-  // 格式化模型顯示名稱（支援多選模型）
+  // 格式化模型顯示名稱（支援多選模型）- 改為顯示家族名稱
   const formatModelDisplay = (modelId: string | undefined): string => {
     if (!modelId) return '';
+
+    const getFamilyName = (id: string) => {
+      // Clean ID
+      const cleanId = id.replace(/:free/gi, '');
+      const model = availableModels.find((m: any) => m.model_id === id || m.model_id === cleanId);
+      if (!model) return stripFree(cleanId);
+
+      const FAMILY_MAP: Record<string, string> = {
+        'chatgpt': 'ChatGPT',
+        'gemini': 'Gemini',
+        'claude': 'Claude',
+        'grok': 'Grok',
+        'deepseek': 'DeepSeek',
+        'qwen': 'Qwen',
+        'flux': 'Flux',
+        'openai': 'ChatGPT',
+        'google': 'Gemini',
+        'anthropic': 'Claude',
+        'xai': 'Grok',
+        'alibaba': 'Qwen'
+      };
+
+      const familyKey = model.metadata?.family?.toLowerCase() || model.provider?.toLowerCase();
+      if (familyKey && FAMILY_MAP[familyKey]) {
+        return FAMILY_MAP[familyKey];
+      }
+      return stripFree(model.display_name || cleanId);
+    };
 
     // 如果包含逗號，表示是多選模型
     if (modelId.includes(',')) {
       const modelIds = modelId.split(',').map((id: string) => id.trim()).filter(Boolean);
-      const names = modelIds.map((id: string) => {
-        // 先移除 model_id 中的 :free
-        const cleanId = id.replace(/:free/gi, '');
-        const m = availableModels.find((x: any) => x.model_id === id || x.model_id === cleanId);
-        const raw = m?.display_name || cleanId;
-        return stripFree(raw);
-      });
-      return names.join('、');
+      const names = modelIds.map(getFamilyName);
+      // Remove duplicates
+      return Array.from(new Set(names)).join('、');
     }
 
     // 單選模型
-    const model = availableModels.find((m: any) => m.model_id === modelId);
-    if (!model) return modelId;
-
-    const displayName = model.display_name || modelId;
-    return stripFree(displayName);
+    return getFamilyName(modelId);
   };
   // 計算 100 字問題食量
   const computeFoodFor100 = (model: any): number => {
     if (!model) return 1;
-    const inputCost = Number(model.input_cost_usd || 0);
+    // Handle HKD or USD
+    let inputCost = 0;
+    if (model.input_cost_hkd) {
+      // HKD to USD approx (1 USD = 7.8 HKD)
+      inputCost = Number(model.input_cost_hkd) / 7.8;
+    } else if (model.input_cost_usd) {
+      inputCost = Number(model.input_cost_usd || 0);
+    }
+
     const totalUsd = (100 / 1_000_000) * inputCost;
     const food = Math.ceil(totalUsd * 3 * 100);
     return Math.max(food, 1);
   };
-  // 載入模型設定（當用戶登入且有角色活躍時）
+  // 處理並設定模型資料 (抽取為共用函數)
+  const processAndSetModels = (data: any[]) => {
+    console.log('✅ [Models] Processing server-side models:', data.length);
+    const parsedData = (data || []).map((m: any) => {
+      let caps = m.capabilities;
+      if (typeof caps === 'string') {
+        try { caps = JSON.parse(caps); } catch (e) { caps = []; }
+      }
+      let meta = m.metadata;
+      if (typeof meta === 'string') {
+        try { meta = JSON.parse(meta); } catch (e) { meta = {}; }
+      }
+      return {
+        ...m,
+        capabilities: Array.isArray(caps) ? caps : [],
+        metadata: meta || {}
+      };
+    });
+    setAvailableModels(parsedData);
+  };
+
+
+
+  // 載入角色用戶設定（當用戶登入且有角色活躍時）
   useEffect(() => {
     if (user?.id && activeRoles.length > 0) {
-      // 先載入可用模型列表，然後載入所有活躍角色的用戶設定
-      loadAvailableModels().then(() => {
-        // 載入所有活躍角色的模型設定
-        activeRoles.forEach(roleId => {
-          if (roleId === 'pico') loadPicoModelSettings();
-          else if (roleId === 'mori') loadMoriModelSettings();
-          else if (roleId === 'hibi') loadHibiModelSettings();
-        });
+      activeRoles.forEach(roleId => {
+        if (roleId === 'pico') loadPicoModelSettings();
+        else if (roleId === 'mori') loadMoriModelSettings();
+        else if (roleId === 'hibi') loadHibiModelSettings();
       });
     }
   }, [user?.id, activeRoles]);
@@ -1783,189 +1843,81 @@ export default function RoomChatPage() {
   // 載入房間資訊和角色
   const loadRoomInfo = async () => {
     try {
-      console.log('🔍 載入房間資訊:', roomId);
+      console.log('🔍 [Load] 載入房間資訊 - Start, RoomID:', roomId);
 
-      const supabase = createSaasClient();
+      const response = await fetch('/api/chat/room-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId,
+          userId: user?.id
+        })
+      });
 
-      // 載入房間基本資訊
-      const { data: roomData, error: roomError } = await supabase
-        .from('ai_rooms')
-        .select('id, title, description, room_type, created_at, settings')
-        .eq('id', roomId)
-        .single() as { data: { id: string; title: string; description?: string; room_type?: string; created_at: string; settings?: any } | null; error: any };
-
-      // 載入房間角色（兩段式查詢避免 400/406 並確保完整資料）
-      let roomRoles: string[] = [];
-      try {
-        console.log('🔍 載入房間角色:', roomId);
-        // 第一步：先查 room_roles 取得 role_instance_id 列表
-        const { data: roomRoleLinks, error: roomRolesError } = await supabase
-          .from('room_roles')
-          .select('role_instance_id')
-          .eq('room_id', roomId)
-          .eq('is_active', true);
-
-        if (roomRolesError) {
-          console.log('⚠️ 載入房間角色關聯失敗:', roomRolesError);
-        }
-
-        const roleInstanceIds = (roomRoleLinks || [])
-          .map((r: any) => r.role_instance_id)
-          .filter(Boolean);
-
-        if (roleInstanceIds.length > 0) {
-          // Second step: Query role_instances to get full information
-          const { data: roleInstancesData, error: roleInstancesError } = await supabase
-            .from('role_instances')
-            .select('*')
-            .in('id', roleInstanceIds);
-
-          let roleInstances: any[] = (roleInstancesData as any[]) || [];
-
-          if (!roleInstancesError && roleInstancesData && roleInstancesData.length > 0) {
-            // Fetch roles separately
-            const roleIds = roleInstancesData.map((ri: any) => ri.role_id).filter(Boolean);
-            if (roleIds.length > 0) {
-              const { data: rolesData } = await supabase
-                .from('ai_roles')
-                .select('*')
-                .in('id', roleIds);
-
-              if (rolesData) {
-                // Merge role data
-                roleInstances = roleInstancesData.map((ri: any) => ({
-                  ...ri,
-                  role: rolesData.find((r: any) => r.id === ri.role_id)
-                }));
-
-                // Fetch equipped mind blocks
-                if (user) {
-                  const { data: mindBlocksData } = await supabase
-                    .from('role_mind_blocks' as any)
-                    .select('role_id, mind_block_id, is_active')
-                    .in('role_id', roleIds)
-                    .eq('user_id', user.id)
-                    .eq('is_active', true);
-
-                  if (mindBlocksData && mindBlocksData.length > 0) {
-                    const blockIds = mindBlocksData.map((mb: any) => mb.mind_block_id);
-                    const { data: blocksInfo } = await supabase
-                      .from('mind_blocks' as any)
-                      .select('id, title')
-                      .in('id', blockIds);
-
-                    if (blocksInfo) {
-                      roleInstances = roleInstances.map((ri: any) => {
-                        const equipped = mindBlocksData.filter((mb: any) => mb.role_id === ri.role_id);
-                        const blocks = equipped.map((mb: any) => blocksInfo.find((b: any) => b.id === mb.mind_block_id)).filter(Boolean);
-                        return {
-                          ...ri,
-                          mindBlocks: blocks
-                        };
-                      });
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          if (roleInstancesError) {
-            console.log('⚠️ 載入角色實例失敗:', roleInstancesError);
-          } else {
-            // Populate roleInstancesMap
-            const newRoleInstancesMap: Record<string, RoleInstance> = {};
-
-            const roomSettings = roomData?.settings || {};
-            const mindBlockOverrides = roomSettings.mind_block_overrides || {};
-
-            const roleIds = (roleInstances || [])
-              .map((ri: any) => {
-                const slug = ri.role?.slug;
-                if (slug) {
-                  // Normalize slug to internal name
-                  let internalName = slug;
-                  if (slug.includes('hibi-manager')) internalName = 'hibi';
-                  else if (slug.includes('mori-researcher')) internalName = 'mori';
-                  else if (slug.includes('pico-artist')) internalName = 'pico';
-
-                  // Check for overrides
-                  if (mindBlockOverrides[internalName]) {
-                    console.log(`🏠 [Load] 應用房間積木設定: ${internalName}`, mindBlockOverrides[internalName]);
-
-                    // Ensure settings and equipped_blocks exist
-                    if (!ri.settings) ri.settings = {};
-                    if (!ri.settings.equipped_blocks) ri.settings.equipped_blocks = {};
-
-                    // Apply overrides
-                    ri.settings.equipped_blocks = {
-                      ...ri.settings.equipped_blocks,
-                      ...mindBlockOverrides[internalName]
-                    };
-                  }
-
-                  newRoleInstancesMap[internalName] = ri as unknown as RoleInstance;
-                  return ri.role_id;
-                }
-                return null;
-              })
-              .filter(Boolean);
-
-            setRoleInstancesMap(newRoleInstancesMap);
-
-            if (roleIds.length > 0) {
-              // 第三步：查 ai_roles 取得 slug (其實上面已經有了，但為了保持原有邏輯結構暫時保留，或者直接用上面的 map 結果)
-              // 既然我們已經 join 了 role，其實不需要第三步了，直接構造 roomRoles
-
-              roomRoles = Object.values(newRoleInstancesMap).map((instance: any) => instance.role?.slug || instance.role?.name || '').filter(Boolean);
-              console.log('✅ 從資料庫載入的房間角色:', roomRoles);
-            }
-          }
-        } else {
-          console.log('⚠️ 此房間沒有任何角色關聯');
-        }
-
-        // 如果從資料庫載入到角色，且沒有 URL 參數，則使用資料庫的角色
-        if (roomRoles.length > 0 && !urlParams.initialRole && !urlParams.companion) {
-          console.log('🔄 使用資料庫中的角色設定:', roomRoles);
-          const normalize = (name: any) => {
-            const n = String(name).toLowerCase();
-            if (n.includes('hibi') || n.includes('希希')) return 'hibi';
-            if (n.includes('mori') || n.includes('墨墨')) return 'mori';
-            if (n.includes('pico') || n.includes('皮可')) return 'pico';
-            return null;
-          };
-          const normalized = Array.from(new Set(roomRoles.map(normalize).filter(Boolean))) as ('hibi' | 'mori' | 'pico')[];
-          setActiveRoles(normalized);
-          if (roomRoles.length === 1) {
-            setSelectedCompanion(normalized[0]);
-          }
-          // 保存到 sessionStorage
-          sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(normalized));
-        }
-        setHasLoadedFromDatabase(true);
-      } catch (error) {
-        console.error('載入房間角色錯誤:', error);
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
       }
 
-      if (roomError) {
-        console.error('❌ 載入房間資訊失敗:', roomError);
-        // 使用預設資訊
-        setRoom({
-          title: '未知專案',
-          description: '無法載入專案資訊',
-          activeCompanions: roomRoles.length > 0 ? roomRoles as ('hibi' | 'mori' | 'pico')[] : activeRoles
-        });
-      } else if (roomData) {
-        console.log('✅ 房間資訊載入成功:', roomData.title || (roomData as any).project_name);
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      const { roomData, roleInstancesMap: newRoleInstancesMap, roomRoles, modelConfigs } = result.data;
+
+      console.log('✅ [Load] API 載入成功:', roomData?.title, 'Roles:', roomRoles, 'Models:', modelConfigs?.length);
+
+      // Update Models immediately
+      if (modelConfigs && modelConfigs.length > 0) {
+        processAndSetModels(modelConfigs);
+      } else {
+        // Fallback to client fetch if server didn't return models (backward compatibility)
+        loadAvailableModels();
+      }
+
+      // Handle Initial Messages (Pre-fetched)
+      const initialMessages = (result.data as any).initialMessages;
+      if (initialMessages && initialMessages.length > 0) {
+        console.log('🚀 [FastLoad] 使用預載入的訊息:', initialMessages.length, '條');
+        const activeMessages = initialMessages.filter((msg: any) => msg.status !== 'deleted');
+        const convertedMessages = transformSupabaseMessages(activeMessages).reverse();
+        setMessages(convertedMessages);
+        setHasLoadedHistory(true);
+        setHasMoreMessages(activeMessages.length >= 30);
+      } else {
+        setHasLoadedHistory(true);
+      }
+
+      // Ensure specific membership in background verify (non-blocking)
+      ensureRoomMembership(roomId, user?.id || '').catch(err => console.warn('Background membership check failed:', err));
+
+      // Update State
+      setRoleInstancesMap(newRoleInstancesMap);
+
+      // Handle Role Selection
+      if (roomRoles.length > 0 && !urlParams.initialRole && !urlParams.companion) {
+        console.log('🔄 使用資料庫中的角色設定:', roomRoles);
+        const normalized = roomRoles as ('hibi' | 'mori' | 'pico')[];
+        setActiveRoles(normalized);
+        if (roomRoles.length === 1) {
+          setSelectedCompanion(normalized[0]);
+        }
+        sessionStorage.setItem(`room_${roomId}_roles`, JSON.stringify(normalized));
+      }
+      setHasLoadedFromDatabase(true);
+
+      // Set Room Data
+      if (roomData) {
         setRoom({
           title: roomData.title || (roomData as any).project_name || '未命名專案',
           description: roomData.description || '',
           activeCompanions: roomRoles.length > 0 ? roomRoles as ('hibi' | 'mori' | 'pico')[] : activeRoles
         });
       }
+
     } catch (error) {
-      console.error('載入房間資訊錯誤:', error);
+      console.error('❌ [Load] 載入房間資訊失敗 (API):', error);
       setRoom({
         title: '載入失敗',
         description: '專案資訊載入失敗',
@@ -2667,6 +2619,24 @@ export default function RoomChatPage() {
     return undefined;
   }, [hibiModelSelectOpen]);
 
+  // 監聽打開積木選擇器的事件
+  useEffect(() => {
+    const handleOpenBlockSelector = (event: CustomEvent) => {
+      const { type, roleInstanceId } = event.detail;
+      console.log('🧩 [Event] Open Block Selector:', type, roleInstanceId);
+      setLoadoutModalState({
+        isOpen: true,
+        slotType: type as any,
+        roleInstanceId: roleInstanceId
+      });
+    };
+
+    window.addEventListener('open-block-selector', handleOpenBlockSelector as any);
+    return () => {
+      window.removeEventListener('open-block-selector', handleOpenBlockSelector as any);
+    };
+  }, []);
+
   // 點擊外部關閉皮可模型選擇下拉選單
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -3012,7 +2982,7 @@ export default function RoomChatPage() {
       return;
     }
 
-    console.log('🛡️ [Membership] 開始檢查成員身份:', roomId, userId);
+    console.log('🛡️ [Membership] 開始檢查成員身份 (API):', roomId, userId);
 
     // 重試機制
     const maxRetries = 3;
@@ -3021,69 +2991,34 @@ export default function RoomChatPage() {
     while (attempt < maxRetries) {
       try {
         attempt++;
-        const supabase = createSaasClient();
 
-        // 檢查用戶是否已經是房間成員
-        // 優化：使用 head: true 只獲取數量，不獲取資料，減少傳輸
-        // 增加超時時間到 15s 以應對網絡波動
-        const checkPromise = supabase
-          .from('room_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('room_id', roomId)
-          .eq('user_id', userId);
+        // 改用 API 路由進行檢查，避免 Client 並發鎖問題
+        const response = await fetch('/api/chat/membership', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ roomId, userId })
+        });
 
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Membership check timeout')), 15000)
-        );
-
-        console.log(`🛡️ [Membership] 第 ${attempt} 次查詢嘗試...`);
-        const result: any = await Promise.race([checkPromise, timeoutPromise]);
-        const { count, error: checkError } = result;
-
-        if (checkError) {
-          console.warn(`⚠️ [Membership] 第 ${attempt} 次檢查失敗:`, checkError);
-          if (attempt === maxRetries) throw checkError;
-          await new Promise(r => setTimeout(r, 1000)); // 等待 1s
-          continue;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `API 錯誤: ${response.status}`);
         }
 
-        // 如果用戶不是房間成員 (count === 0)，自動添加
-        if (count === 0) {
-          console.log('👤 [Membership] 用戶不是房間成員，正在添加...');
-          const { error: insertError } = await (supabase
-            .from('room_members') as any)
-            .insert({
-              room_id: roomId,
-              user_id: userId,
-              role: 'member',
-              user_type: 'hanami_user'
-            });
-
-          if (insertError) {
-            if (insertError.code === '23505') {
-              console.log('✅ [Membership] 用戶已是房間成員（重複鍵錯誤）');
-            } else {
-              console.error('❌ [Membership] 添加房間成員失敗:', insertError);
-              // 添加失敗也當作本輪失敗，重試
-              if (attempt === maxRetries) throw insertError;
-              await new Promise(r => setTimeout(r, 1000));
-              continue;
-            }
-          } else {
-            console.log('✅ [Membership] 用戶已添加為房間成員');
-          }
+        const data = await response.json();
+        if (data.success) {
+          console.log('✅ [Membership] 成員身份檢查成功 (API)');
+          membershipCheckedRef.current = roomId;
+          return;
         } else {
-          console.log('✅ [Membership] 用戶已是房間成員');
+          throw new Error(data.error || 'API 返回失敗狀態');
         }
-
-        // 成功，標記並退出
-        membershipCheckedRef.current = roomId;
-        return;
 
       } catch (error) {
         console.warn(`⚠️ [Membership] 第 ${attempt} 次嘗試發生錯誤:`, error);
         if (attempt === maxRetries) {
-          console.error('❌ 確保房間成員身份多次嘗試後失敗');
+          console.error('❌ 確保房間成員身份多次嘗試後失敗 (API)');
           throw error; // 拋出錯誤讓調用者知道失敗
         } else {
           await new Promise(r => setTimeout(r, 1000));
@@ -3105,18 +3040,32 @@ export default function RoomChatPage() {
       await ensureRoomMembership(roomId, userId);
       console.log('🛡️ ensureRoomMembership 完成');
 
-      const { data, error } = await saasSupabase
-        .from('ai_messages')
-        .select('*')
-        .eq('room_id', roomId)
-        .order('created_at', { ascending: false })
-        .limit(MESSAGE_FETCH_LIMIT);
+      // 改用 API 路由獲取訊息，避免 Client 並發鎖問題
+      console.log('📜 [API] 呼叫訊息載入 API...');
+      const response = await fetch('/api/chat/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId,
+          limit: MESSAGE_FETCH_LIMIT,
+          userId // Optional, for logging/security if needed
+        })
+      });
 
-      if (error) {
-        console.error('❌ 載入歷史訊息失敗:', error);
-        setHasMoreMessages(false);
-        setHasLoadedHistory(true);
-        return;
+      if (!response.ok) {
+        throw new Error(`API 錯誤: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'API 返回失敗');
+      }
+
+      const data = result.data;
+      // const { data, error } = await saasSupabase ... (Removed)
+
+      if (false) { // error check removed as we throw above
+        // ...
       }
 
       const historyMessages = data ?? [];
@@ -5801,30 +5750,87 @@ export default function RoomChatPage() {
                           </svg>
                         </button>
 
-                        {/* Model Selector Chip */}
-                        <button
-                          onClick={() => {
-                            modelState.setModelSelectOpen(true);
-                            if (modelState.setModelSearch) modelState.setModelSearch('');
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#EADBC8] bg-white/50 hover:bg-[#FFF9F2] backdrop-blur-sm transition-all active:scale-95 flex-shrink-0"
-                        >
-                          <CpuChipIcon className="w-3.5 h-3.5 text-orange-400" />
-                          <span className="text-xs font-medium text-[#4B4036] max-w-[100px] truncate">
-                            {roleId === 'mori' && modelState.selectedModelsMulti ? (
-                              modelState.selectedModelsMulti.length > 0
-                                ? `已選 ${modelState.selectedModelsMulti.length} 個模型`
-                                : '預設模型組合'
-                            ) : (
-                              modelName
-                            )}
-                          </span>
-                        </button>
+                        {/* Model Selector Chip - Styled by Tier */}
+                        {(() => {
+                          // Resolve Model and Level for Styling
+                          const mId = roleId === 'mori' && modelState.selectedModelsMulti && modelState.selectedModelsMulti.length > 0
+                            ? modelState.selectedModelsMulti[0]
+                            : (effectiveModelId || '');
+
+                          const m = availableModels.find((x: any) => x.model_id === mId);
+
+                          // Force Family Name Resolution
+                          const FAMILY_MAP: Record<string, string> = {
+                            'chatgpt': 'ChatGPT',
+                            'gemini': 'Gemini',
+                            'claude': 'Claude',
+                            'grok': 'Grok',
+                            'deepseek': 'DeepSeek',
+                            'qwen': 'Qwen',
+                            'flux': 'Flux',
+                            'openai': 'ChatGPT',
+                            'google': 'Gemini',
+                            'anthropic': 'Claude',
+                            'xai': 'Grok',
+                            'alibaba': 'Qwen'
+                          };
+                          const familyKey = m?.metadata?.family?.toLowerCase() || m?.provider?.toLowerCase();
+                          // Fallback to substring if match found in ID, otherwise display_name
+                          let displayName = (familyKey && FAMILY_MAP[familyKey]);
+                          if (!displayName) {
+                            // Try to guess from ID if metadata missing
+                            if (mId.includes('gpt')) displayName = 'ChatGPT';
+                            else if (mId.includes('gemini')) displayName = 'Gemini';
+                            else if (mId.includes('claude')) displayName = 'Claude';
+                            else if (mId.includes('grok')) displayName = 'Grok';
+                            else displayName = m?.display_name || 'Model';
+                          }
+
+                          const level = m?.metadata?.level || 'L1';
+                          const isMulti = roleId === 'mori' && modelState.selectedModelsMulti && modelState.selectedModelsMulti.length > 0;
+
+                          // Dynamic Styles based on Level
+                          // L1: Cool Gray Brighter (Ref: #FAFAFA bg, #727272 text)
+                          let btnClasses = "border border-gray-100 bg-[#FAFAFA] text-[#727272] hover:bg-[#F5F5F5]";
+                          let iconColor = "text-[#727272]";
+
+                          if (level === 'L2') {
+                            // L2: Butter Brighter (Ref: #FDF3C8 bg)
+                            btnClasses = "border border-[#FDF3C8] bg-[#FDF3C8] text-[#5D4037] hover:bg-[#F9ECC8]";
+                            iconColor = "text-[#5D4037]";
+                          } else if (level === 'L3') {
+                            btnClasses = "border border-[#4B4036] bg-[#4B4036] text-[#FFD59A] hover:bg-[#2C241B]";
+                            iconColor = "text-[#FFD59A]";
+                          }
+
+                          return (
+                            <button
+                              onClick={() => {
+                                modelState.setModelSelectOpen(true);
+                                if (modelState.setModelSearch) modelState.setModelSearch('');
+                              }}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm transition-all active:scale-95 flex-shrink-0 ${btnClasses}`}
+                            >
+                              <CpuChipIcon className={`w-3.5 h-3.5 ${iconColor}`} />
+                              <span className="text-xs font-bold max-w-[140px] truncate">
+                                {isMulti ? (
+                                  `已選 ${modelState.selectedModelsMulti?.length} 個模型`
+                                ) : (
+                                  `${displayName} ${level}`
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })()}
 
                         {/* Mind Blocks Chip */}
                         <button
-                          onClick={() => {
-                            if (!instanceForCompanion) return;
+                          onClick={async () => {
+                            if (!instanceForCompanion) {
+                              const { default: toast } = await import('react-hot-toast');
+                              toast.error(`無法開啟積木：找不到 ${selectedCompanionId} 的角色實例`);
+                              return;
+                            }
                             const event = new CustomEvent('open-block-selector', {
                               detail: { type: 'role', roleInstanceId: instanceForCompanion.id }
                             });
@@ -6041,137 +6047,378 @@ export default function RoomChatPage() {
                         </div>
                         <button onClick={() => modelState.setModelSelectOpen(false)} className="p-2 hover:bg-black/5 rounded-full"><XMarkIcon className="w-5 h-5" /></button>
                       </div>
-                      {/* Search */}
-                      <div className="px-5 py-3 border-b border-[#EADBC8]">
-                        <input
-                          type="text"
-                          value={modelState.modelSearch}
-                          onChange={(e) => modelState.setModelSearch(e.target.value)}
-                          placeholder="搜尋模型..."
-                          className="w-full p-2.5 bg-[#F8F5EC] border-transparent focus:bg-white border focus:border-[#FFB6C1] rounded-xl focus:ring-0 text-[#4B4036] pointer-events-auto select-text"
-                          onClick={() => console.log('Input clicked')}
-                        />
-                      </div>
-                      {/* Model List */}
-                      <div className="overflow-y-auto flex-1 p-2 space-y-1 relative z-30" style={{ pointerEvents: 'auto' }}>
-                        {/* System Default Option */}
+
+                      {/* Model List - Family Based (Warm & Soft Design) */}
+                      <div className="overflow-y-auto flex-1 p-4 space-y-5 relative z-30" style={{ pointerEvents: 'auto' }}>
+
+                        {/* System Default Option - Hero Card Style */}
                         <button
                           onMouseDown={() => {
                             if (roleId === 'mori' && modelState.setSelectedModelsMulti) {
-                              // Multi-select for Mori: Revert to default
-                              // Just mark as default mode, don't close.
-                              // DB saves [] to indicate default.
                               modelState.setSelectedModelsMulti([]);
                               modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
                               modelState.saveFunction([]);
                             } else {
                               modelState.setSelectedModel(DEFAULT_MODEL_SENTINEL);
                               modelState.saveFunction(DEFAULT_MODEL_SENTINEL);
-                              modelState.setModelSelectOpen(false); // Single select still closes
+                              modelState.setModelSelectOpen(false);
                             }
                           }}
-                          className={`w-full text-left px-4 py-3 rounded-xl transition-all ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
-                            ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-md'
-                            : 'text-[#4B4036] hover:bg-[#F8F5EC]'
+                          className={`group w-full text-left px-6 py-5 rounded-3xl transition-all duration-300 relative overflow-hidden ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL
+                            ? 'bg-gradient-to-r from-[#FFD8B1] to-[#FFB6C1] text-white shadow-lg shadow-orange-100 scale-[1.02]'
+                            : 'bg-white hover:bg-[#FFF9F0] text-[#5D4037] shadow-md hover:shadow-lg'
                             }`}
                         >
-                          <div className="font-bold text-sm flex items-center justify-between">
-                            <span>✨ 系統推薦 (預設)</span>
+                          {/* Decorative background circle */}
+                          <div className="absolute -right-5 -top-5 w-24 h-24 bg-white/20 rounded-full blur-2xl pointer-events-none" />
+                          <div className="absolute -left-5 -bottom-5 w-20 h-20 bg-white/10 rounded-full blur-xl pointer-events-none" />
+
+                          <div className="relative font-bold text-lg flex items-center justify-between z-10">
+                            <span className="flex items-center gap-3">
+                              <SparklesIcon className={`w-6 h-6 ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL ? 'text-white' : 'text-[#FFB6C1]'}`} />
+                              角色推薦 (預設)
+                            </span>
                             {modelState.selectedModel === DEFAULT_MODEL_SENTINEL && (
-                              <CheckIcon className="w-5 h-5 text-white" />
+                              <div className="bg-white/30 p-1.5 rounded-full backdrop-blur-sm">
+                                <CheckIcon className="w-5 h-5 text-white" />
+                              </div>
                             )}
+                          </div>
+                          <div className={`text-sm mt-2 font-medium ${modelState.selectedModel === DEFAULT_MODEL_SENTINEL ? 'text-white/90' : 'text-[#8D6E63]'}`}>
+                            自動選擇最佳效能與成本平衡的模型
                           </div>
                         </button>
 
-                        {modelState.getFilteredModels?.().filter((m: any) => {
-                          if (!modelState.modelSearch.trim()) return true;
-                          return (m.display_name?.toLowerCase().includes(modelState.modelSearch.toLowerCase()));
-                        }).map((model: any) => {
-                          const isMori = roleId === 'mori';
+                        {/* Family Groups */}
+                        {(() => {
+                          const models = modelState.getFilteredModels?.() || [];
 
-                          // Parse defaults for logic
-                          const defaults = (isMori && modelState.roleDefaultModel)
-                            ? modelState.roleDefaultModel.split(',').map((s: string) => s.trim()).filter(Boolean)
-                            : [];
-
-                          // Check selection state
-                          let isSelected = false;
-                          if (isMori) {
-                            if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
-                              isSelected = defaults.includes(model.model_id);
-                            } else {
-                              isSelected = modelState.selectedModelsMulti?.includes(model.model_id) || false;
-                            }
+                          // DEBUG: Log models to check metadata
+                          if (models.length > 0) {
+                            console.log('[ModelSelector] Loaded models:', models.length);
+                            console.log('[ModelSelector] Sample model metadata:', {
+                              id: models[0].model_id,
+                              provider: models[0].provider,
+                              metadata: models[0].metadata
+                            });
                           } else {
-                            isSelected = modelState.selectedModel === model.model_id;
+                            console.warn('[ModelSelector] No models loaded!');
                           }
 
-                          // Check selection limit (4)
-                          const isLimitReached = isMori && !isSelected && (modelState.selectedModelsMulti?.length || 0) >= 4;
+                          // Display Name Mapping for Families
+                          const FAMILY_DISPLAY_NAMES: Record<string, string> = {
+                            'chatgpt': 'ChatGPT',
+                            'gemini': 'Gemini',
+                            'claude': 'Claude',
+                            'grok': 'Grok',
+                            'deepseek': 'Deepseek',
+                            'qwen': 'Qwen',
+                            'flux': 'Flux',
+                            // Fallbacks for legacy/direct provider names
+                            'openai': 'ChatGPT',
+                            'google': 'Gemini',
+                            'anthropic': 'Claude',
+                            'xai': 'Grok',
+                            'alibaba': 'Qwen',
+                            'black forest labs': 'Flux'
+                          };
 
-                          return (
-                            <button
-                              key={model.model_id}
-                              style={{ pointerEvents: 'auto', cursor: 'pointer' }}
-                              id={`model-btn-${model.model_id}`}
-                              disabled={isLimitReached}
-                              onMouseDown={async (e) => {
-                                // console.log('[ModelSelector] MouseDown triggered for:', model.model_id);
+                          const families: Record<string, any[]> = {};
 
-                                // Prevent any default behavior that might close the modal
-                                e.preventDefault();
-                                e.stopPropagation();
+                          models.forEach((m: any) => {
+                            // Filter by search
+                            if (modelState.modelSearch.trim() && !m.display_name?.toLowerCase().includes(modelState.modelSearch.toLowerCase())) {
+                              return;
+                            }
 
-                                const { default: toast } = await import('react-hot-toast');
-                                try {
-                                  if (isMori && modelState.setSelectedModelsMulti) {
-                                    // Handle Multi-Select - UPDATE LOCAL STATE ONLY
-                                    // Logic for transitioning from Default -> Custom
-                                    let currentSelection: string[] = [];
-                                    if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
-                                      currentSelection = [...defaults];
-                                      modelState.setSelectedModel('');
-                                    } else {
-                                      currentSelection = modelState.selectedModelsMulti || [];
-                                    }
+                            // Determine Family Key: Priority metadata.family -> provider
+                            let familyKey = 'Other';
 
-                                    const newSelection = currentSelection.includes(model.model_id)
-                                      ? currentSelection.filter((id: string) => id !== model.model_id)
-                                      : [...currentSelection, model.model_id];
+                            if (m.metadata?.family) {
+                              familyKey = m.metadata.family.toLowerCase();
+                            } else if (m.provider) {
+                              familyKey = m.provider.toLowerCase();
+                            }
 
-                                    modelState.setSelectedModelsMulti(newSelection);
-                                    // DO NOT close modal here for Mori multi-select
-                                  } else {
-                                    // Handle Single Select
-                                    modelState.setSelectedModel(model.model_id);
-                                    modelState.setModelSelectOpen(false); // Close for single select
-                                    toast.success('已選擇 ' + (model.display_name || model.model_id));
-                                    await modelState.saveFunction(model.model_id);
-                                  }
-                                } catch (err) {
-                                  console.error(err);
-                                  toast.error('選擇失敗');
+                            // Normalize family keys
+                            if (familyKey === 'google') familyKey = 'gemini';
+                            if (familyKey === 'openai') familyKey = 'chatgpt';
+                            if (familyKey === 'anthropic') familyKey = 'claude';
+                            if (familyKey === 'xai') familyKey = 'grok';
+                            if (familyKey === 'alibaba') familyKey = 'qwen';
+                            if (familyKey === 'black forest labs') familyKey = 'flux';
+
+                            // Initialize group if needed
+                            if (!families[familyKey]) families[familyKey] = [];
+                            // Dedup models by ID
+                            if (!families[familyKey].some(exist => exist.model_id === m.model_id)) {
+                              families[familyKey].push(m);
+                            }
+                          });
+
+                          // 6 Main Families Order
+                          const ALLOWED_FAMILIES = ['chatgpt', 'gemini', 'claude', 'grok', 'deepseek', 'qwen', 'flux'];
+
+                          const sortedFamilies = ALLOWED_FAMILIES
+                            .map(key => [key, families[key] || []])
+                            .filter(([_, models]) => (models as any[]).length > 0) as [string, any[]][];
+
+                          return sortedFamilies.map(([familyKey, familyModels]) => {
+                            if (familyModels.length === 0) return null;
+
+                            const displayName = FAMILY_DISPLAY_NAMES[familyKey] ||
+                              // Capitalize first letter if not in map
+                              familyKey.charAt(0).toUpperCase() + familyKey.slice(1);
+
+                            // Sort models by cost (USD or HKD converted)
+                            familyModels.sort((a, b) => {
+                              const costA = a.input_cost_usd || (a.input_cost_hkd ? a.input_cost_hkd / 7.8 : 0);
+                              const costB = b.input_cost_usd || (b.input_cost_hkd ? b.input_cost_hkd / 7.8 : 0);
+                              return costA - costB;
+                            });
+
+                            // Identify Tiers: Smart Classification
+                            let uniqueTiers: any[] = [];
+
+                            const isMori = roleId === 'mori';
+                            let isFamilyActive = false;
+
+                            if (roleId === 'pico') {
+                              // --- Pico Logic: Show specific models directly ---
+                              familyModels.sort((a, b) => {
+                                // Put Flash/Fast models first (usually preferred for quick gen)
+                                const isAFlash = a.model_id.toLowerCase().includes('flash');
+                                const isBFlash = b.model_id.toLowerCase().includes('flash');
+                                if (isAFlash && !isBFlash) return -1;
+                                if (!isAFlash && isBFlash) return 1;
+
+                                // Then by cost
+                                const costA = a.input_cost_usd || 0;
+                                const costB = b.input_cost_usd || 0;
+                                return costA - costB;
+                              });
+
+                              // Determine plan status for cost display
+                              const isFreePlan = !user?.subscription_plan_id || user?.subscription_plan_id === 'free';
+
+                              uniqueTiers = familyModels.map(m => {
+                                // Clean up display name
+                                let label = m.display_name || m.model_id.split('/').pop() || 'Unknown';
+                                // Remove provider prefix to keep it short
+                                label = label.replace(/^(Google|OpenAI|Anthropic|DeepSeek|xAI|Flux)\s+/i, '');
+                                // Remove "Model" suffix
+                                label = label.replace(/\s+Model$/i, '');
+                                // Shorten specific names
+                                label = label.replace(/Gemini 2.5 Flash Image Preview/i, 'Flash Image');
+                                label = label.replace(/Gemini 2.5 Flash Image/i, 'Flash Image');
+
+                                let costVal: string | number = 10; // Default
+
+                                if (m.is_free) {
+                                  costVal = isFreePlan ? '免費' : '無限用';
+                                } else {
+                                  // Custom cost calculation for image models if needed, currently using generic
+                                  const food = computeFoodFor100(m);
+                                  // For image models, we might want a fixed cost logic if not L1/L2/L3 based
+                                  // But reusing computeFoodFor100 is safe for now
+                                  costVal = food;
                                 }
-                              }}
-                              className={`relative z-[51] w-full text-left px-4 py-3 rounded-xl transition-all ${isSelected
-                                ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                : isLimitReached
-                                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                  : 'hover:bg-[#F8F5EC] text-[#4B4036]'
-                                }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <div className="font-bold text-sm">{model.display_name || model.model_id}</div>
-                                  <div className={`text-xs ${isSelected ? 'text-white/80' : 'text-[#4B4036]/60'}`}>
-                                    {model.provider} {model.price_tier ? `• ${model.price_tier}` : ''}
+
+                                return {
+                                  label: label,
+                                  model: m,
+                                  desc: '繪圖',
+                                  costVal: costVal
+                                };
+                              });
+                            } else {
+                              // --- Mori/Hibi Logic: L1/L2/L3 Smart Hierarchies ---
+                              let remainingModels = [...familyModels];
+                              let l1Model: any = null;
+                              let l2Model: any = null;
+                              let l3Model: any = null;
+
+                              // 1. Strict Metadata Matching First
+                              l1Model = remainingModels.find(m => m.metadata?.level === 'L1');
+                              if (l1Model) remainingModels = remainingModels.filter(m => m.model_id !== l1Model?.model_id);
+
+                              l3Model = remainingModels.find(m => m.metadata?.level === 'L3');
+                              if (l3Model) remainingModels = remainingModels.filter(m => m.model_id !== l3Model?.model_id);
+
+                              l2Model = remainingModels.find(m => m.metadata?.level === 'L2');
+                              if (l2Model) remainingModels = remainingModels.filter(m => m.model_id !== l2Model?.model_id);
+
+                              // 2. Heuristic Matching (if slots empty)
+                              // L3 Heuristics (Pro/Ultra/Opus - usually expensive or explicit high-end names)
+                              if (!l3Model) {
+                                l3Model = remainingModels.find(m =>
+                                  m.model_id.includes('ultra') ||
+                                  m.model_id.includes('opus') ||
+                                  (m.display_name && m.display_name.toLowerCase().includes('ultra')) ||
+                                  (m.input_cost_usd || 0) > 10 // Very expensive > $10
+                                );
+                                if (l3Model) remainingModels = remainingModels.filter(m => m.model_id !== l3Model?.model_id);
+                              }
+
+                              // L1 Heuristics (Mini/Flash/Haiku - cheap/fast)
+                              if (!l1Model) {
+                                l1Model = remainingModels.find(m =>
+                                  m.model_id.includes('mini') ||
+                                  m.model_id.includes('flash') ||
+                                  m.model_id.includes('haiku') ||
+                                  m.model_id.includes('micro') ||
+                                  m.is_free
+                                );
+                                if (l1Model) remainingModels = remainingModels.filter(m => m.model_id !== l1Model?.model_id);
+                              }
+
+                              // L2 Heuristics (Pro/Plus/Standard - middle ground)
+                              if (!l2Model) {
+                                l2Model = remainingModels.find(m =>
+                                  m.model_id.includes('pro') ||
+                                  m.model_id.includes('plus') ||
+                                  m.model_id.includes('turbo')
+                                );
+                                if (l2Model) remainingModels = remainingModels.filter(m => m.model_id !== l2Model?.model_id);
+                              }
+
+                              // 3. Fallback / Leftover Distribution
+                              if (remainingModels.length > 0) {
+                                // Sort remaining by cost
+                                remainingModels.sort((a, b) => {
+                                  const costA = a.input_cost_usd || 0;
+                                  const costB = b.input_cost_usd || 0;
+                                  return costA - costB;
+                                });
+
+                                // Fill null slots from remaining
+                                if (!l1Model) l1Model = remainingModels.shift();
+                                if (!l3Model && remainingModels.length > 0) l3Model = remainingModels.pop();
+                                if (!l2Model && remainingModels.length > 0) l2Model = remainingModels.shift();
+                              }
+
+                              if (isMori) {
+                                if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
+                                  const defaults = modelState.roleDefaultModel?.split(',').map((s: string) => s.trim()) || [];
+                                  isFamilyActive = familyModels.some(m => defaults.includes(m.model_id));
+                                } else {
+                                  isFamilyActive = familyModels.some(m => modelState.selectedModelsMulti?.includes(m.model_id));
+                                }
+                              } else {
+                                isFamilyActive = familyModels.some(m => m.model_id === modelState.selectedModel);
+                              }
+
+                              // Determine plan status for cost display
+                              const isFreePlan = !user?.subscription_plan_id || user?.subscription_plan_id === 'free';
+
+                              uniqueTiers = [
+                                { label: 'L1', model: l1Model, desc: '綜合', costVal: isFreePlan ? 3 : '無限用' },
+                                { label: 'L2', model: l2Model, desc: '思考', costVal: 4 },
+                                { label: 'L3', model: l3Model, desc: '研究', costVal: 20 }
+                              ].filter(t => t.model);
+                            }
+
+                            return (
+                              <div key={familyKey} className={`group rounded-3xl transition-all duration-300 ${isFamilyActive
+                                ? 'bg-[#FFF5EB] shadow-md shadow-orange-100'
+                                : 'bg-white shadow-sm hover:shadow-md hover:bg-[#FAFAFA]'
+                                }`}>
+                                {/* Family Header */}
+                                <div
+                                >
+                                  <div className="flex items-center space-x-4">
+                                    <div className={`p-2.5 rounded-2xl transition-colors ${isFamilyActive ? 'bg-[#FFD8B1] text-[#5D4037]' : 'bg-[#F5F5F0] text-[#8D6E63] group-hover:bg-[#FFD8B1]/50'}`}>
+                                      <CpuChipIcon className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                      <span className={`block font-bold text-lg ${isFamilyActive ? 'text-[#5D4037]' : 'text-[#8D6E63]'}`}>{displayName}</span>
+                                      <span className="text-xs text-[#BCAAA4] font-medium tracking-wide">AI 家族</span>
+                                    </div>
                                   </div>
+                                  {isFamilyActive && (
+                                    <div className="h-2.5 w-2.5 rounded-full bg-[#FFB6C1] shadow-sm" />
+                                  )}
                                 </div>
-                                {isSelected && <CheckIcon className="w-5 h-5 text-white" />}
+
+                                {/* Tiers Toggles */}
+                                < div className="px-5 pb-5 pt-1 flex space-x-3" >
+                                  {
+                                    uniqueTiers.map((tier) => {
+                                      const m = tier.model;
+                                      let isTierSelected = false;
+
+                                      if (isMori) {
+                                        if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
+                                          const defaults = modelState.roleDefaultModel?.split(',').map((s: string) => s.trim()) || [];
+                                          isTierSelected = defaults.includes(m.model_id);
+                                        } else {
+                                          isTierSelected = modelState.selectedModelsMulti?.includes(m.model_id) || false;
+                                        }
+                                      } else {
+                                        isTierSelected = modelState.selectedModel === m.model_id;
+                                      }
+
+                                      return (
+                                        <button
+                                          key={m.model_id}
+                                          onMouseDown={async (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const { default: toast } = await import('react-hot-toast');
+
+                                            if (isMori && modelState.setSelectedModelsMulti) {
+                                              let currentSelection = [...(modelState.selectedModelsMulti || [])];
+                                              if (modelState.selectedModel === DEFAULT_MODEL_SENTINEL) {
+                                                modelState.setSelectedModel('');
+                                                currentSelection = [];
+                                              }
+                                              if (currentSelection.includes(m.model_id)) {
+                                                currentSelection = currentSelection.filter(id => id !== m.model_id);
+                                              } else {
+                                                if (currentSelection.length >= 4) {
+                                                  toast.error('最多選擇 4 個模型');
+                                                  return;
+                                                }
+                                                currentSelection.push(m.model_id);
+                                              }
+                                              modelState.setSelectedModelsMulti(currentSelection);
+                                            } else {
+                                              modelState.setSelectedModel(m.model_id);
+                                              modelState.saveFunction(m.model_id);
+                                              toast.success(`已選擇 ${displayName} ${tier.label}`);
+                                            }
+                                          }}
+                                          className={`flex-1 py-3 px-2 rounded-2xl text-xs font-medium transition-all duration-300 flex flex-col items-center justify-center gap-1 ${isTierSelected
+                                            ? tier.label === 'L1'
+                                              ? 'bg-[#FAFAFA] text-[#727272] border border-gray-100 shadow-md transform scale-[1.02]'
+                                              : tier.label === 'L2'
+                                                ? 'bg-[#FDF3C8] text-[#5D4037] border border-[#FDF3C8] shadow-md transform scale-[1.02]'
+                                                : 'bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] text-white shadow-md transform scale-[1.02]'
+                                            : 'bg-[#F5F5F0] text-[#8D6E63] hover:bg-[#EFEBE9] hover:text-[#5D4037]'
+                                            }`}
+                                        >
+                                          <span className="font-extrabold text-sm">{tier.label}</span>
+                                          <span className="w-full text-center opacity-80 truncate px-1 scale-90 font-medium">{tier.desc}</span>
+                                          <span className={`text-[10px] whitespace-nowrap opacity-75 font-semibold flex items-center justify-center gap-0.5 ${isTierSelected ? (tier.label === 'L1' ? 'text-gray-500' : tier.label === 'L2' ? 'text-[#5D4037]/80' : 'text-white/90') : 'text-[#8D6E63]/70'
+                                            }`}>
+                                            {typeof tier.costVal === 'number' ? (
+                                              <>
+                                                {tier.costVal}
+                                                <img src="/apple-icon.svg" alt="food" className="w-3 h-3 -mt-0.5" />
+                                              </>
+                                            ) : (
+                                              tier.costVal
+                                            )}
+                                          </span>
+                                        </button>
+                                      );
+                                    })
+                                  }
+                                </div>
                               </div>
-                            </button>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                       </div>
                       {/* Footer for Multi-select */}
                       {roleId === 'mori' && (
@@ -6205,10 +6452,11 @@ export default function RoomChatPage() {
                         </div>
                       )}
                     </div>
-                  </div>,
+                  </div >,
                   document.body
-                )}
-              </div>
+                )
+                }
+              </div >
             );
           })()}
 

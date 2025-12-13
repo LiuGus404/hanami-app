@@ -16,12 +16,12 @@ export function useUser() {
 
     const loadSession = async () => {
       try {
-        console.log('useUser: 開始獲取會話...');
-        
+
+
         // 首先檢查 Supabase 會話
         const supabase = createClientComponentClient();
         const { data: { session }, error } = await supabase.auth.getSession();
-        
+
         if (session && session.user) {
           console.log('useUser: 找到 Supabase 會話:', session.user);
           // 將 Supabase 用戶轉換為我們的 UserProfile 格式
@@ -40,16 +40,16 @@ export function useUser() {
         } else {
           // 如果沒有 Supabase 會話，檢查自定義會話
           console.log('useUser: 沒有 Supabase 會話，檢查自定義會話');
-          
+
           // 檢查 localStorage 原始數據
           if (typeof window !== 'undefined') {
             const rawSession = localStorage.getItem('hanami_user_session');
             console.log('useUser: localStorage 原始數據:', rawSession);
           }
-          
+
           const userSession = getUserSession();
           console.log('useUser: 獲取到的自定義會話:', userSession);
-          
+
           if (userSession) {
             if (!isMounted) return;
             setUser(userSession);

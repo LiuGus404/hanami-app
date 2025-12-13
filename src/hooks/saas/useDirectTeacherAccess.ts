@@ -31,7 +31,7 @@ export function useDirectTeacherAccess() {
       setLoading(true);
       setError(null);
 
-      console.log('直接 Supabase 查詢教師權限，email:', email);
+
 
       // 直接查詢 hanami_employee 表
       const { data: employeeData, error: employeeError } = await supabase
@@ -40,10 +40,10 @@ export function useDirectTeacherAccess() {
         .eq('teacher_email', email)
         .maybeSingle();
 
-      const typedEmployeeData = employeeData as { teacher_status?: string; [key: string]: any } | null;
+      const typedEmployeeData = employeeData as { teacher_status?: string;[key: string]: any } | null;
       console.log('Supabase 查詢結果:', { employeeData: typedEmployeeData, employeeError });
-      console.log('教師狀態檢查:', { 
-        teacher_status: typedEmployeeData?.teacher_status, 
+      console.log('教師狀態檢查:', {
+        teacher_status: typedEmployeeData?.teacher_status,
         validStatuses: ['active', 'full time', 'part time', 'contract'],
         isValid: typedEmployeeData ? ['active', 'full time', 'part time', 'contract'].includes(typedEmployeeData.teacher_status || '') : false
       });

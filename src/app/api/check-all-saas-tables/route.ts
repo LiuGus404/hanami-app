@@ -51,11 +51,11 @@ export async function GET(request: NextRequest) {
     // 檢查每個已知表是否存在
     for (const tableName of knownTables) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from(tableName)
           .select('*')
           .limit(1);
-        
+
         if (!error) {
           existingTables.push(tableName);
           if (tableName.startsWith('hanami_') || tableName.startsWith('Hanami_')) {
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
     if (existingTables.includes('saas_users')) {
       try {
         // 嘗試獲取 saas_users 表的樣本數據來推斷結構
-        const { data: sampleData, error: sampleError } = await supabase
+        const { data: sampleData, error: sampleError } = await (supabase as any)
           .from('saas_users')
           .select('*')
           .limit(1);
@@ -168,10 +168,10 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('檢查所有 SAAS 表時發生錯誤:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: '檢查表結構時發生錯誤',
-        details: error.message 
+        details: error.message
       },
       { status: 500 }
     );

@@ -610,7 +610,7 @@ export default function MultiCourseScheduleManagementPanel() {
           const saasQueryPromise = saasClient
             .from('saas_users')
             .select('id, email, full_name')
-            .in('id', memberUserIds)
+            .in('id', memberUserIds as string[])
             .then((result: any) => {
               console.log('[MultiCourseScheduleManagementPanel] saas_users 查詢成功返回');
               return result;

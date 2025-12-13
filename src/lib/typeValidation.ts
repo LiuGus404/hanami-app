@@ -56,16 +56,16 @@ export async function validateAllTypes(): Promise<TypeValidationResult> {
 
   try {
     const supabase = createSaasClient();
-    
+
     // 驗證每個表
     for (const tableName of Object.values(DatabaseTable)) {
       const tableResult = await validateTable(tableName);
-      
+
       if (!tableResult.exists) {
         result.errors.push(`表 ${tableName} 不存在`);
         result.isValid = false;
       }
-      
+
       // 檢查必要的列
       const requiredColumns = getRequiredColumns(tableName);
       for (const requiredColumn of requiredColumns) {
@@ -78,15 +78,15 @@ export async function validateAllTypes(): Promise<TypeValidationResult> {
         }
       }
     }
-    
+
     // 檢查表之間的關聯
     await validateTableRelationships(result);
-    
+
   } catch (error) {
     result.errors.push(`型別驗證失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
     result.isValid = false;
   }
-  
+
   return result;
 }
 
@@ -95,7 +95,7 @@ export async function validateAllTypes(): Promise<TypeValidationResult> {
  */
 export async function validateTable(tableName: string): Promise<TableValidationResult> {
   const supabase = createSaasClient();
-  
+
   const result: TableValidationResult = {
     tableName,
     exists: false,
@@ -103,14 +103,14 @@ export async function validateTable(tableName: string): Promise<TableValidationR
     indexes: [],
     constraints: []
   };
-  
+
   try {
     // 檢查表是否存在
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from(tableName)
       .select('*')
       .limit(1);
-    
+
     if (error) {
       if (error.code === 'PGRST116') {
         // 表不存在
@@ -118,14 +118,14 @@ export async function validateTable(tableName: string): Promise<TableValidationR
       }
       throw error;
     }
-    
+
     result.exists = true;
-    
+
     // 獲取表結構資訊
-    const { data: columns, error: columnsError } = await supabase.rpc('get_table_columns', {
+    const { data: columns, error: columnsError } = await (supabase as any).rpc('get_table_columns', {
       table_name: tableName
     } as any);
-    
+
     if (!columnsError && columns && Array.isArray(columns)) {
       result.columns = (columns as any[]).map((col: any) => ({
         name: col.column_name,
@@ -137,19 +137,19 @@ export async function validateTable(tableName: string): Promise<TableValidationR
         isForeignKey: col.is_foreign_key
       }));
     }
-    
+
   } catch (error) {
     console.error(`驗證表 ${tableName} 時發生錯誤:`, error);
   }
-  
+
   return result;
 }
 
 /**
  * 獲取表的必要列定義
  */
-function getRequiredColumns(tableName: string): Array<{name: string, type: string}> {
-  const requiredColumns: Record<string, Array<{name: string, type: string}>> = {
+function getRequiredColumns(tableName: string): Array<{ name: string, type: string }> {
+  const requiredColumns: Record<string, Array<{ name: string, type: string }>> = {
     [DatabaseTable.SAAS_USERS]: [
       { name: 'id', type: 'uuid' },
       { name: 'email', type: 'text' },
@@ -228,7 +228,7 @@ function getRequiredColumns(tableName: string): Array<{name: string, type: strin
       { name: 'timestamp', type: 'timestamp with time zone' }
     ]
   };
-  
+
   return requiredColumns[tableName] || [];
 }
 
@@ -278,15 +278,15 @@ async function validateTableRelationships(result: TypeValidationResult): Promise
       column: 'plan_id'
     }
   ];
-  
+
   for (const rel of relationships) {
     try {
       const supabase = createSaasClient();
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from(rel.from)
         .select(`${rel.column}`)
         .limit(1);
-      
+
       if (error && error.code === 'PGRST116') {
         result.warnings.push(`關聯表 ${rel.from} 不存在，無法驗證與 ${rel.to} 的關聯`);
       }
@@ -303,7 +303,7 @@ export function generateTypeValidationReport(validationResult: TypeValidationRes
   let report = '# HanamiEcho 型別驗證報告\n\n';
   report += `**驗證時間**: ${new Date().toISOString()}\n`;
   report += `**整體狀態**: ${validationResult.isValid ? '✅ 通過' : '❌ 失敗'}\n\n`;
-  
+
   if (validationResult.errors.length > 0) {
     report += '## ❌ 錯誤\n\n';
     validationResult.errors.forEach(error => {
@@ -311,7 +311,7 @@ export function generateTypeValidationReport(validationResult: TypeValidationRes
     });
     report += '\n';
   }
-  
+
   if (validationResult.warnings.length > 0) {
     report += '## ⚠️ 警告\n\n';
     validationResult.warnings.forEach(warning => {
@@ -319,7 +319,7 @@ export function generateTypeValidationReport(validationResult: TypeValidationRes
     });
     report += '\n';
   }
-  
+
   if (validationResult.suggestions.length > 0) {
     report += '## 💡 建議\n\n';
     validationResult.suggestions.forEach(suggestion => {
@@ -327,11 +327,11 @@ export function generateTypeValidationReport(validationResult: TypeValidationRes
     });
     report += '\n';
   }
-  
+
   if (validationResult.isValid && validationResult.warnings.length === 0) {
     report += '## ✅ 所有型別定義都與資料庫結構一致！\n\n';
   }
-  
+
   return report;
 }
 
@@ -340,7 +340,7 @@ export function generateTypeValidationReport(validationResult: TypeValidationRes
  */
 export function checkTypeCompleteness(): string[] {
   const missingTypes: string[] = [];
-  
+
   // 檢查必要的型別定義
   const requiredTypes = [
     'SaasUser',
@@ -353,10 +353,10 @@ export function checkTypeCompleteness(): string[] {
     'CharacterInteraction',
     'UserAnalytics'
   ];
-  
+
   // 這裡可以添加更詳細的檢查邏輯
   // 例如檢查型別定義是否包含所有必要的屬性
-  
+
   return missingTypes;
 }
 
@@ -370,18 +370,18 @@ export function validateTypeSyntax(): TypeValidationResult {
     warnings: [],
     suggestions: []
   };
-  
+
   try {
     // 這裡可以添加 TypeScript 編譯器 API 來檢查型別語法
     // 或者使用其他型別檢查工具
-    
+
     result.suggestions.push('建議使用 TypeScript 編譯器進行更深入的型別檢查');
-    
+
   } catch (error) {
     result.errors.push(`型別語法檢查失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
     result.isValid = false;
   }
-  
+
   return result;
 }
 

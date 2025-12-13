@@ -6,7 +6,8 @@ export async function GET(request: NextRequest) {
     const supabase = createSaasAdminClient();
 
     // 檢查 saas_users 表是否存在
-    const { data: tables, error: tablesError } = await supabase
+    // 檢查 saas_users 表是否存在
+    const { data: tables, error: tablesError } = await (supabase as any)
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
         );
       `;
 
-      const { error: createError } = await supabase.rpc('exec_sql', {
+      const { error: createError } = await (supabase as any).rpc('exec_sql', {
         sql: createTableSQL
       } as any);
 
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
           FOR INSERT WITH CHECK (auth.uid() = id);
       `;
 
-      const { error: rlsError } = await supabase.rpc('exec_sql', {
+      const { error: rlsError } = await (supabase as any).rpc('exec_sql', {
         sql: rlsSQL
       } as any);
 
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 檢查表結構
-    const { data: columns, error: columnsError } = await supabase
+    const { data: columns, error: columnsError } = await (supabase as any)
       .from('information_schema.columns')
       .select('column_name, data_type, is_nullable')
       .eq('table_schema', 'public')

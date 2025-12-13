@@ -41,6 +41,7 @@ import UsageStatsDisplay from '@/components/ai-companion/UsageStatsDisplay';
 import { BlockSelectionModal } from '@/components/ai-companion/BlockSelectionModal';
 import { MindBlock, MindBlockType } from '@/types/mind-block';
 import FoodBalanceButton from '@/components/aihome/FoodBalanceButton';
+import { ModelFamilySelector } from '@/components/ai-companion/ModelFamilySelector';
 
 interface AIRoom {
   id: string;
@@ -174,7 +175,7 @@ export default function AICompanionsPage() {
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [availableModels, setAvailableModels] = useState<any[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [showAllModels, setShowAllModels] = useState(false);
+  const [showAllModels, setShowAllModels] = useState(true);
   const [modelSearch, setModelSearch] = useState('');
   const [modelSelectOpen, setModelSelectOpen] = useState(false);
   const [selectedModelsMulti, setSelectedModelsMulti] = useState<string[]>([]);
@@ -190,13 +191,27 @@ export default function AICompanionsPage() {
 
   const DEFAULT_MODEL_SENTINEL = '__default__';
   // 估算 100 字問題食量（僅輸入成本；3x 食量，轉為「分」）；最少顯示 1 食量
+  // 估算 100 字問題食量（標準化 Tier 費率）
   const computeFoodFor100 = (model: any): number => {
     if (!model) return 1;
-    const inputCost = Number(model.input_cost_usd || 0);
-    const totalUsd = (100 / 1_000_000) * inputCost; // 以 100 tokens 近似 100 字
-    const food = Math.ceil(totalUsd * 3 * 100);
-    const hkd = totalUsd * 3 * 7.85; // 轉 HKD（僅計算不顯示）
-    return Math.max(food, 1);
+
+    // Determine Tier
+    let tier = 'L2'; // Default
+    const level = model.metadata?.level || model.metadata?.image_output_level;
+
+    if (level === 'L1' || level === 'L2' || level === 'L3') {
+      tier = level;
+    } else {
+      // Fallback heuristics
+      if (model.input_cost_usd > 10 || model.input_cost_hkd > 78) tier = 'L3';
+      else tier = 'L2';
+    }
+
+    // Return Cost
+    if (tier === 'L1') return 3;
+    if (tier === 'L2') return 4;
+    if (tier === 'L3') return 20;
+    return 4;
   };
 
   // 移除所有 free 相關字樣的通用函數
@@ -271,10 +286,11 @@ export default function AICompanionsPage() {
     try {
       const supabase = getSaasSupabaseClient();
       const { data, error } = await supabase
-        .from('available_models')
+        .from('model_configs')
         .select('*')
-        .order('is_free', { ascending: false })
-        .order('input_cost_usd', { ascending: true });
+        .eq('is_active', true)
+        .eq('is_available', true)
+        .order('input_cost_hkd', { ascending: true });
 
       if (error) {
         console.error('載入模型配置錯誤:', error);
@@ -285,8 +301,13 @@ export default function AICompanionsPage() {
           { model_id: 'claude-3-5-sonnet', display_name: 'Claude 3.5 Sonnet', description: '創意寫作專家', price_tier: '標準' }
         ]);
       } else {
-        console.log('✅ 成功載入模型配置:', data?.length || 0, '個模型');
-        setAvailableModels(data || []);
+
+        // Map data to ensure compatibility if needed, e.g. calculate is_free
+        const mapped = (data || []).map((m: any) => ({
+          ...m,
+          is_free: (m.input_cost_hkd || 0) === 0
+        }));
+        setAvailableModels(mapped);
       }
     } catch (error) {
       console.error('載入模型配置異常:', error);
@@ -307,7 +328,7 @@ export default function AICompanionsPage() {
 
     // 從資料庫載入角色資訊
     try {
-      console.log('🔍 載入角色資訊，角色 ID:', companion.id);
+
       console.log('🔍 查詢條件: slug =', companion.id, ', status = active');
 
       // 使用映射函數獲取正確的 slug
@@ -340,9 +361,21 @@ export default function AICompanionsPage() {
         // 先取系統預設
         // 對於 Mori，如果資料庫中沒有 default_model 或是舊的 gpt-4o-mini，使用新的多選預設
         const dbDefaultModel = (roleData as any).default_model;
-        const systemDefault = (companion.id === 'mori' && (!dbDefaultModel || dbDefaultModel === 'gpt-4o-mini' || !dbDefaultModel.includes(',')))
-          ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini'
-          : (dbDefaultModel || 'gpt-4o-mini');
+        // 如果 DB 值為舊版 'gpt-4o-mini'，則視為無效/舊值，使用新的系統預設
+        const isOldDefault = !dbDefaultModel || dbDefaultModel === 'gpt-4o-mini';
+
+        let systemDefault = dbDefaultModel || 'gpt-4o-mini';
+
+        if (companion.id === 'mori' && (isOldDefault || !dbDefaultModel.includes(','))) {
+          // Mori 多選預設
+          systemDefault = 'openai/gpt-5-mini,google/gemini-2.5-flash-lite-preview-09-2025,x-ai/grok-4-fast,deepseek/deepseek-v3.2-exp';
+        } else if (companion.id === 'hibi' && isOldDefault) {
+          // Hibi 預設 ChatGPT L1
+          systemDefault = 'openai/gpt-5-mini';
+        } else if (companion.id === 'pico') {
+          // Pico 預設 Gemini 2.5 Flash Image
+          systemDefault = 'google/gemini-2.5-flash-image';
+        }
 
         // 再檢查使用者覆寫（從 user_role_settings 表載入）
         let userOverrideModel = null as string | null;
@@ -851,28 +884,59 @@ export default function AICompanionsPage() {
       let displayName = '';
       let food = 1;
 
+      // Helper to format a single model
+      const formatSingleModel = (m: any, id: string): string => {
+        if (!m) return stripFree(id || '');
+
+        // Determine Tier
+        let tier = 'L2';
+        const level = m.metadata?.level || m.metadata?.image_output_level;
+        if (level === 'L1' || level === 'L2' || level === 'L3') tier = level;
+        else if (m.input_cost_usd > 10 || m.input_cost_hkd > 78) tier = 'L3';
+
+        // Normalize Family Name
+        let familyName = m.metadata?.family || m.provider || 'AI';
+        if (familyName.toLowerCase() === 'openai') familyName = 'ChatGPT';
+        if (familyName.toLowerCase() === 'google') familyName = 'Gemini';
+        if (familyName.toLowerCase() === 'anthropic') familyName = 'Claude';
+        if (familyName.toLowerCase() === 'x-ai') familyName = 'Grok';
+        if (familyName.toLowerCase() === 'deepseek') familyName = 'DeepSeek';
+
+        return `${familyName} ${tier}`;
+      };
+
       if (modelId && modelId.includes(',')) {
-        // 多選模型（Mori）
+        // Multi-model: Format each and join
         const modelIds = modelId.split(',').map(id => id.trim()).filter(Boolean);
         const names = modelIds.map(id => {
           const cleanId = id.replace(/:free/gi, '');
           const m = availableModels.find((x: any) => x.model_id === id || x.model_id === cleanId);
-          return m ? stripFree(m.display_name || '') : cleanId;
+          // If Pico, use display_name; otherwise use Family Tier
+          return companion.id === 'pico'
+            ? (m ? stripFree(m.display_name || '') : cleanId)
+            : formatSingleModel(m, cleanId);
         });
-        displayName = names.join('、');
-        // 計算平均食量
+        displayName = names.join('、'); // using ideographic comma for separation
+
+        // Calculate total food (Sum of all models)
         const foods = modelIds.map(id => {
           const cleanId = id.replace(/:free/gi, '');
           const m = availableModels.find((x: any) => x.model_id === id || x.model_id === cleanId);
           return computeFoodFor100(m);
         });
-        food = Math.ceil(foods.reduce((a, b) => a + b, 0) / foods.length);
+        food = foods.reduce((a, b) => a + b, 0);
       } else {
-        // 單選模型
+        // Single model
         const cleanId = modelId?.replace(/:free/gi, '') || '';
         const m = availableModels.find((x: any) => x.model_id === modelId || x.model_id === cleanId);
-        displayName = m ? stripFree(m.display_name || '') : (modelId || '');
+
         food = computeFoodFor100(m);
+
+        if (companion.id === 'pico') {
+          displayName = m ? stripFree(m.display_name || '') : (cleanId || '未設定');
+        } else {
+          displayName = formatSingleModel(m, cleanId);
+        }
       }
 
       const modelInfo = {
@@ -941,20 +1005,42 @@ export default function AICompanionsPage() {
   };
 
   // 保存角色設定
-  const handleSaveSettings = async () => {
-    if (!selectedCompanion) return;
+  const handleSaveSettings = async (overrideRoleId?: string, overrideModel?: string) => {
+    // If overrideRoleId is provided, we might need to find the companion for it, 
+    // or just assume we are saving for the *selected* companion but with different values?
+    // The previous call stack passed (selectedCompanion.id, saveValue). 
+    // So overrideRoleId is actually the compId or roleId? 
+    // In handleResetToDefaults: handleSaveSettings(selectedCompanion.id, saveValue)
+    // Here we use selectedCompanion.id or overrideRoleId.
+
+    const targetCompanionId = overrideRoleId || selectedCompanion?.id;
+    if (!targetCompanionId) return;
+
+    // Resolve Companion Object (if override provided, we might need to find it from list, 
+    // but simplified assumption: we are operating on the active context or the override ID matches active)
+    // Actually handleResetToDefaults passes selectedCompanion.id.
+
+    const isTargetDefaultRole = ['hibi', 'mori', 'pico'].includes(targetCompanionId);
 
     try {
       // 解析選定模型（支援預設哨兵值）；若啟用多模型則以逗號串接儲存至 default_model
-      const primaryResolved = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
-      const multiResolved = selectedModelsMulti.length > 0 ? selectedModelsMulti : [];
-      const resolvedModel = multiResolved.length > 0 ? multiResolved.join(',') : primaryResolved;
+      // If overrideModel is provided, use it directly.
+      let resolvedModel = '';
+
+      if (overrideModel !== undefined) {
+        resolvedModel = overrideModel;
+      } else {
+        // Use State
+        const primaryResolved = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
+        const multiResolved = selectedModelsMulti.length > 0 ? selectedModelsMulti : [];
+        resolvedModel = multiResolved.length > 0 ? multiResolved.join(',') : primaryResolved;
+      }
 
       // 統一使用 user_role_settings 表儲存用戶設定
       // 先獲取角色 ID
-      const roleSlug = isDefaultRole(selectedCompanion)
-        ? getRoleSlug(selectedCompanion.id)
-        : selectedCompanion.id;
+      const roleSlug = isTargetDefaultRole
+        ? getRoleSlug(targetCompanionId)
+        : targetCompanionId;
 
       const { data: roleData } = await supabase
         .from('ai_roles')
@@ -1090,96 +1176,64 @@ export default function AICompanionsPage() {
   };
 
   // 還原預設設定（刪除 user_role_settings 記錄，恢復系統預設）
+  // 還原預設設定
   const handleResetToDefaults = async () => {
-    if (!selectedCompanion || !user?.id) return;
+    if (!selectedCompanion) return;
     try {
-      console.log('[Reset] start', { role: selectedCompanion.id, user: user.id });
+      console.log('[Reset] start', { role: selectedCompanion.id });
 
-      // 獲取角色 ID
-      const roleSlug = isDefaultRole(selectedCompanion)
-        ? getRoleSlug(selectedCompanion.id)
-        : selectedCompanion.id;
+      // Determine correct defaults based on role
+      let targetModel = DEFAULT_MODEL_SENTINEL;
+      let targetModelsMulti: string[] = [];
 
-      const { data: roleData } = await supabase
-        .from('ai_roles')
-        .select('id')
-        .eq('slug', roleSlug)
-        .maybeSingle();
-
-      const roleId = (roleData as any)?.id;
-      if (!roleId) {
-        console.error('找不到角色:', roleSlug);
-        const { default: toast } = await import('react-hot-toast');
-        toast.error('找不到角色設定', {
-          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
-          duration: 2000,
-          style: {
-            background: '#fff',
-            color: '#4B4036',
-          }
-        });
-        return;
-      }
-
-      // 刪除 user_role_settings 記錄以恢復系統預設
-      const { error } = await supabase
-        .from('user_role_settings')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('role_id', roleId);
-
-      if (error) {
-        console.error('刪除覆寫失敗', error);
-        const { default: toast } = await import('react-hot-toast');
-        toast.error('還原預設失敗', {
-          icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
-          duration: 2000,
-          style: {
-            background: '#fff',
-            color: '#4B4036',
-          }
-        });
+      if (selectedCompanion.id === 'mori') {
+        const moriDefaults = [
+          'openai/gpt-5-mini',
+          'google/gemini-2.5-flash-lite-preview-09-2025',
+          'x-ai/grok-4-fast',
+          'deepseek/deepseek-v3.2-exp'
+        ];
+        targetModelsMulti = moriDefaults;
+        targetModel = ''; // Clear single selection
+      } else if (selectedCompanion.id === 'hibi') {
+        targetModel = 'openai/gpt-5-mini';
+        targetModelsMulti = [];
+      } else if (selectedCompanion.id === 'pico') {
+        targetModel = 'google/gemini-2.5-flash-image';
+        targetModelsMulti = [];
       } else {
-        console.log('[Reset] 覆寫已刪除');
-        const { default: toast } = await import('react-hot-toast');
-        toast.success('已還原為系統預設設定', {
-          icon: <ArrowPathIcon className="w-5 h-5 text-green-600" />,
-          duration: 2000,
-          style: {
-            background: '#fff',
-            color: '#4B4036',
-          }
-        });
+        // Fallback or other roles use system default (sentinel)
+        targetModel = DEFAULT_MODEL_SENTINEL;
+        targetModelsMulti = [];
       }
 
-      // 重設本地狀態
-      setSelectedModelsMulti([]);
-      setSelectedModel(DEFAULT_MODEL_SENTINEL);
-      // 立即套用系統預設模型（避免等待遠端）
-      const systemDefault = selectedCompanion.id === 'mori'
-        ? 'deepseek/deepseek-chat-v3.1,google/gemini-2.5-flash-lite,x-ai/grok-4-fast:free,openai/gpt-5-mini'
-        : (selectedCompanion.id === 'hibi' ? 'openai/gpt-5' : 'google/gemini-2.5-flash-image-preview');
-      setRoleDefaultModel(systemDefault);
+      // Update Local State
+      setSelectedModel(targetModel);
+      setSelectedModelsMulti(targetModelsMulti);
+      setRoleDefaultModel(targetModel === DEFAULT_MODEL_SENTINEL ? '' : targetModel); // optimistic update if needed
 
-      // 如果是 Mori 且是多選模型，立即設置到 selectedModelsMulti
-      if (selectedCompanion.id === 'mori' && systemDefault.includes(',')) {
-        const modelIds = systemDefault.split(',').map(id => id.trim()).filter(Boolean);
-        setSelectedModelsMulti(modelIds);
+      // Save to Server (Override User Settings)
+      // Note for Mori: handleSaveSettings expects single model string as 2nd arg.
+      // If we pass empty string, it might clear it.
+      // But we need to save the multi-select preference somewhere?
+      // Actually, user_role_settings stores 'model_override'.
+      // If Mori, we might need to store the COMMA SEPARATED string?
+      // If targetModel is empty string, we should prob pass the joined string if valid?
+      // Or if handleSaveSettings handles empty string by NOT updating prompt/tone but updating model?
+
+      let saveValue = targetModel;
+      if (selectedCompanion.id === 'mori' && targetModelsMulti.length > 0) {
+        saveValue = targetModelsMulti.join(',');
       }
 
-      // 再重新載入角色資料以確保與資料庫一致（這會重置語氣和指引）
-      await handleRoleSettings(selectedCompanion);
-    } catch (e) {
-      console.error('還原預設失敗:', e);
+      await handleSaveSettings(selectedCompanion.id, saveValue);
+
       const { default: toast } = await import('react-hot-toast');
-      toast.error('還原預設失敗', {
-        icon: <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />,
-        duration: 2000,
-        style: {
-          background: '#fff',
-          color: '#4B4036',
-        }
-      });
+      toast.success('已還原預設值');
+    } catch (error: any) {
+      console.error('還原預設失敗:', error);
+      const { default: toast } = await import('react-hot-toast');
+      toast.error('還原失敗');
     }
   };
 
@@ -1192,7 +1246,7 @@ export default function AICompanionsPage() {
     try {
       setLoadingRooms(true);
 
-      console.log('🔍 開始載入聊天室，用戶 ID:', user.id);
+
 
       // 方法 1: 載入用戶創建的聊天室（簡化權限檢查）
       const { data: allRooms, error: allRoomsError } = await saasSupabase
@@ -1470,7 +1524,7 @@ export default function AICompanionsPage() {
   useEffect(() => {
     if (!user?.id) return;
 
-    console.log('📡 [列表] 開始監聽 ai_messages 更新...');
+
     const channel = saasSupabaseClient
       .channel('room-list-updates')
       .on(
@@ -1545,6 +1599,10 @@ export default function AICompanionsPage() {
       if (companion) {
         getCompanionModel(companion);
       }
+    }
+    // Also force load for ALL companions initally to ensure display text is correct
+    if (availableModels.length > 0 && companions.length > 0) {
+      companions.forEach(c => getCompanionModel(c));
     }
   }, [availableModels, clickedCompanionId]);
 
@@ -1854,15 +1912,7 @@ export default function AICompanionsPage() {
 
       const latestMessage = latestResult.data as { created_at?: string | null, content?: string, id?: string } | null;
 
-      // Debug logging for stale data investigation
-      if (roomId.includes('team') || roomId.includes('project') || (latestMessage && latestMessage.content?.includes('Hibi'))) {
-        console.log(`🔍 [RoomStats] Room ${roomId}:`, {
-          latestId: latestMessage?.id,
-          latestTime: latestMessage?.created_at,
-          latestContent: latestMessage?.content?.substring(0, 20),
-          count: countResult.count
-        });
-      }
+
 
       const lastMessagePreview = formatMessagePreview(latestMessage);
       const lastActivity = latestMessage?.created_at ? new Date(latestMessage.created_at) : null;
@@ -3087,7 +3137,7 @@ export default function AICompanionsPage() {
                                 {companionModels[companion.id]?.displayName || '載入中...'}
                               </div>
                               <div className="flex items-center gap-2 text-xs text-[#2B3A3B]">
-                                <span>100字提問食量：約 {companionModels[companion.id]?.food || 1} 食量</span>
+                                <span>一次查詢：{companionModels[companion.id]?.food || 1} 食量</span>
                                 <img src="/apple-icon.svg" alt="食量" className="w-4 h-4" />
                               </div>
                             </div>
@@ -3508,16 +3558,71 @@ export default function AICompanionsPage() {
                     </motion.div>
                     <p className="mt-4 text-[#2B3A3B] text-lg max-w-2xl mx-auto leading-relaxed">{selectedCompanion.description}</p>
                     {/* 100字問題食量顯示（僅顯示食量與圖示） */}
+                    {/* 模型資訊顯示 */}
                     {(() => {
                       const resolvedId = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
                       const m = availableModels.find((x: any) => x.model_id === resolvedId);
-                      const food = computeFoodFor100(m);
-                      return (
-                        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
-                          <span className="text-sm text-[#4B4036]">100字提問食量：約 {food} 食量</span>
-                          <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
-                        </div>
-                      );
+
+                      // Helper logic (inline for now)
+                      const getTier = (mod: any) => {
+                        if (!mod) return 'L1';
+                        const level = mod.metadata?.level || mod.metadata?.image_output_level;
+                        if (level === 'L1' || level === 'L2' || level === 'L3') return level;
+                        if (mod.input_cost_usd > 10 || mod.input_cost_hkd > 78) return 'L3';
+                        return 'L2';
+                      };
+                      const getCost = (t: string) => {
+                        if (t === 'L1') return 3;
+                        if (t === 'L2') return 4;
+                        if (t === 'L3') return 20;
+                        return 4;
+                      };
+
+                      if (!m) return null;
+
+                      const tier = getTier(m);
+                      const cost = getCost(tier);
+                      const isFreePlan = !user?.subscription_plan_id || user?.subscription_plan_id === 'free';
+                      const isFreeL1 = tier === 'L1' && !isFreePlan; // Unlimited for paid L1
+
+                      if (selectedCompanion.id === 'pico') {
+                        // Pico Display: Specific Model Name
+                        return (
+                          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2 shadow-sm">
+                            <CpuChipIcon className="w-4 h-4 text-[#4B4036]" />
+                            <span className="text-sm font-medium text-[#4B4036]">
+                              {m.display_name}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${tier === 'L1' ? 'bg-gray-100' : tier === 'L2' ? 'bg-amber-100' : 'bg-stone-800 text-white'}`}>
+                              {tier}
+                            </span>
+                            <span className="text-sm text-[#8A7A70] flex items-center">
+                              {cost} <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5 ml-1" />
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        // Hibi/Mori Display: AI Family
+                        let familyName = m.metadata?.family || m.provider || 'AI';
+                        // Normalize
+                        if (familyName.toLowerCase() === 'openai') familyName = 'ChatGPT';
+                        if (familyName.toLowerCase() === 'google') familyName = 'Gemini';
+                        if (familyName.toLowerCase() === 'anthropic') familyName = 'Claude';
+
+                        return (
+                          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2 shadow-sm">
+                            <span className="text-sm font-medium text-[#4B4036]">
+                              {familyName} {tier}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${tier === 'L1' ? 'bg-gray-100' : tier === 'L2' ? 'bg-amber-100' : 'bg-stone-800 text-white'}`}>
+                              {tier}
+                            </span>
+                            <span className="text-sm text-[#8A7A70] flex items-center">
+                              {isFreeL1 ? '無限' : cost} <img src="/apple-icon.svg" alt="食量" className="w-3.5 h-3.5 ml-1" />
+                            </span>
+                          </div>
+                        );
+                      }
                     })()}
                   </motion.div>
 
@@ -3678,292 +3783,48 @@ export default function AICompanionsPage() {
                       </button>
 
                       {openPanels.model && (
-                        <div className="px-4 pb-4 border-t border-[#EADBC8]">
-                          <div className="relative mt-4 space-y-2">
-                            {/* 自訂下拉選單 */}
-                            <div className="relative" ref={modelSelectRef}>
-                              <input
-                                ref={modelInputRef}
-                                type="text"
-                                value={modelSearch}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  setModelSearch(v);
-                                  setModelSelectOpen(true);
+                        <div className="px-4 pb-4 border-t border-[#EADBC8] bg-[#FFF9F2]/30">
+                          {(() => {
+                            let modelsToShow = availableModels;
+                            if (selectedCompanion.id === 'pico') {
+                              modelsToShow = availableModels.filter(m =>
+                                m.model_type === 'image_generation' ||
+                                !!m.metadata?.image_output_level
+                              );
+                            }
 
-                                  if (v === DEFAULT_MODEL_SENTINEL) {
-                                    setSelectedModel(v);
-                                    setModelSearch(''); // 清空以顯示 placeholder
-                                    if (selectedCompanion?.id === 'mori') {
-                                      setSelectedModelsMulti([]); // 清除多選
-                                    }
-                                    return;
-                                  }
-                                  // 只在非 Mori 模式下自動選擇
-                                  if (selectedCompanion?.id !== 'mori') {
-                                    const exists = getFilteredModels().some(m => m.model_id === v) || availableModels.some(m => m.model_id === v);
-                                    if (exists) setSelectedModel(v);
-                                  }
-                                }}
-                                onFocus={() => setModelSelectOpen(true)}
-                                onBlur={() => setTimeout(() => setModelSelectOpen(false), 200)}
-                                placeholder={(() => {
-                                  // Mori 多選模式
-                                  if (selectedCompanion?.id === 'mori') {
-                                    if (selectedModelsMulti.length === 0) {
-                                      return "選擇至少 2 個模型（最多 4 個）";
-                                    }
-                                    return "繼續選擇模型或輸入以搜尋...";
-                                  }
-                                  // 單選模式：顯示預設模型
-                                  if (selectedModel === DEFAULT_MODEL_SENTINEL && roleDefaultModel) {
-                                    const defaultDisplay = formatModelDisplay(roleDefaultModel);
-                                    return defaultDisplay ? `預設（建議）：${defaultDisplay}` : "預設（建議）或輸入以搜尋模型";
-                                  }
-                                  return "預設（建議）或輸入以搜尋模型";
-                                })()}
-                                className="w-full p-3 pr-10 border border-[#EADBC8] rounded-lg focus:ring-2 focus:ring-[#FFB6C1] focus:border-transparent bg-white text-[#4B4036]"
+                            return (
+                              <ModelFamilySelector
+                                availableModels={modelsToShow}
+                                selectedModel={selectedModel}
+                                setSelectedModel={setSelectedModel}
+                                selectedModelsMulti={selectedModelsMulti}
+                                setSelectedModelsMulti={setSelectedModelsMulti}
+                                displayMode={selectedCompanion.id === 'pico' ? 'list' : 'family'}
+                                isMori={selectedCompanion?.id === 'mori'}
+                                roleDefaultModel={roleDefaultModel}
+                                user={user}
+                                modelSearch=""
+                                saveFunction={() => { }}
+                                onClose={() => setOpenPanels(prev => ({ ...prev, model: false }))}
                               />
-                              {/* 下拉箭頭 */}
-                              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                                <motion.div
-                                  animate={{ rotate: modelSelectOpen ? 180 : 0 }}
-                                  transition={{ duration: 0.2 }}
-                                >
-                                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </motion.div>
-                              </div>
+                            );
+                          })()}
 
-                              {/* 自訂下拉選單列表 - 使用 Portal 渲染到 body */}
-                              {typeof document !== 'undefined' && modelSelectOpen && dropdownPosition && createPortal(
-                                <AnimatePresence>
-                                  <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10 }}
-                                    transition={{ duration: 0.2 }}
-                                    style={{
-                                      position: 'fixed',
-                                      top: `${dropdownPosition.top}px`,
-                                      left: `${dropdownPosition.left}px`,
-                                      width: `${dropdownPosition.width}px`,
-                                      zIndex: 9999
-                                    }}
-                                    className="bg-white border border-[#EADBC8] rounded-lg shadow-xl flex flex-col max-h-[400px]"
-                                    data-model-dropdown
-                                  >
-                                    <div className="overflow-y-auto flex-1">
-                                      {/* 預設選項 */}
-                                      <motion.button
-                                        whileHover={{ backgroundColor: "#FFFBEB" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        type="button"
-                                        onMouseDown={(e) => {
-                                          e.preventDefault(); // 防止觸發 onBlur
-                                          setSelectedModel(DEFAULT_MODEL_SENTINEL);
-                                          setModelSearch('');
-                                          setModelSelectOpen(false);
-                                        }}
-                                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${selectedModel === DEFAULT_MODEL_SENTINEL
-                                          ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                          : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                          }`}
-                                      >
-                                        預設（建議）
-                                      </motion.button>
-
-                                      {/* 模型選項 */}
-                                      {getFilteredModels().filter(m => {
-                                        if ((m.price_tier || '').includes('免費') || (m.price_tier || '').toLowerCase().includes('free')) return false;
-                                        if (!modelSearch.trim()) return true;
-                                        const q = modelSearch.toLowerCase();
-                                        return (
-                                          (m.display_name || '').toLowerCase().includes(q) ||
-                                          (m.description || '').toLowerCase().includes(q) ||
-                                          (m.provider || '').toLowerCase().includes(q) ||
-                                          (m.model_id || '').toLowerCase().includes(q)
-                                        );
-                                      }).map((model) => {
-                                        // 對於 Mori，檢查是否在多選列表中
-                                        const isMultiSelected = selectedCompanion?.id === 'mori' && selectedModelsMulti.includes(model.model_id);
-                                        const isSingleSelected = selectedCompanion?.id !== 'mori' && selectedModel === model.model_id;
-                                        const isSelected = isMultiSelected || isSingleSelected;
-                                        const isDisabled = selectedCompanion?.id === 'mori' && !isMultiSelected && selectedModelsMulti.length >= 4;
-
-                                        return (
-                                          <motion.button
-                                            key={model.model_id}
-                                            whileHover={isDisabled ? {} : { backgroundColor: "#FFFBEB" }}
-                                            whileTap={{ scale: 0.98 }}
-                                            type="button"
-                                            disabled={isDisabled}
-                                            onMouseDown={(e) => {
-                                              e.preventDefault(); // 防止觸發 onBlur
-
-                                              if (selectedCompanion?.id === 'mori') {
-                                                // 多選模式
-                                                if (isMultiSelected) {
-                                                  // 取消選擇
-                                                  setSelectedModelsMulti(prev => prev.filter(id => id !== model.model_id));
-                                                } else if (selectedModelsMulti.length < 4) {
-                                                  // 添加選擇
-                                                  setSelectedModelsMulti(prev => [...prev, model.model_id]);
-                                                }
-                                                // 多選模式下不關閉下拉選單
-                                              } else {
-                                                // 單選模式
-                                                setSelectedModel(model.model_id);
-                                                setModelSearch(stripFree(model.display_name || model.model_id));
-                                                setModelSelectOpen(false);
-                                              }
-                                            }}
-                                            className={`w-full text-left px-3 py-2 text-sm transition-colors border-t border-[#EADBC8]/30 ${isSelected
-                                              ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white'
-                                              : isDisabled
-                                                ? 'text-gray-400 cursor-not-allowed'
-                                                : 'text-[#4B4036] hover:bg-[#FFFBEB]'
-                                              }`}
-                                          >
-                                            <div className="flex items-center justify-between">
-                                              <div className="flex-1">
-                                                <div className="font-medium">{stripFree(model.display_name || '')}</div>
-                                                <div className={`text-xs ${isSelected ? 'opacity-90' : 'opacity-80'}`}>
-                                                  {stripFree(model.description || '')} ({stripFree(model.price_tier || '')})
-                                                </div>
-                                              </div>
-                                              {selectedCompanion?.id === 'mori' && (
-                                                <div className="ml-2 flex-shrink-0">
-                                                  {isMultiSelected ? (
-                                                    <motion.div
-                                                      initial={{ scale: 0 }}
-                                                      animate={{ scale: 1 }}
-                                                      className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-sm"
-                                                    >
-                                                      <svg className="w-3 h-3 text-[#FFB6C1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                      </svg>
-                                                    </motion.div>
-                                                  ) : (
-                                                    <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-white/80' : 'border-[#EADBC8]'
-                                                      }`} />
-                                                  )}
-                                                </div>
-                                              )}
-                                            </div>
-                                          </motion.button>
-                                        );
-                                      })}
-                                    </div>
-
-                                    {/* 底部確認按鈕（僅 Mori 多選模式） */}
-                                    {selectedCompanion?.id === 'mori' && (
-                                      <div className="p-3 bg-gray-50 border-t border-[#EADBC8] flex justify-between items-center shrink-0">
-                                        <div className="text-xs text-[#4B4036]">
-                                          已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
-                                        </div>
-                                        <button
-                                          type="button"
-                                          onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            setModelSelectOpen(false);
-                                          }}
-                                          className="px-4 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-md text-sm font-medium hover:bg-[#EBC9A4] transition-colors shadow-sm"
-                                        >
-                                          確認選擇
-                                        </button>
-                                      </div>
-                                    )}
-                                  </motion.div>
-                                </AnimatePresence>,
-                                document.body
-                              )}
-                            </div>
-
-                            {/* 多選模型僅對 Mori 啟用 - 已整合到上方 Portal 下拉選單中 */}
-                            {selectedCompanion?.id === 'mori' && selectedModelsMulti.length > 0 && (
-                              <div className="mt-2">
-                                <div className="flex flex-wrap gap-2">
-                                  {selectedModelsMulti.map(id => {
-                                    const m = availableModels.find(x => x.model_id === id) || getFilteredModels().find(x => x.model_id === id);
-                                    return (
-                                      <motion.span
-                                        key={id}
-                                        initial={{ scale: 0, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0, opacity: 0 }}
-                                        className="inline-flex items-center gap-1 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white text-xs px-3 py-1.5 rounded-full shadow-sm"
-                                      >
-                                        {stripFree(m?.display_name || id)}
-                                        <motion.button
-                                          whileHover={{ scale: 1.1 }}
-                                          whileTap={{ scale: 0.9 }}
-                                          type="button"
-                                          onClick={() => setSelectedModelsMulti(prev => prev.filter(x => x !== id))}
-                                          className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
-                                        >
-                                          <XMarkIcon className="w-3 h-3" />
-                                        </motion.button>
-                                      </motion.span>
-                                    );
-                                  })}
-                                </div>
-                                <div className="mt-2 text-xs text-[#4B4036]">
-                                  已選 {selectedModelsMulti.length} / 4{selectedModelsMulti.length < 2 && '（至少 2 個）'}
-                                </div>
-                              </div>
+                          {/* 模式切換：自動/全部 */}
+                          <div className="mt-4 flex items-center gap-3 text-sm px-2 pt-2 border-t border-[#EADBC8]/50">
+                            <label className="flex items-center gap-2 cursor-pointer select-none group">
+                              <input
+                                type="checkbox"
+                                checked={showAllModels}
+                                onChange={(e) => setShowAllModels(e.target.checked)}
+                                className="rounded border-[#EADBC8] text-[#FFB6C1] focus:ring-[#FFB6C1] cursor-pointer"
+                              />
+                              <span className="text-[#4B4036] group-hover:text-[#FFB6C1] transition-colors">顯示全部模型</span>
+                            </label>
+                            {!showAllModels && (
+                              <span className="text-[#BCAAA4] text-xs">（已根據角色自動篩選）</span>
                             )}
-                          </div>
-
-                          {/* 模式切換：自動/全部（預設角色不顯示） */}
-                          {!isDefaultRole(selectedCompanion!) && (
-                            <div className="mt-3 flex items-center gap-3 text-sm">
-                              <label className="flex items-center gap-2 cursor-pointer select-none">
-                                <input
-                                  type="checkbox"
-                                  checked={showAllModels}
-                                  onChange={(e) => setShowAllModels(e.target.checked)}
-                                />
-                                顯示全部模型（預設自動篩選）
-                              </label>
-                              {!showAllModels && (
-                                <span className="text-[#2B3A3B]">已依角色自動篩選</span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* 選中模型詳情/預設提示 */}
-                          <div className="mt-3 p-3 bg-[#FFF9F2] border border-[#FFB6C1] rounded-lg">
-                            {(() => {
-                              if (selectedModel === DEFAULT_MODEL_SENTINEL) {
-                                return <div className="text-sm text-[#4B4036]">將使用角色的預設模型</div>;
-                              }
-                              const source = getFilteredModels();
-                              const effectiveModelId = selectedModel === DEFAULT_MODEL_SENTINEL ? roleDefaultModel : selectedModel;
-                              const selectedModelData = source.find(m => m.model_id === effectiveModelId) || availableModels.find(m => m.model_id === effectiveModelId);
-                              return selectedModelData ? (
-                                <>
-                                  <div className="flex items-center justify-between">
-                                    <div className="text-sm font-medium text-[#4B4036]">{stripFree(selectedModelData.display_name || '')}</div>
-                                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${stripFree(selectedModelData.price_tier || '') === '免費' || selectedModelData.price_tier === '免費' ? 'bg-green-100 text-green-800' :
-                                      stripFree(selectedModelData.price_tier || '') === '經濟' || selectedModelData.price_tier === '經濟' ? 'bg-blue-100 text-blue-800' :
-                                        stripFree(selectedModelData.price_tier || '') === '標準' || selectedModelData.price_tier === '標準' ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-purple-100 text-purple-800'
-                                      }`}>
-                                      {stripFree(selectedModelData.price_tier || '')}
-                                    </div>
-                                  </div>
-                                  <div className="text-xs text-[#2B3A3B] mt-1">{stripFree(selectedModelData.description || '')}</div>
-                                  {/* 僅顯示食量與圖示，不顯示金額 */}
-                                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white border border-[#EADBC8] px-4 py-2">
-
-                                    <span className="text-sm text-[#4B4036]">100字提問：約 {computeFoodFor100(selectedModelData)} 食量</span>
-                                    <img src="/apple-icon.svg" alt="食量" className="w-5 h-5" />
-                                  </div>
-                                </>
-                              ) : (<div className="text-sm text-[#4B4036]">請選擇模型</div>);
-                            })()}
                           </div>
                         </div>
                       )}
@@ -3979,7 +3840,7 @@ export default function AICompanionsPage() {
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={handleSaveSettings}
+                      onClick={() => handleSaveSettings()}
                       className="flex-1 px-6 py-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] hover:from-[#FFA0B4] hover:to-[#EBC9A4] text-white rounded-xl font-medium transition-all shadow-lg"
                     >
                       保存設定

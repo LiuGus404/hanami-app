@@ -97,7 +97,7 @@ export function useHanamiEcho(userId: string) {
         // 不阻擋流程，因為餘額已經建立
       }
 
-      setFoodBalance(newBalance);
+      setFoodBalance(newBalance as UserFoodBalance);
       return newBalance;
     } catch (err) {
       console.error('初始化食量餘額失敗:', err);
@@ -129,7 +129,7 @@ export function useHanamiEcho(userId: string) {
       }
 
       console.log('loadFoodBalance 成功:', data);
-      setFoodBalance(data);
+      setFoodBalance(data as UserFoodBalance);
     } catch (err) {
       console.error('載入食量餘額錯誤 (catch):', err);
       setError(err instanceof Error ? err.message : '載入食量餘額失敗');
@@ -148,7 +148,7 @@ export function useHanamiEcho(userId: string) {
 
       if (error) throw error;
 
-      setRecentTransactions(data || []);
+      setRecentTransactions((data || []) as FoodTransaction[]);
     } catch (err) {
       console.error('載入交易記錄錯誤:', err);
       setError(err instanceof Error ? err.message : '載入交易記錄失敗');

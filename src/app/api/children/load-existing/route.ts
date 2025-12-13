@@ -6,22 +6,22 @@ export async function GET(request: NextRequest) {
     // 獲取認證用戶
     const saasClient = createSaasClient();
     const { data: { user }, error: authError } = await saasClient.auth.getUser();
-    
+
     if (authError || !user) {
       return NextResponse.json({ error: '未授權訪問' }, { status: 401 });
     }
 
     // 使用管理員客戶端查詢資料庫
     const adminClient = createSaasAdminClient();
-    
+
     // 查詢所有學生資料（試堂和常規學生）
     const [trialStudents, regularStudents] = await Promise.all([
-      adminClient
+      (adminClient as any)
         .from('hanami_trial_students')
         .select('id, full_name, nick_name, student_dob, gender, student_preference, health_notes, contact_number, parent_email')
         .order('created_at', { ascending: false }),
-      
-      adminClient
+
+      (adminClient as any)
         .from('Hanami_Students')
         .select('id, full_name, nick_name, student_dob, gender, student_preference, health_notes, contact_number, parent_email')
         .order('created_at', { ascending: false })
@@ -47,10 +47,10 @@ export async function GET(request: NextRequest) {
       if (student.student_dob) {
         const birthDate = new Date(student.student_dob);
         const today = new Date();
-        ageMonths = (today.getFullYear() - birthDate.getFullYear()) * 12 + 
-                   (today.getMonth() - birthDate.getMonth());
+        ageMonths = (today.getFullYear() - birthDate.getFullYear()) * 12 +
+          (today.getMonth() - birthDate.getMonth());
       }
-      
+
       return {
         ...student,
         age_months: ageMonths,

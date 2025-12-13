@@ -6,14 +6,14 @@ export async function GET(request: NextRequest) {
     // 從查詢參數獲取用戶 ID
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
-    
+
     if (!userId) {
       return NextResponse.json({ error: '缺少用戶 ID' }, { status: 400 });
     }
 
     // 使用管理員客戶端查詢資料庫
     const adminClient = createSaasAdminClient();
-    
+
     // 查詢家長綁定的學生資料
     const { data: bindings, error: bindingError } = await adminClient
       .from('parent_student_bindings')
@@ -44,15 +44,15 @@ export async function GET(request: NextRequest) {
 
     // 獲取學生詳細資料
     const studentIds = (bindings as any[]).map((b: any) => b.student_id);
-    
+
     // 查詢試堂學生
-    const { data: trialStudents, error: trialError } = await adminClient
+    const { data: trialStudents, error: trialError } = await (adminClient as any)
       .from('hanami_trial_students')
       .select('id, full_name, nick_name, student_dob, gender, student_preference, health_notes, contact_number, parent_email')
       .in('id', studentIds);
 
     // 查詢常規學生
-    const { data: regularStudents, error: regularError } = await adminClient
+    const { data: regularStudents, error: regularError } = await (adminClient as any)
       .from('Hanami_Students')
       .select('id, full_name, nick_name, student_dob, gender, student_preference, health_notes, contact_number, parent_email')
       .in('id', studentIds);
@@ -77,10 +77,10 @@ export async function GET(request: NextRequest) {
       if (student.student_dob) {
         const birthDate = new Date(student.student_dob);
         const today = new Date();
-        ageMonths = (today.getFullYear() - birthDate.getFullYear()) * 12 + 
-                   (today.getMonth() - birthDate.getMonth());
+        ageMonths = (today.getFullYear() - birthDate.getFullYear()) * 12 +
+          (today.getMonth() - birthDate.getMonth());
       }
-      
+
       return {
         ...student,
         age_months: ageMonths,

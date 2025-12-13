@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     // 計算排行榜
     // 1. 獲取該機構的所有老師/員工
-    let employeesQuery = supabase
+    let employeesQuery = (supabase as any)
       .from('hanami_employee')
       .select('teacher_fullname, teacher_nickname');
 

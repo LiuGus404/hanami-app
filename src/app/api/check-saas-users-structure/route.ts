@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const supabase = createSaasAdminClient();
 
     // 檢查 saas_users 表是否存在
-    const { data: tableExists, error: tableError } = await supabase
+    const { data: tableExists, error: tableError } = await (supabase as any)
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取 saas_users 表的欄位結構
-    const { data: columns, error: columnsError } = await supabase
+    const { data: columns, error: columnsError } = await (supabase as any)
       .from('information_schema.columns')
       .select(`
         column_name,
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 獲取表的約束條件
-    const { data: constraints, error: constraintsError } = await supabase
+    const { data: constraints, error: constraintsError } = await (supabase as any)
       .from('information_schema.table_constraints')
       .select(`
         constraint_name,
@@ -56,28 +56,28 @@ export async function GET(request: NextRequest) {
       .eq('table_name', 'saas_users');
 
     // 獲取索引信息
-    const { data: indexes, error: indexesError } = await supabase
+    const { data: indexes, error: indexesError } = await (supabase as any)
       .from('pg_indexes')
       .select('indexname, indexdef')
       .eq('tablename', 'saas_users')
       .eq('schemaname', 'public');
 
     // 獲取觸發器信息
-    const { data: triggers, error: triggersError } = await supabase
+    const { data: triggers, error: triggersError } = await (supabase as any)
       .from('information_schema.triggers')
       .select('trigger_name, event_manipulation, action_statement')
       .eq('event_object_schema', 'public')
       .eq('event_object_table', 'saas_users');
 
     // 獲取 RLS 政策
-    const { data: policies, error: policiesError } = await supabase
+    const { data: policies, error: policiesError } = await (supabase as any)
       .from('pg_policies')
       .select('policyname, permissive, roles, cmd, qual, with_check')
       .eq('tablename', 'saas_users')
       .eq('schemaname', 'public');
 
     // 獲取樣本數據
-    const { data: sampleData, error: sampleError } = await supabase
+    const { data: sampleData, error: sampleError } = await (supabase as any)
       .from('saas_users')
       .select('*')
       .limit(3);
@@ -105,10 +105,10 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('檢查 saas_users 表結構時發生錯誤:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: '檢查表結構時發生錯誤',
-        details: error.message 
+        details: error.message
       },
       { status: 500 }
     );

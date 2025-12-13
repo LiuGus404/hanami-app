@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
         // In a real multi-tenant app, filter by org/user.
         // For now, listing all for authenticated users.
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from('hanami_task_templates')
             .select('*')
             .order('created_at', { ascending: false });
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from('hanami_task_templates')
             // @ts-ignore
             .insert([{
@@ -73,7 +73,7 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
             .from('hanami_task_templates')
             // @ts-ignore
             .update({
@@ -108,7 +108,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Template ID is required' }, { status: 400 });
         }
 
-        const { error } = await supabase
+        const { error } = await (supabase as any)
             .from('hanami_task_templates')
             .delete()
             .eq('id', id);

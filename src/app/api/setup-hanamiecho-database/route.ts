@@ -267,15 +267,15 @@ export async function POST(request: NextRequest) {
     `;
 
     // 執行遷移
-    const { data, error } = await supabase.rpc('exec_sql', { sql: migrationSQL } as any);
+    const { data, error } = await (supabase as any).rpc('exec_sql', { sql: migrationSQL } as any);
 
     if (error) {
       console.error('資料庫遷移失敗:', error);
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: '資料庫遷移失敗',
-          details: error.message 
+          details: error.message
         },
         { status: 500 }
       );
@@ -320,10 +320,10 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('設置 HanamiEcho 資料庫時發生錯誤:', error);
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: '設置資料庫時發生錯誤',
-        details: error.message 
+        details: error.message
       },
       { status: 500 }
     );
