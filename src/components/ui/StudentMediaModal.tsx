@@ -379,13 +379,6 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
 
           if (mediaType === 'video' && videoExtensions.includes(extension)) {
             isTypeAllowed = true;
-            // 修正 MIME type 以確保這後的上傳流程正常
-            if (!file.type) {
-              Object.defineProperty(file, 'type', {
-                value: 'video/mp4',
-                writable: false
-              });
-            }
           } else if (mediaType === 'photo' && photoExtensions.includes(extension)) {
             isTypeAllowed = true;
           }
@@ -768,18 +761,31 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
           // 這一步繞過 Next.js 伺服器，直接對接 Storage，解決記憶體與逾時問題
           // [STEP 2] 直接上傳到 Supabase Storage (使用 XMLHttpRequest 以支援進度和避免 fetch 記憶體問題)
           try {
+            // [STEP 2] 直接上傳到 Supabase Storage (使用 XMLHttpRequest 以支援進度和避免 fetch 記憶體問題)
             await new Promise<void>((resolve, reject) => {
               const xhr = new XMLHttpRequest();
               xhr.open('PUT', prepareData.uploadUrl);
-              xhr.setRequestHeader('Content-Type', fileToUpload.type || 'application/octet-stream');
+
+              // 修正：使用判斷出的 mediaType 對應的 MIME type，或者默認值
+              const contentType = file.type || (mediaType === 'video' ? 'video/mp4' : 'image/jpeg');
+              xhr.setRequestHeader('Content-Type', contentType);
               xhr.setRequestHeader('Cache-Control', '3600');
 
-              // 上傳進度監聽
+              // 上傳進度監聽 (加入節流以防止 React 渲染過度導致崩潰)
+              let lastUpdate = 0;
+              let lastPercent = 0;
+
               xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {
+                  const now = Date.now();
                   const percent = Math.round((event.loaded / event.total) * 100);
-                  // 使用函數式更新以避免閉包問題，並限制更新頻率（這裡雖未顯式節流，但 React 狀態更新通常會批次處理）
-                  setUploadProgress(prev => ({ ...prev, [file.name]: percent }));
+
+                  // 僅當進度變化 >= 1% 且距離上次更新超過 100ms 時才更新狀態，或者已完成(100%)
+                  if ((percent > lastPercent && now - lastUpdate > 100) || percent === 100) {
+                    setUploadProgress(prev => ({ ...prev, [file.name]: percent }));
+                    lastUpdate = now;
+                    lastPercent = percent;
+                  }
                 }
               };
 
@@ -1347,6 +1353,14 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
     img.src = URL.createObjectURL(file);
   };
 
+  // 使用 useMemo 優化計算，避免每次渲染都重新計算 (減少上傳進度更新時的 Lag)
+  const counts = useMemo(() => {
+    return {
+      videoCount: media.filter(m => m.media_type === 'video').length,
+      photoCount: media.filter(m => m.media_type === 'photo').length
+    };
+  }, [media]);
+
   if (!isOpen || !student) return null;
 
   return (
@@ -1382,15 +1396,11 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
                 </svg>
               </div>
               <h3 className="text-base sm:text-lg font-bold text-gray-700">媒體統計</h3>
-              {/* 容量狀態指示器 */}
               <div className="flex items-center gap-1 ml-2">
                 {(() => {
-                  const videoCount = media.filter(m => m.media_type === 'video').length;
-                  const photoCount = media.filter(m => m.media_type === 'photo').length;
-                  const videoLimit = quotaLevel?.video_limit || 5;
-                  const photoLimit = quotaLevel?.photo_limit || 10;
-                  const isNearLimit = videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2;
-                  const isAtLimit = videoCount >= videoLimit || photoCount >= photoLimit;
+                  // 使用 useMemo 優化的計算結果
+                  const isNearLimit = counts.videoCount >= (quotaLevel?.video_limit || 5) - 1 || counts.photoCount >= (quotaLevel?.photo_limit || 10) - 2;
+                  const isAtLimit = counts.videoCount >= (quotaLevel?.video_limit || 5) || counts.photoCount >= (quotaLevel?.photo_limit || 10);
 
                   if (isAtLimit) {
                     return (
