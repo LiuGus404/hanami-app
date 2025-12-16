@@ -55,6 +55,8 @@ export default function SimpleStudentDetailPage() {
   const [isStudentBound, setIsStudentBound] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const handleTabChange = (tabKey: 'basic' | 'lessons' | 'avatar' | 'media') => {
     // 檢查是否為需要 premium 的功能
     const studentOrgId = student?.org_id ?? null;
@@ -111,7 +113,8 @@ export default function SimpleStudentDetailPage() {
     if (loading || !user || !id) return;
 
     // 如果 ID 沒有變化且已經載入過，不重複載入
-    if (currentIdRef.current === id && dataFetchedRef.current) return;
+    // 当 refreshTrigger 变化时，我们希望重新加载，所以这里需要放宽条件
+    if (currentIdRef.current === id && dataFetchedRef.current && refreshTrigger === 0) return;
 
     // 防止重複載入
     if (loadingRef.current) return;
@@ -120,10 +123,13 @@ export default function SimpleStudentDetailPage() {
     // 更新當前 ID
     currentIdRef.current = id as string;
 
-    setPageLoading(true);
-    setStudent(null);
-    setError(null);
-    setIsInactiveStudent(false);
+    // 只在第一次加载时显示页面级 loading
+    if (refreshTrigger === 0) {
+      setPageLoading(true);
+      setStudent(null);
+      setError(null);
+      setIsInactiveStudent(false);
+    }
 
     const fetchStudent = async () => {
       try {
@@ -142,9 +148,11 @@ export default function SimpleStudentDetailPage() {
         dataFetchedRef.current = true;
         loadingRef.current = false;
 
-        await logAccess(payload.data.id, institution, 'view');
-        await checkBindingStatus(payload.data.id);
-        await checkLessonData(payload.data.id);
+        if (refreshTrigger === 0) {
+          await logAccess(payload.data.id, institution, 'view');
+          await checkBindingStatus(payload.data.id);
+          await checkLessonData(payload.data.id);
+        }
       } catch (err: any) {
         console.error('Error fetching student:', err);
         setError(err?.message || '發生錯誤，請稍後再試');
@@ -196,7 +204,7 @@ export default function SimpleStudentDetailPage() {
     };
 
     fetchStudent();
-  }, [user, loading, id, institution]);
+  }, [user, loading, id, institution, refreshTrigger]);
 
   // 當 ID 變化時重置防抖狀態
   useEffect(() => {
@@ -438,11 +446,13 @@ export default function SimpleStudentDetailPage() {
                       }
                       onPendingClick={() => setShowPendingModal(true)}
                       isParentView={true}
+                      onCourseUpdate={() => setRefreshTrigger(prev => prev + 1)}
                     />
                   );
                 })()}
               </div>
             )}
+
 
             {student && (
               <StudentPendingRequestsModal

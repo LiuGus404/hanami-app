@@ -168,7 +168,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
     };
 
     fetchStudent();
-  }, [studentId, orgId, orgDataDisabled, organizationResolved]);
+  }, [studentId, orgId, orgDataDisabled, organizationResolved, courseUpdateTrigger]);
 
   const handleRestoreStudent = async () => {
     if (!student || !isInactiveStudent || !orgId) return;
@@ -414,8 +414,8 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
           )}
 
           {activeTab === 'avatar' && student && (
-            <EnhancedStudentAvatarTab 
-              student={student} 
+            <EnhancedStudentAvatarTab
+              student={student}
               className="mt-4"
               isTeacher={true}
               orgId={orgId}
