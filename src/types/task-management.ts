@@ -668,3 +668,23 @@ export const DEFAULT_TASK_MANAGEMENT_CONFIG: TaskManagementConfig = {
     analytics: true
   }
 };
+// ... existing code ...
+export interface Reward {
+  id: string;
+  title: string;
+  points_cost: number;
+  icon?: string;
+  org_id?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Redemption {
+  id: string;
+  user_id: string;
+  reward_id: string;
+  points_spent: number;
+  redeemed_by?: string;
+  created_at: string;
+}

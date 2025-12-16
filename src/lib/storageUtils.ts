@@ -9,9 +9,9 @@ export const FILE_LIMITS = {
   video: {
     maxSize: 20 * 1024 * 1024, // 20MB
     allowedTypes: [
-      'video/mp4', 
-      'video/mov', 
-      'video/avi', 
+      'video/mp4',
+      'video/mov',
+      'video/avi',
       'video/quicktime',  // QuickTime 格式
       'video/x-msvideo',  // AVI 格式
       'video/x-ms-wmv',   // WMV 格式
@@ -25,8 +25,8 @@ export const FILE_LIMITS = {
   photo: {
     maxSize: 1 * 1024 * 1024, // 1MB
     allowedTypes: [
-      'image/jpeg', 
-      'image/png', 
+      'image/jpeg',
+      'image/png',
       'image/webp',
       'image/gif',        // GIF 格式
       'image/bmp',        // BMP 格式
@@ -49,10 +49,27 @@ export const validateFile = (file: File, mediaType: MediaType): { valid: boolean
   const limits = FILE_LIMITS[mediaType];
 
   // 檢查檔案類型
-  if (!limits.allowedTypes.includes(file.type)) {
+  let isTypeAllowed = limits.allowedTypes.includes(file.type);
+
+  // Android/iOS 相容性修復：如果 MIME type 檢查失敗，檢查副檔名
+  if (!isTypeAllowed) {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (extension) {
+      const videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'webm', 'ogg', 'm4v', '3gp', '3g2'];
+      const photoExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'svg', 'heic'];
+
+      if (mediaType === 'video' && videoExtensions.includes(extension)) {
+        isTypeAllowed = true;
+      } else if (mediaType === 'photo' && photoExtensions.includes(extension)) {
+        isTypeAllowed = true;
+      }
+    }
+  }
+
+  if (!isTypeAllowed) {
     return {
       valid: false,
-      error: `不支援的檔案類型: ${file.type}。允許的類型: ${limits.allowedTypes.join(', ')}`
+      error: `不支援的檔案類型: ${file.type || file.name}。允許的類型: ${limits.allowedTypes.join(', ')}`
     };
   }
 
@@ -158,7 +175,7 @@ export const getFileUrl = (filePath: string): string => {
   const { data } = supabase.storage
     .from('hanami-media')
     .getPublicUrl(filePath);
-  
+
   return data.publicUrl;
 };
 
@@ -197,15 +214,15 @@ export const getVideoDuration = (file: File): Promise<number> => {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.preload = 'metadata';
-    
+
     video.onloadedmetadata = () => {
       resolve(Math.round(video.duration));
     };
-    
+
     video.onerror = () => {
       reject(new Error('無法讀取影片時長'));
     };
-    
+
     video.src = URL.createObjectURL(file);
   });
 };
@@ -216,11 +233,11 @@ export const generateThumbnail = async (videoFile: File): Promise<Blob> => {
     const video = document.createElement('video');
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    
+
     video.onloadeddata = () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      
+
       if (ctx) {
         ctx.drawImage(video, 0, 0);
         canvas.toBlob((blob) => {
@@ -234,11 +251,11 @@ export const generateThumbnail = async (videoFile: File): Promise<Blob> => {
         reject(new Error('無法獲取 canvas 上下文'));
       }
     };
-    
+
     video.onerror = () => {
       reject(new Error('無法載入影片'));
     };
-    
+
     video.src = URL.createObjectURL(videoFile);
   });
 };
@@ -246,11 +263,11 @@ export const generateThumbnail = async (videoFile: File): Promise<Blob> => {
 // 格式化檔案大小
 export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 

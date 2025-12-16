@@ -1,21 +1,29 @@
 import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Task, DEFAULT_STATUS_CONFIG, DEFAULT_PRIORITY_CONFIG } from '@/types/task-management';
+import { Task, TaskStatus, TaskPriority, TaskCategory, TaskStats as ITaskStats, DEFAULT_STATUS_CONFIG, DEFAULT_PRIORITY_CONFIG } from '@/types/task-management';
 import TaskCard from './TaskCard';
 import SharedTaskSection from './SharedTaskSection';
 import { motion, AnimatePresence } from 'framer-motion';
+import { RewardsSection } from './RewardsSection';
 
 interface TaskDashboardProps {
   userPhone?: string;
-  orgId?: string;
   userEmail?: string;
+  userName?: string;
+  orgId?: string;
   onTaskEdit: (task: Task) => void;
+  onTaskDelete: (task: Task) => void;
+  onTaskStatusChange: (task: Task, newStatus: string) => void;
+  onTaskProgressUpdate: (task: Task, progress: number) => void;
+  onTaskAssign: (task: Task, assignedTo: string[]) => void;
+  onTaskApprove?: (task: Task) => void;
   onTaskCreate: () => void;
+  stats?: ITaskStats;
+  canApprove?: boolean;
   taskFilter?: 'all' | 'personal' | 'shared';
   userSession?: any;
   personalTasks?: Task[];
   onFilteredTasksChange?: (tasks: Task[]) => void;
-  canApprove?: boolean;
 }
 
 interface LeaderboardEntry {
@@ -25,19 +33,28 @@ interface LeaderboardEntry {
   rank: number;
 }
 
-interface TaskStats {
-  totalPoints: number;
-  approvedTasks: number;
-  leaderboard: LeaderboardEntry[];
-}
+// Keeping this local interface if needed for legacy compatibility or just rely on ITaskStats.
+// ITaskStats has `leaderboard` and `total_tasks` etc.
+// The stats state is initialized with ITaskStats | null.
 
 export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit, onTaskCreate, taskFilter, userSession, personalTasks, onFilteredTasksChange, canApprove = false }: TaskDashboardProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [stats, setStats] = useState<TaskStats | null>(null);
+  const [stats, setStats] = useState<ITaskStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>(['pending', 'in_progress']);
+
+  useEffect(() => {
+    fetchTasks();
+    fetchStats();
+  }, [userPhone, orgId, taskFilter]);
+  // ... (fetchTasks and fetchStats functions are below)
+
+  // ... rest of the component
+
+  // Skip to rendering part to fix myStats usage
+
 
   useEffect(() => {
     fetchTasks();
@@ -119,10 +136,26 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
       ));
 
       // 2. API Call
+      // Determine approval status
+      const isCompleted = newStatus === 'completed';
+      const autoApprove = isCompleted && canApprove;
+
+      const updatePayload: any = {
+        status: newStatus,
+        // If moving to completed:
+        // - Admins auto-approve
+        // - Users need approval (is_approved = false)
+        // If moving OUT of completed:
+        // - Reset approval (is_approved = false)
+        is_approved: autoApprove,
+        approved_by: autoApprove ? (userSession?.name || 'Admin') : null,
+        approved_at: autoApprove ? new Date().toISOString() : null
+      };
+
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(updatePayload),
       });
 
       if (!response.ok) {
@@ -130,7 +163,7 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
         console.log('Update failed body:', errorText);
         let errorData: any = {};
         try { errorData = JSON.parse(errorText); } catch (e) { }
-        throw new Error(`Failed to update status: ${errorData?.details || errorData?.error || response.statusText}`);
+        throw new Error(`Failed to update status: ${errorData?.details || errorData?.error || response.statusText} `);
       }
 
       const updatedTask = await response.json();
@@ -291,6 +324,14 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
           </div>
         </div>
       </div>
+
+      {/* Rewards Section */}
+      <RewardsSection
+        orgId={orgId || localStorage.getItem('hanami_org_id') || undefined}
+        isAdmin={canApprove}
+        totalEarnedPoints={stats?.leaderboard?.find(l => l.user_name === userSession?.name)?.points || 0}
+        currentUserId={userSession?.id}
+      />
 
       {/* Stats & Leaderboard Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

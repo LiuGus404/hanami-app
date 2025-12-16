@@ -14,6 +14,74 @@ export type Database = {
   }
   public: {
     Tables: {
+      hanami_task_rewards: {
+        Row: {
+          id: string
+          org_id: string
+          title: string
+          points_cost: number
+          icon: string | null
+          is_active: boolean | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          org_id: string
+          title: string
+          points_cost: number
+          icon?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          org_id?: string
+          title?: string
+          points_cost?: number
+          icon?: string | null
+          is_active?: boolean | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      },
+      hanami_task_redemptions: {
+        Row: {
+          id: string
+          user_id: string
+          reward_id: string
+          points_spent: number
+          redeemed_at: string | null
+          redeemed_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          reward_id: string
+          points_spent: number
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          reward_id?: string
+          points_spent?: number
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hanami_task_redemptions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "hanami_task_rewards"
+            referencedColumns: ["id"]
+          }
+        ]
+      },
       ai_messages: {
         Row: {
           attachments: Json | null
