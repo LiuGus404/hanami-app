@@ -75,6 +75,13 @@ export function SecureImageDisplay({
         setIsLoading(true);
         setHasError(false);
 
+        // ⭐ Data URI 直接使用，不經過任何處理
+        if (imageUrl.startsWith('data:')) {
+          setSignedUrl(imageUrl);
+          setIsLoading(false);
+          return;
+        }
+
         // ⭐ bucket 已改為 public，只需要將 sign/authenticated URL 轉換為 public URL
         if (needsSignedUrl(imageUrl)) {
           // ⭐ 使用緩存，避免重複請求
@@ -130,6 +137,14 @@ export function SecureImageDisplay({
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     console.error('❌ [SecureImage] 圖片載入失敗');
+
+    // Data URI 失敗不嘗試代理
+    if (imageUrl.startsWith('data:')) {
+      setHasError(true);
+      setIsLoading(false);
+      if (onError) onError(e);
+      return;
+    }
 
     // ⭐ 如果當前 URL 是公開 URL 但載入失敗，嘗試使用代理 API
     if (signedUrl.includes('/storage/v1/object/public/ai-images')) {

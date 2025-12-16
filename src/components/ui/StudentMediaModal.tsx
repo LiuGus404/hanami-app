@@ -60,6 +60,7 @@ interface StudentLesson {
 interface StudentMediaModalProps {
   isOpen: boolean;
   onClose: () => void;
+  canManageApproval?: boolean;
   student: StudentWithMedia | null;
   onQuotaChanged?: () => void; // 新增：配額更改回調
   orgId?: string | null; // 新增：機構 ID
@@ -78,7 +79,7 @@ interface MediaQuotaLevel {
   [key: string]: unknown;
 }
 
-export default function StudentMediaModal({ isOpen, onClose, student, onQuotaChanged, orgId }: StudentMediaModalProps) {
+export default function StudentMediaModal({ isOpen, onClose, canManageApproval = false, student, onQuotaChanged, orgId }: StudentMediaModalProps) {
   // 自定義關閉函數，重置所有狀態
   const handleClose = () => {
     // 重置所有上傳相關狀態
@@ -249,7 +250,8 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
         title: media.title ?? undefined,
         description: media.description ?? undefined,
         uploaded_by: media.uploaded_by ?? undefined,
-        is_favorite: media.is_favorite ?? undefined
+        is_favorite: media.is_favorite ?? undefined,
+        is_approved: media.is_approved ?? false // Default to false if not set
       })));
     } catch (error) {
       console.error('載入媒體失敗:', error);
@@ -366,8 +368,32 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       const limits = DEFAULT_MEDIA_LIMITS[mediaType];
 
       // 檢查檔案格式
-      if (!limits.allowedTypes.includes(file.type)) {
-        errors.push(`不支援的檔案格式: ${file.type}`);
+      let isTypeAllowed = limits.allowedTypes.includes(file.type);
+
+      // Android/iOS 相容性修復：如果 MIME type 檢查失敗，檢查副檔名
+      if (!isTypeAllowed) {
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        if (extension) {
+          const videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'webm', 'ogg', 'm4v', '3gp', '3g2'];
+          const photoExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'svg', 'heic']; // 加入 heic 支援
+
+          if (mediaType === 'video' && videoExtensions.includes(extension)) {
+            isTypeAllowed = true;
+            // 修正 MIME type 以確保這後的上傳流程正常
+            if (!file.type) {
+              Object.defineProperty(file, 'type', {
+                value: 'video/mp4',
+                writable: false
+              });
+            }
+          } else if (mediaType === 'photo' && photoExtensions.includes(extension)) {
+            isTypeAllowed = true;
+          }
+        }
+      }
+
+      if (!isTypeAllowed) {
+        errors.push(`不支援的檔案格式: ${file.type || file.name}`);
       }
 
       // 檢查檔案大小限制（使用配額等級的實際限制）
@@ -512,14 +538,6 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
       // 如果沒有選擇檔案，只檢查當前容量
       if (!selectedFiles || selectedFiles.length === 0) {
-        if (currentVideoCount >= videoLimit) {
-          return { hasSpace: false, message: `影片數量已達上限 (${currentVideoCount}/${videoLimit})` };
-        }
-
-        if (currentPhotoCount >= photoLimit) {
-          return { hasSpace: false, message: `相片數量已達上限 (${currentPhotoCount}/${photoLimit})` };
-        }
-
         if (currentStorageUsedMB >= storageLimitMB) {
           return { hasSpace: false, message: `儲存空間已達上限 (${currentStorageUsedMB.toFixed(2)}MB/${storageLimitMB}MB)` };
         }
@@ -542,20 +560,6 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       const totalStorageUsedMB = currentStorageUsedMB + newStorageSizeMB;
 
       // 容量檢查日誌已移除以提高性能
-
-      if (totalVideoCount > videoLimit) {
-        return {
-          hasSpace: false,
-          message: `影片數量將超過上限 (當前: ${currentVideoCount}, 新增: ${newVideoCount}, 限制: ${videoLimit})`
-        };
-      }
-
-      if (totalPhotoCount > photoLimit) {
-        return {
-          hasSpace: false,
-          message: `相片數量將超過上限 (當前: ${currentPhotoCount}, 新增: ${newPhotoCount}, 限制: ${photoLimit})`
-        };
-      }
 
       if (totalStorageUsedMB > storageLimitMB) {
         return {
@@ -588,13 +592,14 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     }, 0);
 
     // 檢查是否達到任何限制
-    const isVideoFull = videoCount >= videoLimit;
-    const isPhotoFull = photoCount >= photoLimit;
+    // 檢查是否達到任何限制
+    // const isVideoFull = videoCount >= videoLimit;
+    // const isPhotoFull = photoCount >= photoLimit;
     const isStorageFull = currentStorageUsedMB >= storageLimitMB;
 
-    if (isVideoFull || isPhotoFull || isStorageFull) {
+    if (isStorageFull) {
       return { status: 'full', message: '容量已滿' };
-    } else if (videoCount >= videoLimit - 1 || photoCount >= photoLimit - 2 || currentStorageUsedMB >= storageLimitMB * 0.9) {
+    } else if (currentStorageUsedMB >= storageLimitMB * 0.9) {
       return { status: 'near', message: '容量緊張' };
     } else {
       return { status: 'ok', message: '容量充足' };
@@ -730,39 +735,94 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
           }
 
           // 壓縮檔案（如果需要）
-          const compressedFile = await compressFile(file, maxSizeMB);
+          const fileToUpload = await compressFile(file, maxSizeMB);
 
-          console.log('檔案壓縮後大小:', (compressedFile.size / (1024 * 1024)).toFixed(2) + 'MB');
+          console.log('檔案壓縮後大小:', (fileToUpload.size / (1024 * 1024)).toFixed(2) + 'MB');
 
-          // 嘗試使用 API 上傳
+          // [STEP 1] 準備上傳：獲取 Signed URL
+          let prepareData;
           try {
-            // 準備 FormData
-            const formData = new FormData();
-            formData.append('file', compressedFile);
-            formData.append('studentId', student!.id);
-            formData.append('mediaType', mediaType);
-            if (orgId) {
-              formData.append('orgId', orgId);
-            }
-
-            const response = await fetch('/api/student-media/upload', {
+            const prepareRes = await fetch('/api/student-media/prepare-upload', {
               method: 'POST',
-              body: formData,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                studentId: student!.id,
+                fileSize: fileToUpload.size,
+                mediaType,
+                originalName: file.name,
+                orgId
+              })
             });
 
-            let result;
-            try {
-              result = await response.json();
-            } catch (e) {
-              console.error('API 回應解析失敗:', e);
-              throw new Error(`上傳失敗: 伺服器回應格式錯誤 (${response.status})`);
+            if (!prepareRes.ok) {
+              const err = await prepareRes.json();
+              throw new Error(err.error || `準備上傳失敗 (${prepareRes.status})`);
+            }
+            prepareData = await prepareRes.json();
+          } catch (err) {
+            console.error('準備上傳失敗:', err);
+            throw new Error(err instanceof Error ? err.message : '準備上傳流程失敗');
+          }
+
+          // [STEP 2] 直接上傳到 Supabase Storage (使用 PUT)
+          // 這一步繞過 Next.js 伺服器，直接對接 Storage，解決記憶體與逾時問題
+          // [STEP 2] 直接上傳到 Supabase Storage (使用 XMLHttpRequest 以支援進度和避免 fetch 記憶體問題)
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open('PUT', prepareData.uploadUrl);
+              xhr.setRequestHeader('Content-Type', fileToUpload.type || 'application/octet-stream');
+              xhr.setRequestHeader('Cache-Control', '3600');
+
+              // 上傳進度監聽
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  const percent = Math.round((event.loaded / event.total) * 100);
+                  // 使用函數式更新以避免閉包問題，並限制更新頻率（這裡雖未顯式節流，但 React 狀態更新通常會批次處理）
+                  setUploadProgress(prev => ({ ...prev, [file.name]: percent }));
+                }
+              };
+
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  resolve();
+                } else {
+                  reject(new Error(`Storage 上傳失敗 (${xhr.status})`));
+                }
+              };
+
+              xhr.onerror = () => reject(new Error('檔案傳輸失敗，網絡錯誤'));
+              xhr.ontimeout = () => reject(new Error('上傳逾時'));
+
+              xhr.send(fileToUpload);
+            });
+          } catch (err) {
+            console.error('Direct upload failed:', err);
+            throw new Error(err instanceof Error ? err.message : '檔案傳輸失敗，請檢查網路連線');
+          }
+
+          // [STEP 3] 完成上傳：寫入資料庫
+          try {
+            const completeRes = await fetch('/api/student-media/complete-upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                studentId: student!.id,
+                path: prepareData.path,
+                mediaType,
+                fileSize: fileToUpload.size,
+                newFileName: prepareData.newFileName,
+                orgId
+              })
+            });
+
+            const result = await completeRes.json();
+
+            if (!completeRes.ok) {
+              throw new Error(result.error || `完成上傳失敗 (${completeRes.status})`);
             }
 
-            if (!response.ok) {
-              throw new Error(result.error || `上傳失敗 (${response.status})`);
-            }
-
-            console.log('API 上傳成功:', result);
+            console.log('流程完成:', result);
             setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
             localSuccessCount += 1;
 
@@ -788,7 +848,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             }
 
           } catch (apiError) {
-            console.error(`API 上傳失敗:`, apiError);
+            console.error(`完成上傳步驟失敗:`, apiError);
             throw apiError;
           }
         } catch (fileError) {
@@ -800,7 +860,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       };
 
       // 並行上傳邏輯
-      const CONCURRENCY = 3; // 同時上傳數量
+      const CONCURRENCY = 1; // 降低並行數以防止記憶體崩潰
       const files = [...selectedFiles];
 
       // 將檔案分組
@@ -848,28 +908,28 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
     if (!confirm('確定要刪除此媒體檔案嗎？')) return;
 
     try {
-      const mediaToDelete = media.find(m => m.id === mediaId);
-      if (!mediaToDelete) return;
+      const response = await fetch('/api/student-media/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mediaId,
+          studentId: student!.id
+        })
+      });
 
-      // 從 Storage 刪除檔案
-      const { error: storageError } = await supabase.storage
-        .from('hanami-media')
-        .remove([mediaToDelete.file_path]);
+      if (!response.ok) {
+        throw new Error('刪除請求失敗');
+      }
 
-      if (storageError) throw storageError;
-
-      // 從資料庫刪除記錄
-      const { error: dbError } = await supabase
-        .from('hanami_student_media')
-        .delete()
-        .eq('id', mediaId);
-
-      if (dbError) throw dbError;
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
       toast.success('媒體檔案已刪除');
       loadStudentMedia(); // 重新載入媒體列表
 
-      // 通知父組件配額已更改，觸發按鈕顏色更新
+      // 通知父組件配額已更改
       if (onQuotaChanged) {
         onQuotaChanged();
       }
@@ -1185,7 +1245,14 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       return file;
     }
 
-    // 圖片使用 Worker 壓縮
+    // 安全措施：如果是影片，跳過客戶端壓縮以防止低階設備崩潰
+    // 影片壓縮消耗大量記憶體和CPU，容易導致 iOS/Android Webview 閃退
+    if (file.type.startsWith('video/')) {
+      console.log('跳過影片客戶端壓縮以防止崩潰:', file.name);
+      return file;
+    }
+
+    // 圖片使用 Worker 壓縮 (優先)
     if (file.type.startsWith('image/')) {
       try {
         const worker = getCompressionWorker();
@@ -1212,55 +1279,72 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
       }
     }
 
-    // 回退邏輯：使用主線程壓縮 (smartCompress or fallback)
+    // 回退邏輯：使用主線程 Canvas 壓縮 (僅限圖片)
     return new Promise((resolve) => {
-      import('@/lib/mediaCompression').then(({ smartCompress }) => {
-        smartCompress(file, maxSizeMB).then(compressedFile => {
-          const originalSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-          const compressedSizeMB = (compressedFile.size / (1024 * 1024)).toFixed(1);
-          const compressionRatio = ((file.size - compressedFile.size) / file.size * 100).toFixed(1);
+      if (!file.type.startsWith('image/')) {
+        resolve(file);
+        return;
+      }
 
-          toast(`檔案 ${file.name} 已壓縮: ${originalSizeMB}MB → ${compressedSizeMB}MB (節省 ${compressionRatio}%)`, {
-            icon: '🎯',
-            duration: 3000
-          });
+      // 嘗試使用 createImageBitmap (更高效)
+      if (typeof createImageBitmap !== 'undefined') {
+        createImageBitmap(file).then(bitmap => {
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const maxDim = 1280; // 安全降低解析度
+            let { width, height } = bitmap;
 
-          resolve(compressedFile);
-        }).catch(error => {
-          console.error('壓縮失敗:', error);
-          resolve(file); // 壓縮失敗時使用原始檔案
-        });
-      }).catch(() => {
-        console.error('無法載入壓縮模組，使用最基礎回退');
-        // 如果模組載入失敗，使用最基礎邏輯
-        if (file.type.startsWith('video/')) {
-          const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-          toast(`檔案 ${file.name} (${fileSizeMB}MB) 超過配額限制，但將嘗試上傳。`, {
-            icon: '⚠️',
-            duration: 5000
-          });
-          resolve(file);
-        } else if (file.type.startsWith('image/')) {
-          // 簡單的 Canvas 壓縮回退
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const img = new Image();
-          img.onload = () => {
-            const maxDim = 1280;
-            let { width, height } = img;
             if (width > height && width > maxDim) { height = (height * maxDim) / width; width = maxDim; }
             else if (height > maxDim) { width = (width * maxDim) / height; height = maxDim; }
-            canvas.width = width; canvas.height = height;
-            ctx?.drawImage(img, 0, 0, width, height);
-            canvas.toBlob(blob => resolve(blob ? new File([blob], file.name, { type: file.type }) : file), file.type, 0.6);
-          };
-          img.onerror = () => resolve(file);
-          img.src = URL.createObjectURL(file);
-        } else {
-          resolve(file);
-        }
-      });
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx?.drawImage(bitmap, 0, 0, width, height);
+            bitmap.close();
+
+            canvas.toBlob(blob => {
+              if (blob) {
+                const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+                toast(`圖片 ${file.name} 已壓縮 (Fallback): ${(compressed.size / 1024 / 1024).toFixed(1)}MB`, { icon: '⚠️' });
+                resolve(compressed);
+              } else {
+                resolve(file);
+              }
+            }, 'image/jpeg', 0.7);
+          } catch (e) {
+            console.error('Bitmap 壓縮失敗:', e);
+            resolve(file);
+          }
+        }).catch(() => {
+          // Bitmap 失敗，嘗試最傳統的 Image
+          fallbackToImageElement(file, resolve);
+        });
+      } else {
+        fallbackToImageElement(file, resolve);
+      }
     });
+  };
+
+  const fallbackToImageElement = (file: File, resolve: (f: File) => void) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const maxDim = 1280;
+        let { width, height } = img;
+        if (width > height && width > maxDim) { height = (height * maxDim) / width; width = maxDim; }
+        else if (height > maxDim) { width = (width * maxDim) / height; height = maxDim; }
+        canvas.width = width; canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(blob => resolve(blob ? new File([blob], file.name, { type: 'image/jpeg' }) : file), 'image/jpeg', 0.6);
+      } catch (e) {
+        resolve(file);
+      }
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
   };
 
   if (!isOpen || !student) return null;
@@ -1279,6 +1363,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
             </p>
           </div>
           <button
+            type="button"
             onClick={handleClose}
             className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 flex-shrink-0 ml-2 group"
           >
@@ -1671,11 +1756,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                 <div className="mt-4 text-xs sm:text-sm text-gray-500 space-y-1">
                   <p className="flex items-center gap-1 justify-center">
                     <span className="p-1 bg-blue-100 rounded-full text-blue-500">📹</span>
-                    影片: 最多 {quotaLevel?.video_limit || DEFAULT_MEDIA_LIMITS.video.maxCount} 個，每個 ≤ {quotaLevel?.video_size_limit_mb || DEFAULT_MEDIA_LIMITS.video.maxSize / (1024 * 1024)}MB
+                    影片: 單個檔案 ≤ {quotaLevel?.video_size_limit_mb || DEFAULT_MEDIA_LIMITS.video.maxSize / (1024 * 1024)}MB
                   </p>
                   <p className="flex items-center gap-1 justify-center">
                     <span className="p-1 bg-red-100 rounded-full text-red-500">📸</span>
-                    相片: 最多 {quotaLevel?.photo_limit || DEFAULT_MEDIA_LIMITS.photo.maxCount} 張，每張 ≤ {quotaLevel?.photo_size_limit_mb || DEFAULT_MEDIA_LIMITS.photo.maxSize / (1024 * 1024)}MB
+                    相片: 單個檔案 ≤ {quotaLevel?.photo_size_limit_mb || DEFAULT_MEDIA_LIMITS.photo.maxSize / (1024 * 1024)}MB
                   </p>
 
                   {/* 檔案上傳指南連結 */}
@@ -1730,6 +1815,7 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
                             {/* Remove Button (Top Right) */}
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 const newFiles = selectedFiles.filter((_, i) => i !== index);
@@ -1745,6 +1831,21 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                             <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 text-center truncate">
                               {getFileSize(file.size)}
                             </div>
+
+                            {/* Upload Progress Overlay */}
+                            {uploadProgress[file.name] !== undefined && uploadProgress[file.name] >= 0 && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center flex-col gap-1 backdrop-blur-[1px]">
+                                <div className="text-white font-bold text-xs drop-shadow-md">
+                                  {uploadProgress[file.name]}%
+                                </div>
+                                <div className="w-16 h-1.5 bg-gray-200/30 rounded-full overflow-hidden backdrop-blur-sm shadow-inner">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-200 shadow-[0_0_10px_rgba(52,211,153,0.5)]"
+                                    style={{ width: `${uploadProgress[file.name]}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1752,9 +1853,23 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
 
                     <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          uploadFiles();
+                          e.preventDefault(); // 防止任何可能的表單提交
+
+                          // 使用 setTimeout 讓 UI 先更新 (顯示上傳中 spinner)，再執行繁重的上傳邏輯
+                          // 這能解決某些手機點擊按鈕後立即卡死/閃退的問題
+                          if (!uploading) {
+                            setUploading(true);
+                            setTimeout(() => {
+                              uploadFiles().catch(err => {
+                                console.error("上傳啟動失敗:", err);
+                                setUploading(false);
+                                toast.error("無法開始上傳，請稍後再試");
+                              });
+                            }, 50);
+                          }
                         }}
                         disabled={uploading}
                         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#A64B2A] to-[#8B3A1F] text-white rounded-xl hover:from-[#8B3A1F] hover:to-[#6B2A0F] disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 w-full sm:w-auto justify-center shadow-md hover:shadow-lg transform hover:scale-105 disabled:transform-none"
@@ -1774,8 +1889,10 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                         )}
                       </button>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
+                          e.preventDefault();
                           if (uploading) {
                             cancelUpload();
                           } else {
@@ -1921,6 +2038,49 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                             )}
                           </div>
                           <div className="flex gap-2">
+                            {/* Approval Toggle */}
+                            {canManageApproval && (
+                              <div
+                                className={`flex items-center px-2 rounded-lg cursor-pointer transition-colors border ${item.is_approved
+                                  ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                                  : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                  }`}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const newStatus = !item.is_approved;
+                                  try {
+                                    // Optimistic update
+                                    setMedia(prev => prev.map(m =>
+                                      m.id === item.id ? { ...m, is_approved: newStatus } : m
+                                    ));
+
+                                    const { error } = await supabase
+                                      .from('hanami_student_media')
+                                      // @ts-ignore - Supabase types not yet updated
+                                      .update({ is_approved: newStatus })
+                                      .eq('id', item.id);
+
+                                    if (error) throw error;
+
+                                    toast.success(newStatus ? '已批准 (家長可見)' : '已取消批准 (家長不可見)');
+                                  } catch (err) {
+                                    console.error('更新批准狀態失敗:', err);
+                                    toast.error('更新失敗');
+                                    // Revert optimistic update
+                                    setMedia(prev => prev.map(m =>
+                                      m.id === item.id ? { ...m, is_approved: !newStatus } : m
+                                    ));
+                                  }
+                                }}
+                                title={item.is_approved ? "點擊取消批准" : "點擊批准"}
+                              >
+                                <div className={`w-2 h-2 rounded-full mr-1.5 ${item.is_approved ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                <span className="text-xs font-medium select-none">
+                                  {item.is_approved ? '已批' : '未批'}
+                                </span>
+                              </div>
+                            )}
+
                             <HanamiButton
                               variant="secondary"
                               size="sm"
@@ -1954,7 +2114,11 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                             <HanamiButton
                               variant="danger"
                               size="sm"
-                              onClick={() => deleteMedia(item.id)}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteMedia(item.id);
+                              }}
                             >
                               <TrashIcon className="h-4 w-4" />
                             </HanamiButton>
@@ -2066,6 +2230,49 @@ export default function StudentMediaModal({ isOpen, onClose, student, onQuotaCha
                           )}
                         </div>
                         <div className="flex gap-2">
+                          {/* Approval Toggle */}
+                          {canManageApproval && (
+                            <div
+                              className={`flex items-center px-2 py-1 rounded-lg cursor-pointer transition-colors border max-h-[32px] ${item.is_approved
+                                ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                }`}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const newStatus = !item.is_approved;
+                                try {
+                                  // Optimistic update
+                                  setMedia(prev => prev.map(m =>
+                                    m.id === item.id ? { ...m, is_approved: newStatus } : m
+                                  ));
+
+                                  const { error } = await supabase
+                                    .from('hanami_student_media')
+                                    // @ts-ignore - Supabase types not yet updated
+                                    .update({ is_approved: newStatus })
+                                    .eq('id', item.id);
+
+                                  if (error) throw error;
+
+                                  toast.success(newStatus ? '已批准 (家長可見)' : '已取消批准 (家長不可見)');
+                                } catch (err) {
+                                  console.error('更新批准狀態失敗:', err);
+                                  toast.error('更新失敗');
+                                  // Revert optimistic update
+                                  setMedia(prev => prev.map(m =>
+                                    m.id === item.id ? { ...m, is_approved: !newStatus } : m
+                                  ));
+                                }
+                              }}
+                              title={item.is_approved ? "點擊取消批准" : "點擊批准"}
+                            >
+                              <div className={`w-2 h-2 rounded-full mr-1.5 ${item.is_approved ? 'bg-green-500' : 'bg-gray-400'}`} />
+                              <span className="text-xs font-medium select-none whitespace-nowrap">
+                                {item.is_approved ? '已批' : '未批'}
+                              </span>
+                            </div>
+                          )}
+
                           <HanamiButton
                             variant="secondary"
                             size="sm"

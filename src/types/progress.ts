@@ -255,6 +255,7 @@ export interface StudentMedia {
   created_at: string;
   updated_at: string;
   is_favorite?: boolean;
+  is_approved?: boolean;
 }
 
 // 學生媒體配額類型
@@ -289,9 +290,9 @@ export const DEFAULT_MEDIA_LIMITS: MediaUploadLimits = {
     maxSize: 20 * 1024 * 1024, // 20MB
     maxCount: 5,
     allowedTypes: [
-      'video/mp4', 
-      'video/mov', 
-      'video/avi', 
+      'video/mp4',
+      'video/mov',
+      'video/avi',
       'video/quicktime',  // QuickTime 格式
       'video/x-msvideo',  // AVI 格式
       'video/x-ms-wmv',   // WMV 格式
@@ -306,8 +307,8 @@ export const DEFAULT_MEDIA_LIMITS: MediaUploadLimits = {
     maxSize: 1 * 1024 * 1024, // 1MB
     maxCount: 10,
     allowedTypes: [
-      'image/jpeg', 
-      'image/png', 
+      'image/jpeg',
+      'image/png',
       'image/webp',
       'image/gif',        // GIF 格式
       'image/bmp',        // BMP 格式

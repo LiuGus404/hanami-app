@@ -464,6 +464,7 @@ export default function SimpleStudentDetailPage() {
                 studentId={student.id}
                 studentName={student.full_name}
                 className="h-full"
+                isReadOnly={true}
               />
             )}
           </motion.div>

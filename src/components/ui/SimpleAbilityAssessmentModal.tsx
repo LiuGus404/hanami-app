@@ -110,6 +110,8 @@ interface AbilityAssessment {
   overall_performance_rating: number;
   general_notes: string | null;
   next_lesson_focus: string | null;
+  progress_notes?: string | null; // 新增：導師評語
+  progress_notes_public?: boolean; // 新增：導師評語是否公開
 }
 
 interface SimpleAbilityAssessmentModalProps {
@@ -181,6 +183,9 @@ export default function SimpleAbilityAssessmentModal({
   const [overallRating, setOverallRating] = useState(initialData?.overall_performance_rating || 3);
   const [generalNotes, setGeneralNotes] = useState(initialData?.general_notes || '');
   const [nextFocus, setNextFocus] = useState(initialData?.next_lesson_focus || '');
+  const [progressNotes, setProgressNotes] = useState(initialData?.progress_notes || '');
+  const [progressNotesPublic, setProgressNotesPublic] = useState(initialData?.progress_notes_public ?? false);
+
 
   // 學生選擇相關狀態
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
@@ -366,9 +371,59 @@ export default function SimpleAbilityAssessmentModal({
 
   // 監聽 goalAssessments 狀態變化
   useEffect(() => {
-    console.log('📊 goalAssessments 狀態變化:', goalAssessments);
-    console.log('📊 當前 goalAssessments 的鍵:', Object.keys(goalAssessments));
+    /* console.log('📊 goalAssessments 狀態變化:', goalAssessments); */
   }, [goalAssessments]);
+
+  // 新增：當選擇學生元日期改變時，載入該堂課的 progress_notes
+  useEffect(() => {
+    const loadLessonNotes = async () => {
+      if (!selectedStudentId || !lessonDate) return;
+
+      try {
+        // 如果是編輯模式且有初始值，且日期匹配，則不需要重新載入
+        if (isEditMode && initialData?.lesson_date === lessonDate && initialData?.progress_notes !== undefined) {
+          return;
+        }
+
+        console.log('🔄 載入課程導師評語:', { selectedStudentId, lessonDate });
+
+        const { data, error } = await supabase
+          .from('hanami_student_lesson')
+          .select('progress_notes, progress_notes_public')
+          .eq('student_id', selectedStudentId)
+          .eq('lesson_date', lessonDate)
+          .maybeSingle();
+
+        if (error) {
+          console.error('載入課程導師評語失敗:', error);
+          return;
+        }
+
+        if (data) {
+          const lessonData = data as any;
+          if (lessonData.progress_notes) {
+            console.log('✅ 載入課程導師評語成功:', lessonData.progress_notes);
+            setProgressNotes(lessonData.progress_notes);
+          }
+          // 如果資料庫中該欄位是 null (舊資料)，默認為 false (不公開)
+          const isPublic = lessonData.progress_notes_public ?? false;
+          console.log('✅ 載入課程導師評語公開狀態:', isPublic);
+          setProgressNotesPublic(isPublic);
+        } else {
+          // 如果沒有找到，且不是編輯模式，則清空
+          if (!isEditMode) {
+            setProgressNotes('');
+            setProgressNotesPublic(false);
+          }
+        }
+      } catch (err) {
+        console.error('載入課程導師評語發生異常:', err);
+      }
+    };
+
+    loadLessonNotes();
+  }, [selectedStudentId, lessonDate, isEditMode, initialData]);
+
 
   // 載入學生活動
   useEffect(() => {
@@ -394,6 +449,12 @@ export default function SimpleAbilityAssessmentModal({
       setOverallRating(fixedInitialData.overall_performance_rating || 3);
       setGeneralNotes(fixedInitialData.general_notes || '');
       setNextFocus(fixedInitialData.next_lesson_focus || '');
+      setNextFocus(fixedInitialData.next_lesson_focus || '');
+      setProgressNotes(fixedInitialData.progress_notes || '');
+      setNextFocus(fixedInitialData.next_lesson_focus || '');
+      setProgressNotes(fixedInitialData.progress_notes || '');
+      setProgressNotesPublic(fixedInitialData.progress_notes_public ?? false);
+
 
       // 更新能力評估狀態
       setAbilityAssessments(fixedInitialData.ability_assessments || {});
@@ -1368,7 +1429,9 @@ export default function SimpleAbilityAssessmentModal({
             setOverallRating(latestAssessment.overall_performance_rating || 1);
             setGeneralNotes(latestAssessment.general_notes || '');
             setNextFocus(latestAssessment.next_lesson_focus || '');
+            // 注意：progress_notes 是課程相關的，不應該從上一次評估記錄繼承，除非是同一堂課
           }
+
 
           abilitiesData = abilitiesData.map(ability => {
             const progress = progressMap.get(ability.id);
@@ -1814,8 +1877,8 @@ export default function SimpleAbilityAssessmentModal({
               {/* 顯示活動來源標記 */}
               {activity.source && (
                 <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${activity.source === 'ongoing'
-                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                    : 'bg-green-100 text-green-800 border border-green-200'
+                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                  : 'bg-green-100 text-green-800 border border-green-200'
                   }`}>
                   {activity.source === 'ongoing' ? (
                     <>
@@ -1901,8 +1964,8 @@ export default function SimpleAbilityAssessmentModal({
                   <button
                     key={progress}
                     className={`px-3 py-1 text-xs rounded-lg transition-all duration-200 ${currentProgress === progress
-                        ? 'bg-[#E8B4A0] text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-[#E8B4A0] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     onClick={() => handleProgressChange(activity.id, progress)}
                   >
@@ -2367,7 +2430,9 @@ export default function SimpleAbilityAssessmentModal({
         ability_assessments: abilityAssessments,
         overall_performance_rating: overallRating,
         general_notes: generalNotes,
-        next_lesson_focus: nextFocus
+        next_lesson_focus: nextFocus,
+        progress_notes: progressNotes,
+        progress_notes_public: progressNotesPublic,
       };
 
       // 準備目標評估資料（用於 API 調用）
@@ -2517,10 +2582,10 @@ export default function SimpleAbilityAssessmentModal({
 
                 <div
                   className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center text-xs font-bold shadow-sm ${isSelected
-                      ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-md transform scale-105'
-                      : isLastAssessment
-                        ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
-                        : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
+                    ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-md transform scale-105'
+                    : isLastAssessment
+                      ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
+                      : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
                     } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}`}
                   onClick={() => handleLevelClick(level)}
                   title={isClickable ? `點擊設定為等級 ${level}: ${content}` : content}
@@ -2529,7 +2594,7 @@ export default function SimpleAbilityAssessmentModal({
                 </div>
                 {index < maxLevel - 1 && (
                   <div className={`w-12 h-0.5 mt-2 transition-all duration-300 ${isSelected ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5]' :
-                      isLastAssessment ? 'bg-gradient-to-r from-[#B8D4E3] to-[#A8C4D3]' : 'bg-[#E8D5C4]'
+                    isLastAssessment ? 'bg-gradient-to-r from-[#B8D4E3] to-[#A8C4D3]' : 'bg-[#E8D5C4]'
                     }`} />
                 )}
               </div>
@@ -2587,15 +2652,15 @@ export default function SimpleAbilityAssessmentModal({
                 return (
                   <div key={`content-${index}-${level}`} className="flex items-start gap-3 text-xs group">
                     <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${isSelected
-                        ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'
-                        : isLastAssessment
-                          ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
-                          : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
+                      ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'
+                      : isLastAssessment
+                        ? 'bg-gradient-to-br from-[#F0F8FF] to-[#E6F3FF] border-[#B8D4E3] text-[#5A7A8A]'
+                        : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
                       }`}>
                       {level}
                     </span>
                     <span className={`text-[#2B3A3B] transition-all duration-200 ${isSelected ? 'font-medium text-[#8B7355]' :
-                        isLastAssessment ? 'text-[#5A7A8A]' : ''
+                      isLastAssessment ? 'text-[#5A7A8A]' : ''
                       }`}>
                       {content}
                     </span>
@@ -2688,7 +2753,7 @@ export default function SimpleAbilityAssessmentModal({
   };
 
   // 修復過往評估記錄的顯示問題
-  const fixHistoricalAssessmentData = (assessmentData: any, currentGoals: GrowthGoal[], currentAbilities: DevelopmentAbility[]) => {
+  const fixHistoricalAssessmentData = (assessmentData: any, currentGoals: GrowthGoal[], currentAbilities: DevelopmentAbility[]): AbilityAssessment => {
     console.log('🔧 開始修復過往評估記錄:', {
       assessmentData,
       currentGoalsCount: currentGoals.length,
@@ -2889,8 +2954,8 @@ export default function SimpleAbilityAssessmentModal({
                     <div className="relative">
                       <button
                         className={`w-full px-3 py-2 border border-[#EADBC8] rounded text-left transition-colors focus:outline-none focus:ring-1 focus:ring-[#A64B2A] text-sm ${assessmentHistory.length > 0
-                            ? 'bg-white hover:bg-[#FFF9F2] cursor-pointer'
-                            : 'bg-gray-50 cursor-not-allowed'
+                          ? 'bg-white hover:bg-[#FFF9F2] cursor-pointer'
+                          : 'bg-gray-50 cursor-not-allowed'
                           }`}
                         type="button"
                         onClick={() => assessmentHistory.length > 0 && setShowAssessmentDropdown(!showAssessmentDropdown)}
@@ -3018,8 +3083,8 @@ export default function SimpleAbilityAssessmentModal({
                 <div className="relative">
                   <button
                     className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${lockStudent
-                        ? 'bg-gray-100 cursor-not-allowed text-gray-500'
-                        : 'bg-white hover:bg-[#FFF9F2]'
+                      ? 'bg-gray-100 cursor-not-allowed text-gray-500'
+                      : 'bg-white hover:bg-[#FFF9F2]'
                       }`}
                     type="button"
                     onClick={() => !lockStudent && setShowStudentDropdown(!showStudentDropdown)}
@@ -3331,6 +3396,44 @@ export default function SimpleAbilityAssessmentModal({
                 />
               </div>
 
+              {/* 導師評語 (新增) */}
+              <div>
+                <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
+                  <PencilIcon className="w-4 h-4 inline mr-1" />
+                  導師評語
+                </label>
+                <textarea
+                  className="w-full px-4 py-2 border border-[#EADBC8] rounded-lg text-[#2B3A3B] focus:outline-none focus:ring-2 focus:ring-[#A68A64] resize-none"
+                  rows={3}
+                  placeholder="請輸入給家長的導師評語..."
+                  value={progressNotes || ''}
+                  onChange={(e) => setProgressNotes(e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-xs text-[#8B7355]">
+                    {progressNotesPublic ? '此評語將顯示在學生的課程記錄中，家長可見' : '此評語僅導師可見，不會顯示給家長'}
+                  </p>
+                  <label className="flex items-center cursor-pointer">
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={progressNotesPublic}
+                        onChange={(e) => setProgressNotesPublic(e.target.checked)}
+                      />
+                      <div className={`block w-10 h-6 rounded-full transition-colors ${progressNotesPublic ? 'bg-[#A68A64]' : 'bg-gray-300'}`}></div>
+                      <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${progressNotesPublic ? 'transform translate-x-4' : ''}`}></div>
+                    </div>
+                    <span className="ml-2 text-xs text-[#8B7355] font-medium">
+                      {progressNotesPublic ? '公開給家長' : '隱藏'}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+
               {/* 教師選擇 */}
               <div className="relative teacher-dropdown">
                 <label className="block text-sm font-medium text-[#2B3A3B] mb-2">
@@ -3339,8 +3442,8 @@ export default function SimpleAbilityAssessmentModal({
                 <div className="relative">
                   <button
                     className={`w-full px-4 py-3 border border-[#EADBC8] rounded-lg text-left transition-colors focus:outline-none focus:ring-2 focus:ring-[#A64B2A] ${lockTeacher
-                        ? 'bg-gray-100 cursor-not-allowed text-gray-500'
-                        : 'bg-white hover:bg-[#FFF9F2]'
+                      ? 'bg-gray-100 cursor-not-allowed text-gray-500'
+                      : 'bg-white hover:bg-[#FFF9F2]'
                       }`}
                     type="button"
                     onClick={() => !lockTeacher && setShowTeacherDropdown(!showTeacherDropdown)}
@@ -3572,8 +3675,8 @@ export default function SimpleAbilityAssessmentModal({
                                       <div key={`level-${index}-${level}`} className="flex flex-col items-center relative">
                                         <div
                                           className={`w-8 h-8 rounded-full border-2 transition-all duration-300 ease-out flex items-center justify-center text-xs font-bold shadow-sm ${isSelected
-                                              ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-md transform scale-105'
-                                              : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
+                                            ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-md transform scale-105'
+                                            : 'bg-white border-[#E8D5C4] text-[#8B7355] hover:border-[#D4A5A5] hover:bg-[#FDF6F0]'
                                             } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-lg active:scale-95' : ''}`}
                                           onClick={() => handleMultiSelectAssessmentChange(goal.id, level, !isSelected)}
                                           title={isClickable ? `點擊${isSelected ? '取消' : '選擇'}等級: ${level}` : level}
@@ -3613,8 +3716,8 @@ export default function SimpleAbilityAssessmentModal({
                                       return (
                                         <div key={`content-${index}-${level}`} className="flex items-start gap-3 text-xs group">
                                           <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all duration-200 ${isSelected
-                                              ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'
-                                              : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
+                                            ? 'bg-gradient-to-br from-[#E8B4A0] to-[#D4A5A5] border-[#C89B9B] text-white shadow-sm'
+                                            : 'bg-white border-[#E8D5C4] text-[#8B7355] group-hover:border-[#D4A5A5]'
                                             }`}>
                                             {index + 1}
                                           </span>
@@ -3781,8 +3884,8 @@ export default function SimpleAbilityAssessmentModal({
                         <div className="flex bg-[#F5F0EB] rounded-lg p-1">
                           <button
                             className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${activityFilter === 'incomplete'
-                                ? 'bg-white text-[#2B3A3B] shadow-sm'
-                                : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                              ? 'bg-white text-[#2B3A3B] shadow-sm'
+                              : 'text-[#8B7355] hover:text-[#2B3A3B]'
                               }`}
                             onClick={() => setActivityFilter('incomplete')}
                           >
@@ -3790,8 +3893,8 @@ export default function SimpleAbilityAssessmentModal({
                           </button>
                           <button
                             className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${activityFilter === 'completed'
-                                ? 'bg-white text-[#2B3A3B] shadow-sm'
-                                : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                              ? 'bg-white text-[#2B3A3B] shadow-sm'
+                              : 'text-[#8B7355] hover:text-[#2B3A3B]'
                               }`}
                             onClick={() => setActivityFilter('completed')}
                           >
@@ -3799,8 +3902,8 @@ export default function SimpleAbilityAssessmentModal({
                           </button>
                           <button
                             className={`px-3 py-1 text-xs rounded-md transition-all duration-200 ${activityFilter === 'all'
-                                ? 'bg-white text-[#2B3A3B] shadow-sm'
-                                : 'text-[#8B7355] hover:text-[#2B3A3B]'
+                              ? 'bg-white text-[#2B3A3B] shadow-sm'
+                              : 'text-[#8B7355] hover:text-[#2B3A3B]'
                               }`}
                             onClick={() => setActivityFilter('all')}
                           >
@@ -3947,8 +4050,8 @@ export default function SimpleAbilityAssessmentModal({
             <button
               type="button"
               className={`px-6 py-2 rounded-lg transition-all duration-300 ease-out ${selectedStudent && selectedTreeId
-                  ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white hover:from-[#D4A5A5] hover:to-[#C89B9B] hover:shadow-lg active:scale-95 border border-[#C89B9B]'
-                  : 'bg-[#E8D5C4] text-[#8B7355] cursor-not-allowed'
+                ? 'bg-gradient-to-r from-[#E8B4A0] to-[#D4A5A5] text-white hover:from-[#D4A5A5] hover:to-[#C89B9B] hover:shadow-lg active:scale-95 border border-[#C89B9B]'
+                : 'bg-[#E8D5C4] text-[#8B7355] cursor-not-allowed'
                 }`}
               onClick={(e) => {
                 e.preventDefault();

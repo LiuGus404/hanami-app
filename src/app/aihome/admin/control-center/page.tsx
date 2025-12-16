@@ -465,6 +465,14 @@ export default function AdminControlCenterPage() {
         return;
       }
 
+      // 0. Hardcoded Owner Check (Fail-safe)
+      if (user.email === 'tqfea12@gmail.com' || user.email === 'kwanyu229@gmail.com') {
+        console.log('AdminControlCenter: Detected Owner Email -> Force Super Admin');
+        setIsSuperAdmin(true);
+        setRoleLoading(false);
+        return;
+      }
+
       // 首先檢查 user 對象中的各種可能的 role 字段
       const normalizedRoleFromUser = (
         (user as any)?.user_role ??

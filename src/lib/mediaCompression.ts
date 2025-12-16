@@ -34,7 +34,7 @@ export const DEFAULT_COMPRESSION_CONFIG: Record<string, CompressionConfig> = {
  * 壓縮圖片檔案
  */
 export const compressImage = async (
-  file: File, 
+  file: File,
   config: CompressionConfig = DEFAULT_COMPRESSION_CONFIG.photo
 ): Promise<File> => {
   return new Promise((resolve, reject) => {
@@ -61,9 +61,9 @@ export const compressImage = async (
         ctx?.drawImage(img, 0, 0, width, height);
 
         // 轉換為指定格式
-        const mimeType = config.format === 'webp' ? 'image/webp' : 
-                        config.format === 'png' ? 'image/png' : 'image/jpeg';
-        
+        const mimeType = config.format === 'webp' ? 'image/webp' :
+          config.format === 'png' ? 'image/png' : 'image/jpeg';
+
         canvas.toBlob(
           (blob) => {
             if (blob) {
@@ -110,7 +110,7 @@ export const compressVideo = async (
       try {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        
+
         if (!ctx) {
           reject(new Error('無法獲取 canvas 上下文'));
           return;
@@ -119,7 +119,7 @@ export const compressVideo = async (
         // 設置畫布尺寸
         const { maxWidth = 1280, maxHeight = 720 } = config;
         let { videoWidth, videoHeight } = video;
-        
+
         if (videoWidth > maxWidth || videoHeight > maxHeight) {
           const ratio = Math.min(maxWidth / videoWidth, maxHeight / videoHeight);
           videoWidth *= ratio;
@@ -154,11 +154,11 @@ export const compressVideo = async (
 
         // 開始錄製
         mediaRecorder.start();
-        
+
         // 播放影片並繪製到畫布
         video.currentTime = 0;
         video.play();
-        
+
         const drawFrame = () => {
           if (!video.paused && !video.ended) {
             ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
@@ -167,7 +167,7 @@ export const compressVideo = async (
             mediaRecorder.stop();
           }
         };
-        
+
         drawFrame();
       } catch (error) {
         reject(error);
@@ -187,14 +187,14 @@ export const smartCompress = async (
   targetSizeMB: number
 ): Promise<File> => {
   const currentSizeMB = file.size / (1024 * 1024);
-  
+
   // 如果檔案已經小於目標大小，直接返回
   if (currentSizeMB <= targetSizeMB) {
     return file;
   }
 
   const compressionRatio = targetSizeMB / currentSizeMB;
-  
+
   if (file.type.startsWith('image/')) {
     // 圖片壓縮
     const quality = Math.max(0.3, compressionRatio * 0.8);
@@ -202,18 +202,26 @@ export const smartCompress = async (
       quality,
       format: 'webp'
     };
-    
+
     return await compressImage(file, config);
   } else if (file.type.startsWith('video/')) {
     // 影片壓縮
+    // 注意：客戶端影片壓縮極其消耗資源，容易導致行動裝置崩潰。
+    // 在更穩定的解決方案（如 FFmpeg.wasm 或伺服器端壓縮）實作前，
+    // 暫時禁用客戶端影片壓縮，直接回傳原始檔案。
+    console.warn('Client-side video compression disabled for stability.');
+    return file;
+
+    /* 暫時註解掉原有邏輯
     const config: CompressionConfig = {
       quality: Math.max(0.3, compressionRatio),
       videoBitrate: Math.max(500000, 1000000 * compressionRatio)
     };
     
     return await compressVideo(file, config);
+    */
   }
-  
+
   return file;
 };
 
@@ -226,13 +234,13 @@ export const batchCompress = async (
   onProgress?: (progress: number) => void
 ): Promise<File[]> => {
   const compressedFiles: File[] = [];
-  
+
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     try {
       const compressedFile = await smartCompress(file, targetSizeMB);
       compressedFiles.push(compressedFile);
-      
+
       if (onProgress) {
         onProgress(((i + 1) / files.length) * 100);
       }
@@ -241,7 +249,7 @@ export const batchCompress = async (
       compressedFiles.push(file); // 使用原始檔案
     }
   }
-  
+
   return compressedFiles;
 };
 
@@ -253,7 +261,7 @@ export const previewCompression = async (
   config: CompressionConfig
 ): Promise<{ originalSize: number; compressedSize: number; compressionRatio: number }> => {
   let compressedFile: File;
-  
+
   if (file.type.startsWith('image/')) {
     compressedFile = await compressImage(file, config);
   } else if (file.type.startsWith('video/')) {
@@ -261,11 +269,11 @@ export const previewCompression = async (
   } else {
     compressedFile = file;
   }
-  
+
   const originalSize = file.size;
   const compressedSize = compressedFile.size;
   const compressionRatio = ((originalSize - compressedSize) / originalSize) * 100;
-  
+
   return {
     originalSize,
     compressedSize,

@@ -20,7 +20,7 @@ import {
     CheckIcon,
     FolderIcon
 } from '@heroicons/react/24/outline';
-import { getSaasSupabaseClient } from '@/lib/supabase';
+import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { MindBlock, MindBlockType } from '@/types/mind-block';
 import { RoleInstance } from '@/types/ai-companion';
 import MindBlockDetailModal from '@/components/mind-block/MindBlockDetailModal';
@@ -41,6 +41,7 @@ export function BlockSelectionModal({
     roleInstanceId
 }: BlockSelectionModalProps) {
     const router = useRouter();
+    const { user } = useSaasAuth(); // Use auth hook to get user
     const [blocks, setBlocks] = useState<MindBlock[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -52,43 +53,39 @@ export function BlockSelectionModal({
         if (isOpen) {
             loadBlocks();
         }
-    }, [isOpen, activeTab, slotType]);
+    }, [isOpen, activeTab, slotType, user?.id]);
 
     const loadBlocks = async () => {
         setLoading(true);
         try {
-            const supabase = getSaasSupabaseClient();
-            const { data: { user } } = await supabase.auth.getUser();
+            console.log('🧩 [BlockSelectionModal] 載入積木:', { activeTab, slotType, userId: user?.id });
 
-            let query = supabase
-                .from('mind_blocks' as any)
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (activeTab === 'my') {
-                if (user?.id) {
-                    query = query.eq('user_id', user.id);
-                }
-            } else {
-                query = query.eq('is_public', true);
+            // Use API to bypass RLS issues
+            const params = new URLSearchParams({
+                tab: activeTab,
+            });
+            
+            if (user?.id) {
+                params.append('userId', user.id);
+            }
+            
+            if (slotType) {
+                params.append('slotType', slotType);
             }
 
-            // Filter by type if possible (assuming we have a type field or tag)
-            // For now, we fetch all and maybe filter client side if needed, 
-            // but ideally we should have a 'block_type' column.
-            // Based on previous files, 'block_type' exists in MindBlock interface.
-            // Let's try to filter by it if it matches our slot types.
-            // Note: MindBlockType includes 'role', 'style', 'task'.
+            const response = await fetch(`/api/mind-blocks?${params.toString()}`);
+            const result = await response.json();
 
-            // query = query.eq('block_type', slotType); 
-            // Commented out because we might want to allow mixing types or the column might be empty for old blocks.
+            if (!result.success) {
+                console.error('❌ [BlockSelectionModal] API 回應失敗:', result.error);
+                throw new Error(result.error || '載入積木失敗');
+            }
 
-            const { data, error } = await query;
-
-            if (error) throw error;
-            setBlocks((data as unknown as MindBlock[]) || []);
+            console.log('✅ [BlockSelectionModal] 載入積木成功:', result.data?.length || 0, '個');
+            setBlocks((result.data as unknown as MindBlock[]) || []);
         } catch (error) {
-            console.error('Failed to load blocks:', error);
+            console.error('❌ [BlockSelectionModal] 載入積木異常:', error);
+            setBlocks([]); // Set empty array on error
         } finally {
             setLoading(false);
         }

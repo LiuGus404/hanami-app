@@ -69,6 +69,14 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
     }
   }, [user?.email, directLoading, directTeacherAccess, directCheckTeacherAccess]);
 
+  const normalizeRole = (value?: string | null) =>
+    value?.toString().trim().toLowerCase().replace(/[\s-]+/g, '_') ?? '';
+
+  const isAdminRole = (role: string) => {
+    const normalized = normalizeRole(role);
+    return ['super_admin', 'admin', 'owner'].includes(normalized);
+  };
+
   useEffect(() => {
     let cancelled = false;
     const resolveRole = async () => {
@@ -81,7 +89,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       }
 
       // 0. Hardcoded Owner Check (Fail-safe)
-      if (user.email === 'tqfea12@gmail.com') {
+      if (user.email === 'tqfea12@gmail.com' || user.email === 'kwanyu229@gmail.com') {
         // console.log('AppSidebar: Detected Owner Email -> Force Super Admin');
         setIsSuperAdmin(true);
         setRoleLoading(false);
@@ -90,7 +98,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       }
 
       // 1. Check user Metadata
-      const normalizedRoleFromUser = (
+      const normalizedRoleFromUser = normalizeRole(
         (user as any)?.user_role ??
         (user as any)?.role ??
         (user as any)?.metadata?.user_role ??
@@ -98,14 +106,11 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         (user as any)?.app_metadata?.user_role ??
         (user as any)?.app_metadata?.role ??
         ''
-      )
-        .toString()
-        .trim()
-        .toLowerCase();
+      );
 
       console.log('AppSidebar: normalizedRoleFromUser', normalizedRoleFromUser);
 
-      if (normalizedRoleFromUser === 'super_admin' || normalizedRoleFromUser === 'admin') {
+      if (isAdminRole(normalizedRoleFromUser)) {
         console.log('AppSidebar: Role found in user object:', normalizedRoleFromUser);
         setIsSuperAdmin(true);
         setRoleLoading(false);
@@ -133,6 +138,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         }
 
         const { data: userData, error } = await query.maybeSingle();
+        console.log('AppSidebar: Raw userData result:', { userData, error });
 
         if (!cancelled) {
           if (error) {
@@ -141,8 +147,8 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             // But we started false.
             setIsSuperAdmin(false);
           } else {
-            const role = (userData as { user_role: string } | null)?.user_role || 'user';
-            const isSuperAdminRole = role.toLowerCase() === 'super_admin' || role.toLowerCase() === 'admin';
+            const role = (userData as { user_role?: string } | null)?.user_role || 'user';
+            const isSuperAdminRole = isAdminRole(role);
             console.log(`AppSidebar: DB Check Result. Role: ${role}, IsSuper: ${isSuperAdminRole}`);
             setIsSuperAdmin(isSuperAdminRole);
           }

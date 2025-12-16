@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
@@ -25,13 +25,21 @@ import {
 } from '@heroicons/react/24/outline';
 import { useMusicPlayer } from '@/contexts/MusicPlayerContext';
 
+interface ExtraMenuItem {
+    name: string;
+    onClick: () => void;
+    icon?: ReactNode;
+    className?: string;
+}
+
 interface UnifiedRightContentProps {
     user: any;
     onLogout: () => void;
     onNavigate?: (key: string) => void;
+    extraMenuItems?: ExtraMenuItem[];
 }
 
-export default function UnifiedRightContent({ user, onLogout, onNavigate }: UnifiedRightContentProps) {
+export default function UnifiedRightContent({ user, onLogout, onNavigate, extraMenuItems }: UnifiedRightContentProps) {
     const router = useRouter();
     const {
         isPlaying,
@@ -51,7 +59,10 @@ export default function UnifiedRightContent({ user, onLogout, onNavigate }: Unif
     const [showGearDropdown, setShowGearDropdown] = useState(false);
 
     const handleItemClick = (item: any) => {
-        if (item.action) {
+        if (item.onClick) {
+            item.onClick();
+            setShowGearDropdown(false);
+        } else if (item.action) {
             if (onNavigate) {
                 onNavigate(item.action);
             } else if (item.action.startsWith('view:')) {
@@ -255,6 +266,23 @@ export default function UnifiedRightContent({ user, onLogout, onNavigate }: Unif
                             <span className="mr-3"><MusicalNoteIcon className="w-4 h-4" /></span>
                             Hanami Lo-Fi
                         </div>
+
+                        {/* Extra Items (Context Specific like Room Settings) */}
+                        {extraMenuItems && extraMenuItems.length > 0 && (
+                            <>
+                                {extraMenuItems.map((item, idx) => (
+                                    <div
+                                        key={`extra-${idx}`}
+                                        onClick={() => handleItemClick(item)}
+                                        className={`flex items-center px-4 py-2 text-sm text-[#6B5142] hover:bg-[#FFF9F2] hover:text-[#4B4036] rounded-lg cursor-pointer transition-colors ${item.className || ''}`}
+                                    >
+                                        {item.icon && <span className="mr-3">{item.icon}</span>}
+                                        {item.name}
+                                    </div>
+                                ))}
+                                <div className="border-t border-[#EADBC8]/30 my-1"></div>
+                            </>
+                        )}
 
                         {[
                             { name: '思維積木', action: 'view:mind', icon: <PuzzlePieceIcon className="w-4 h-4" /> },

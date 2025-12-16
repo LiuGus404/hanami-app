@@ -4902,9 +4902,12 @@ export default function ClassActivitiesPage(
         {showStudentMediaModal && selectedStudentForMedia && (
           <StudentMediaModal
             isOpen={showStudentMediaModal}
+            canManageApproval={['owner', 'admin', 'teacher'].includes(currentOrgRole || '')}
             onClose={() => {
               setShowStudentMediaModal(false);
               setSelectedStudentForMedia(null);
+              // 關閉後清除狀態，防止數據不一致
+              setStudentMediaStatus({});
             }}
             student={selectedStudentForMedia}
             orgId={validOrgId}
@@ -5008,6 +5011,8 @@ export default function ClassActivitiesPage(
                   overall_performance_rating: assessment.overall_performance_rating || 3,
                   general_notes: assessment.general_notes || '',
                   next_lesson_focus: assessment.next_lesson_focus || '',
+                  progress_notes: assessment.progress_notes || '', // 新增：導師評語
+                  progress_notes_public: assessment.progress_notes_public ?? false, // 新增：導師評語是否公開
                   goals: assessment.goals || [],
                   org_id: validOrgId || null,
                 };

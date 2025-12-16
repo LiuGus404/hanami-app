@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
       next_lesson_focus,
       notes,
       goals,
-      org_id
+      org_id,
+      progress_notes, // 新增：導師評語
+      progress_notes_public // 新增：導師評語是否公開
     } = body;
 
     // 驗證必要欄位
@@ -33,7 +35,7 @@ export async function POST(request: NextRequest) {
     // 使用服務端客戶端（繞過 RLS）
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
+
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('API: 缺少 Supabase 環境變數');
       return NextResponse.json({
@@ -41,13 +43,50 @@ export async function POST(request: NextRequest) {
         error: '服務器配置錯誤'
       }, { status: 500 });
     }
-    
+
     const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
+
+    // 1. 儲存導師評語到課程記錄 (hanami_student_lesson)
+    if (progress_notes !== undefined) {
+      console.log('📝 更新課程導師評語:', { student_id, lesson_date, progress_notes, progress_notes_public });
+
+      // 先檢查是否存在該課程記錄
+      const { data: existingLesson, error: checkLessonError } = await (supabase as any)
+        .from('hanami_student_lesson')
+        .select('id')
+        .eq('student_id', student_id)
+        .eq('lesson_date', lesson_date)
+        .maybeSingle();
+
+      if (checkLessonError) {
+        console.error('檢查課程記錄失敗:', checkLessonError);
+      } else if (existingLesson) {
+        // 更新現有課程記錄
+        const updatePayload: any = { progress_notes: progress_notes || null };
+        if (progress_notes_public !== undefined) {
+          updatePayload.progress_notes_public = progress_notes_public;
+        }
+
+        const { error: updateLessonError } = await (supabase as any)
+          .from('hanami_student_lesson')
+          .update(updatePayload)
+          .eq('id', existingLesson.id);
+
+        if (updateLessonError) {
+          console.error('更新課程導師評語失敗:', updateLessonError);
+        } else {
+          console.log('✅ 課程導師評語更新成功');
+        }
+      } else {
+        console.warn('⚠️ 找不到對應的課程記錄，無法更新導師評語');
+        // 如果需要，這裡可以選擇創建新的課程記錄，但通常這應該由排課系統處理
+      }
+    }
 
     // 檢查是否已存在該日期的評估記錄
     const { data: existingAssessmentData, error: checkError } = await ((supabase as any)
@@ -76,9 +115,9 @@ export async function POST(request: NextRequest) {
         .select('org_id')
         .eq('id', student_id)
         .single());
-      
+
       const studentData = studentDataRaw as { org_id: string } | null;
-      
+
       if (studentData?.org_id) {
         finalOrgId = studentData.org_id;
       }
@@ -107,7 +146,7 @@ export async function POST(request: NextRequest) {
     if (existingAssessment) {
       // 更新現有記錄
       console.log('更新現有評估記錄:', existingAssessment.id);
-      
+
       const { data: updatedAssessment, error: updateError } = await (supabase as any)
         .from('hanami_ability_assessments')
         .update(updateData)
@@ -127,7 +166,7 @@ export async function POST(request: NextRequest) {
     } else {
       // 創建新記錄
       console.log('創建新評估記錄');
-      
+
       const { data: newAssessmentData, error: insertError } = await ((supabase as any)
         .from('hanami_ability_assessments')
         .insert({
@@ -148,6 +187,7 @@ export async function POST(request: NextRequest) {
       const newAssessment = newAssessmentData as { id: string };
       assessmentId = newAssessment.id;
     }
+
 
     // 學習目標評估已經包含在 selected_goals 欄位中
     console.log('📋 學習目標評估已儲存在 selected_goals 欄位:', {
@@ -227,7 +267,7 @@ export async function GET(request: NextRequest) {
     // 使用服務端客戶端（繞過 RLS）
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
+
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('API: 缺少 Supabase 環境變數');
       return NextResponse.json({
@@ -235,7 +275,7 @@ export async function GET(request: NextRequest) {
         error: '服務器配置錯誤'
       }, { status: 500 });
     }
-    
+
     const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,

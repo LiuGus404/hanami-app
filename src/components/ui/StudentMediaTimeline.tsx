@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import StudentActivitiesPanel from './StudentActivitiesPanel';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Calendar, 
-  Clock, 
-  Play, 
-  Image, 
-  Video, 
-  ChevronLeft, 
+import {
+  Calendar,
+  Clock,
+  Play,
+  Image,
+  Video,
+  ChevronLeft,
   ChevronRight,
   MapPin,
   Train,
@@ -57,6 +58,7 @@ interface LessonData {
   lesson_teacher: string;
   lesson_activities: string;
   progress_notes: string | null;
+  progress_notes_public?: boolean; // 新增：導師評語是否公開
   next_target: string;
   notes: string;
   course_type: string;
@@ -70,6 +72,7 @@ interface StudentMediaTimelineProps {
   className?: string;
   isTeacher?: boolean; // 是否為老師端，如果是則可以編輯和刪除進度筆記
   orgId?: string | null; // 機構 ID，用於更新資料
+  isReadOnly?: boolean;
 }
 
 // 地鐵站樣式的時間軸節點
@@ -82,24 +85,24 @@ const MetroStationNode: React.FC<{
   totalStations: number;
 }> = ({ lesson, isActive, isSelected, onClick, index, totalStations }) => {
   const [isHovered, setIsHovered] = useState(false);
-  
+
   const getStationColor = () => {
     if (!lesson) return 'from-gray-200 to-gray-300';
     if (isSelected) return 'from-blue-500 to-blue-600';
-    
+
     // 檢查螢幕寬度，決定中心節點索引
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     const centerIndex = isMobile ? 1 : 2; // 移動端中心索引1，桌面端中心索引2
-    
+
     // 中間的課程（最近的一堂）始終用特殊顏色
     if (index === centerIndex) return 'from-orange-400 to-orange-500';
-    
+
     // 根據課程狀態顯示顏色：未上用灰色，已上用綠色
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const lessonDate = new Date(lesson.lesson_date);
     lessonDate.setHours(0, 0, 0, 0);
-    
+
     if (lessonDate <= today) {
       // 已上的課程用綠色
       return 'from-green-400 to-green-500';
@@ -123,9 +126,8 @@ const MetroStationNode: React.FC<{
 
   return (
     <motion.div
-      className={`relative flex flex-col items-center cursor-pointer py-4 ${
-        index === totalStations - 1 ? 'pr-4' : ''
-      }`}
+      className={`relative flex flex-col items-center cursor-pointer py-4 ${index === totalStations - 1 ? 'pr-4' : ''
+        }`}
       onClick={onClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -135,12 +137,11 @@ const MetroStationNode: React.FC<{
       {/* 連接線 */}
       {index < totalStations - 1 && (
         <motion.div
-          className={`absolute top-12 left-1/2 w-full h-0.5 ${
-            isSelected ? 'bg-blue-500' : 
+          className={`absolute top-12 left-1/2 w-full h-0.5 ${isSelected ? 'bg-blue-500' :
             (() => {
               const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
               const centerIndex = isMobile ? 1 : 2;
-              return index === centerIndex ? 'bg-orange-400' : 
+              return index === centerIndex ? 'bg-orange-400' :
                 lesson && (() => {
                   const today = new Date();
                   today.setHours(0, 0, 0, 0);
@@ -149,7 +150,7 @@ const MetroStationNode: React.FC<{
                   return lessonDate <= today ? 'bg-green-400' : 'bg-gray-300';
                 })() || 'bg-gray-300';
             })()
-          }`}
+            }`}
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
           transition={{ delay: index * 0.1, duration: 0.5 }}
@@ -166,20 +167,20 @@ const MetroStationNode: React.FC<{
         `}
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
-        transition={{ 
-          delay: index * 0.1, 
-          duration: 0.6, 
+        transition={{
+          delay: index * 0.1,
+          duration: 0.6,
           type: "spring",
-          stiffness: 200 
+          stiffness: 200
         }}
-        whileHover={{ 
-          scale: 1.1, 
+        whileHover={{
+          scale: 1.1,
           rotate: 5,
           boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
         }}
       >
         {getStationIcon()}
-        
+
         {/* 影片數量指示器 - 只有影片才顯示數字 */}
         {lesson && lesson.media.filter(m => m.media_type === 'video').length > 0 && (
           <motion.div
@@ -201,16 +202,16 @@ const MetroStationNode: React.FC<{
           const centerIndex = isMobile ? 1 : 2;
           return index === centerIndex;
         })() && (
-          <motion.div
-            className="absolute -top-2 -left-2 md:-top-3 md:-left-3 w-6 h-6 md:w-7 md:h-7 bg-green-500 text-white text-xs 
+            <motion.div
+              className="absolute -top-2 -left-2 md:-top-3 md:-left-3 w-6 h-6 md:w-7 md:h-7 bg-green-500 text-white text-xs 
               rounded-full flex items-center justify-center border-2 border-white shadow-lg z-10"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: index * 0.1 + 0.5 }}
-          >
-            <Star className="w-3 h-3 md:w-4 md:h-4" />
-          </motion.div>
-        )}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: index * 0.1 + 0.5 }}
+            >
+              <Star className="w-3 h-3 md:w-4 md:h-4" />
+            </motion.div>
+          )}
       </motion.div>
 
       {/* 車站標籤 */}
@@ -222,39 +223,37 @@ const MetroStationNode: React.FC<{
       >
         {lesson ? (
           <>
-            <div className={`text-xs md:text-sm font-medium truncate ${
-              (() => {
-                const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-                const centerIndex = isMobile ? 1 : 2;
-                return index === centerIndex ? 'text-orange-700' : 
-                  (() => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const lessonDate = new Date(lesson.lesson_date);
-                    lessonDate.setHours(0, 0, 0, 0);
-                    return lessonDate <= today ? 'text-green-700' : 'text-gray-800';
-                  })();
-              })()
-            }`}>
+            <div className={`text-xs md:text-sm font-medium truncate ${(() => {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+              const centerIndex = isMobile ? 1 : 2;
+              return index === centerIndex ? 'text-orange-700' :
+                (() => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const lessonDate = new Date(lesson.lesson_date);
+                  lessonDate.setHours(0, 0, 0, 0);
+                  return lessonDate <= today ? 'text-green-700' : 'text-gray-800';
+                })();
+            })()
+              }`}>
               {new Date(lesson.lesson_date).toLocaleDateString('zh-TW', {
                 month: 'short',
                 day: 'numeric'
               })}
             </div>
-            <div className={`text-xs truncate ${
-              (() => {
-                const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-                const centerIndex = isMobile ? 1 : 2;
-                return index === centerIndex ? 'text-orange-600' : 
-                  (() => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const lessonDate = new Date(lesson.lesson_date);
-                    lessonDate.setHours(0, 0, 0, 0);
-                    return lessonDate <= today ? 'text-green-600' : 'text-gray-500';
-                  })();
-              })()
-            }`}>
+            <div className={`text-xs truncate ${(() => {
+              const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+              const centerIndex = isMobile ? 1 : 2;
+              return index === centerIndex ? 'text-orange-600' :
+                (() => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const lessonDate = new Date(lesson.lesson_date);
+                  lessonDate.setHours(0, 0, 0, 0);
+                  return lessonDate <= today ? 'text-green-600' : 'text-gray-500';
+                })();
+            })()
+              }`}>
               {lesson.actual_timeslot}
             </div>
             {lesson.isToday && (() => {
@@ -262,10 +261,10 @@ const MetroStationNode: React.FC<{
               const centerIndex = isMobile ? 1 : 2;
               return index === centerIndex;
             })() && (
-              <div className="text-xs text-green-600 font-medium mt-1">
-                今天
-              </div>
-            )}
+                <div className="text-xs text-green-600 font-medium mt-1">
+                  今天
+                </div>
+              )}
           </>
         ) : (
           <>
@@ -314,7 +313,9 @@ const MediaCard: React.FC<{
   onView: () => void;
   onDownload: () => void;
   lessonDate?: string; // 新增：課程日期
-}> = ({ media, onView, onDownload, lessonDate }) => {
+  isTeacher?: boolean;
+  onApprovalChange?: (mediaId: string, newStatus: boolean) => void;
+}> = ({ media, onView, onDownload, lessonDate, isTeacher, onApprovalChange }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -344,7 +345,7 @@ const MediaCard: React.FC<{
             </div>
           </div>
         )}
-        
+
         {/* 播放按鈕覆蓋層 */}
         <AnimatePresence>
           {isHovered && (
@@ -380,7 +381,7 @@ const MediaCard: React.FC<{
             )}
           </div>
         </div>
-        
+
         <div className="space-y-1">
           {/* 課程關聯日期 */}
           {lessonDate && (
@@ -389,7 +390,7 @@ const MediaCard: React.FC<{
               <span>課程: {new Date(lessonDate).toLocaleDateString('zh-TW')}</span>
             </div>
           )}
-          
+
           {/* 上傳日期和觀看次數 */}
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center space-x-1">
@@ -413,6 +414,27 @@ const MediaCard: React.FC<{
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
           >
+            {/* Slide Approval Toggle */}
+            {isTeacher && (
+              <div
+                className="flex items-center bg-white/90 rounded-full px-2 py-1 mr-2 cursor-pointer shadow-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Handle approval toggle logic here (passed from parent or handled internally)
+                  const newStatus = !media.is_approved;
+
+                  if (onApprovalChange) {
+                    onApprovalChange(media.id, newStatus);
+                  }
+                }}
+              >
+                <div className={`w-2 h-2 rounded-full mr-1 ${media.is_approved ? 'bg-green-500' : 'bg-gray-400'}`} />
+                <span className={`text-xs font-medium ${media.is_approved ? 'text-green-700' : 'text-gray-600'}`}>
+                  {media.is_approved ? '已批' : '未批'}
+                </span>
+              </div>
+            )}
+
             <motion.button
               onClick={(e) => {
                 e.stopPropagation();
@@ -420,8 +442,6 @@ const MediaCard: React.FC<{
               }}
               className="p-2 bg-white bg-opacity-90 rounded-full shadow-md hover:bg-opacity-100
                 transition-all duration-200"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
             >
               <Download className="w-4 h-4 text-gray-600" />
             </motion.button>
@@ -433,12 +453,13 @@ const MediaCard: React.FC<{
 };
 
 
-export default function StudentMediaTimeline({ 
-  studentId, 
-  studentName, 
+export default function StudentMediaTimeline({
+  studentId,
+  studentName,
   className = '',
   isTeacher = false,
-  orgId = null
+  orgId = null,
+  isReadOnly = false
 }: StudentMediaTimelineProps) {
   const [lessons, setLessons] = useState<LessonData[]>([]);
   const [selectedLesson, setSelectedLesson] = useState<LessonData | null>(null);
@@ -453,6 +474,7 @@ export default function StudentMediaTimeline({
   const [todayLessonRecord, setTodayLessonRecord] = useState<any>(null); // 當日課堂記錄
   const [isEditingProgressNotes, setIsEditingProgressNotes] = useState(false); // 是否正在編輯進度筆記
   const [editedProgressNotes, setEditedProgressNotes] = useState<string>(''); // 編輯中的進度筆記內容
+  const [editedProgressNotesPublic, setEditedProgressNotesPublic] = useState(false); // 編輯中的進度筆記公開狀態
   const [isSaving, setIsSaving] = useState(false); // 是否正在儲存
 
   // 載入當日課堂記錄
@@ -460,7 +482,7 @@ export default function StudentMediaTimeline({
     try {
       console.log('🚀 開始載入當日課堂記錄...');
       console.log('🔍 查詢參數:', { studentId, studentName });
-      
+
       if (!studentId) {
         console.error('❌ studentId 為空，無法載入課堂記錄');
         return;
@@ -469,64 +491,64 @@ export default function StudentMediaTimeline({
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayStr = today.toISOString().split('T')[0];
-      
+
       console.log('🔍 查詢當日課堂記錄:', { studentId, todayStr });
-      
+
       // 先查詢該學生的所有課堂記錄
       console.log('🔍 開始查詢 Supabase...');
-      
+
       // 先測試 Supabase 連接
       console.log('🔍 測試 Supabase 連接...');
       const { data: testData, error: testError } = await supabase
         .from('hanami_student_lesson')
         .select('id, student_id, lesson_date')
         .limit(1);
-      
+
       console.log('🔍 Supabase 連接測試結果:', { testData, testError });
-      
+
       if (testError) {
         console.error('❌ Supabase 連接測試失敗:', testError);
         return;
       }
-      
+
       console.log('✅ Supabase 連接測試成功');
-      
+
       console.log('🔍 開始查詢該學生的課堂記錄...');
       console.log('🔍 查詢條件:', { student_id: studentId });
-      
+
       const { data: allLessons, error: allError } = await supabase
         .from('hanami_student_lesson')
         .select('*')
         .eq('student_id', studentId)
         .order('lesson_date', { ascending: false })
         .limit(10);
-      
+
       console.log('🔍 Supabase 查詢結果:', { data: allLessons, error: allError });
-      
+
       if (allError) {
         console.error('❌ 查詢該學生課堂記錄失敗:', allError);
         return;
       }
-      
+
       console.log('✅ 查詢該學生課堂記錄成功');
 
-      const typedAllLessons = (allLessons || []) as Array<{ lesson_date: string | null; [key: string]: any }>;
+      const typedAllLessons = (allLessons || []) as Array<{ lesson_date: string | null;[key: string]: any }>;
       console.log('📚 該學生的所有課堂記錄:', typedAllLessons);
       console.log('📊 課堂記錄數量:', typedAllLessons.length);
 
       // 查找當日的課堂記錄
       console.log('🔍 查找當日的課堂記錄...');
       console.log('🔍 今日日期:', todayStr);
-      
+
       const todayLesson = typedAllLessons.find(lesson => {
         if (!lesson.lesson_date) return false;
         const lessonDate = new Date(lesson.lesson_date);
         lessonDate.setHours(0, 0, 0, 0);
         const isToday = lessonDate.getTime() === today.getTime();
-        console.log('🔍 檢查課程日期:', { 
-          lessonDate: lesson.lesson_date, 
+        console.log('🔍 檢查課程日期:', {
+          lessonDate: lesson.lesson_date,
           normalizedDate: lessonDate.toISOString().split('T')[0],
-          isToday 
+          isToday
         });
         return isToday;
       });
@@ -545,7 +567,7 @@ export default function StudentMediaTimeline({
           console.log('📅 無任何課堂記錄');
         }
       }
-      
+
       console.log('🎯 當日課堂記錄載入完成');
     } catch (error) {
       console.error('❌ 載入當日課堂記錄錯誤:', error);
@@ -559,12 +581,13 @@ export default function StudentMediaTimeline({
   // 保存進度筆記
   const handleSaveProgressNotes = async () => {
     if (!selectedLesson) return;
-    
+
     setIsSaving(true);
     try {
       const lessonId = selectedLesson.id;
       const updateData: Record<string, any> = {
         progress_notes: editedProgressNotes || null,
+        progress_notes_public: editedProgressNotesPublic, // 更新公開狀態
         updated_at: new Date().toISOString(),
       };
 
@@ -589,13 +612,14 @@ export default function StudentMediaTimeline({
       const updatedLesson = {
         ...selectedLesson,
         progress_notes: editedProgressNotes || null,
+        progress_notes_public: editedProgressNotesPublic,
       };
       setSelectedLesson(updatedLesson);
-      
+
       // 更新 lessons 陣列中的對應項目
-      setLessons(lessons.map(lesson => 
-        lesson.id === lessonId 
-          ? { ...lesson, progress_notes: editedProgressNotes || null }
+      setLessons(lessons.map(lesson =>
+        lesson.id === lessonId
+          ? { ...lesson, progress_notes: editedProgressNotes || null, progress_notes_public: editedProgressNotesPublic }
           : lesson
       ));
 
@@ -604,6 +628,7 @@ export default function StudentMediaTimeline({
         setTodayLessonRecord({
           ...todayLessonRecord,
           progress_notes: editedProgressNotes || null,
+          progress_notes_public: editedProgressNotesPublic,
         });
       }
 
@@ -653,10 +678,10 @@ export default function StudentMediaTimeline({
         progress_notes: null,
       };
       setSelectedLesson(updatedLesson);
-      
+
       // 更新 lessons 陣列中的對應項目
-      setLessons(lessons.map(lesson => 
-        lesson.id === lessonId 
+      setLessons(lessons.map(lesson =>
+        lesson.id === lessonId
           ? { ...lesson, progress_notes: null }
           : lesson
       ));
@@ -683,10 +708,10 @@ export default function StudentMediaTimeline({
     const checkIsMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkIsMobile();
     window.addEventListener('resize', checkIsMobile);
-    
+
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
 
@@ -705,13 +730,13 @@ export default function StudentMediaTimeline({
 
         // 使用簡化版API路由載入資料
         const response = await fetch(`/api/student-media/timeline-simple?studentId=${studentId}`);
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        
+
         if (!result.success) {
           throw new Error(result.error || '載入資料失敗');
         }
@@ -724,7 +749,7 @@ export default function StudentMediaTimeline({
           const mediaCount = lesson.media?.length || 0;
           const videoCount = lesson.media?.filter((m: any) => m.media_type === 'video').length || 0;
           const photoCount = lesson.media?.filter((m: any) => m.media_type === 'photo').length || 0;
-          
+
           if (mediaCount > 0) {
             console.log(`📅 ${lesson.lesson_date} (課程 ${index + 1}):`, {
               mediaCount,
@@ -732,7 +757,7 @@ export default function StudentMediaTimeline({
               photoCount,
               lessonId: lesson.id
             });
-            
+
             // 詳細顯示每個媒體檔案
             lesson.media?.forEach((media: any, mediaIndex: number) => {
               console.log(`  📁 媒體 ${mediaIndex + 1}:`, {
@@ -745,14 +770,14 @@ export default function StudentMediaTimeline({
             });
           }
         });
-        
+
         // 總結統計
         const totalMedia = lessons.reduce((sum: number, l: any) => sum + (l.media?.length || 0), 0);
         const totalVideos = lessons.reduce((sum: number, l: any) => sum + (l.media?.filter((m: any) => m.media_type === 'video').length || 0), 0);
         const totalPhotos = lessons.reduce((sum: number, l: any) => sum + (l.media?.filter((m: any) => m.media_type === 'photo').length || 0), 0);
         console.log('📈 總計統計:', { totalLessons: lessons.length, totalMedia, totalVideos, totalPhotos });
         setLessons(lessons);
-        
+
         // 載入當日課堂記錄
         console.log('🎯 準備載入當日課堂記錄...');
         console.log('🎯 當前 studentId:', studentId);
@@ -767,18 +792,18 @@ export default function StudentMediaTimeline({
             stack: error instanceof Error ? error.stack : undefined
           });
         }
-        
+
         // 預設選擇今天的課程，如果沒有則選擇最近的課程
         if (lessons.length > 0) {
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          
+
           const todayLesson = lessons.find((lesson: any) => {
             const lessonDate = new Date(lesson.lesson_date);
             lessonDate.setHours(0, 0, 0, 0);
             return lessonDate.getTime() === today.getTime();
           });
-          
+
           // 如果沒有今天的課程，選擇最接近今天的課程
           if (!todayLesson) {
             const closestLesson = lessons.reduce((closest: any, lesson: any) => {
@@ -786,13 +811,13 @@ export default function StudentMediaTimeline({
               const todayTime = today.getTime();
               const lessonTime = lessonDate.getTime();
               const closestTime = closest ? new Date(closest.lesson_date).getTime() : Infinity;
-              
+
               const currentDiff = Math.abs(lessonTime - todayTime);
               const closestDiff = Math.abs(closestTime - todayTime);
-              
+
               return currentDiff < closestDiff ? lesson : closest;
             });
-            
+
             setSelectedLesson(closestLesson);
           } else {
             setSelectedLesson(todayLesson);
@@ -816,44 +841,44 @@ export default function StudentMediaTimeline({
   // 處理課程日期排序和選擇邏輯
   const processedLessons = useMemo(() => {
     if (lessons.length === 0) return [];
-    
+
     // 按日期排序（最早的在前，最晚的在後）
-    const sortedLessons = [...lessons].sort((a, b) => 
+    const sortedLessons = [...lessons].sort((a, b) =>
       new Date(a.lesson_date).getTime() - new Date(b.lesson_date).getTime()
     );
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0); // 重置時間到當天開始
-    
+
     // 找到最接近今天的課程
     let todayIndex = -1;
     let minDiff = Infinity;
-    
+
     sortedLessons.forEach((lesson, index) => {
       const lessonDate = new Date(lesson.lesson_date);
       lessonDate.setHours(0, 0, 0, 0);
       const diff = Math.abs(lessonDate.getTime() - today.getTime());
-      
+
       if (diff < minDiff) {
         minDiff = diff;
         todayIndex = index;
       }
     });
-    
+
     // 如果沒有找到接近今天的課程，使用第一個課程作為中心
     if (todayIndex === -1) {
       todayIndex = 0;
     }
-    
+
     // 檢查螢幕寬度，決定顯示3個還是5個課程
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     const nodeCount = isMobile ? 3 : 5;
     const centerOffset = isMobile ? 1 : 2; // 移動端中心偏移1，桌面端偏移2
-    
+
     // 計算當前顯示的起始索引（基於currentIndex偏移）
     const startIndex = Math.max(0, todayIndex - centerOffset + currentIndex);
     const selectedLessons = [];
-    
+
     // 選擇課程
     for (let i = 0; i < nodeCount; i++) {
       const lessonIndex = startIndex + i;
@@ -862,7 +887,7 @@ export default function StudentMediaTimeline({
         const lessonDate = new Date(lesson.lesson_date);
         lessonDate.setHours(0, 0, 0, 0);
         const isToday = lessonDate.getTime() === today.getTime();
-        
+
         selectedLessons.push({
           ...lesson,
           isToday: isToday
@@ -871,7 +896,7 @@ export default function StudentMediaTimeline({
         selectedLessons.push(null);
       }
     }
-    
+
     return selectedLessons.slice(0, nodeCount);
   }, [lessons, currentIndex, isMobile]);
 
@@ -895,7 +920,7 @@ export default function StudentMediaTimeline({
   };
 
   const handleNextLessons = () => {
-    const sortedLessons = [...lessons].sort((a, b) => 
+    const sortedLessons = [...lessons].sort((a, b) =>
       new Date(a.lesson_date).getTime() - new Date(b.lesson_date).getTime()
     );
     const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -915,12 +940,12 @@ export default function StudentMediaTimeline({
   // 構建媒體URL的輔助函數
   const buildMediaUrl = (media: StudentMedia): string | null => {
     if (!media.file_path) return null;
-    
+
     // 如果 file_path 已經包含完整的 URL，直接返回
     if (media.file_path.startsWith('http')) {
       return media.file_path;
     }
-    
+
     // 根據實際的 storage bucket 名稱構建 URL
     // 從代碼中看到媒體檔案是上傳到 'hanami-media' bucket
     return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/hanami-media/${media.file_path}`;
@@ -931,7 +956,7 @@ export default function StudentMediaTimeline({
     try {
       // 構建媒體URL
       const mediaUrl = buildMediaUrl(media);
-      
+
       if (!mediaUrl) {
         toast.error('檔案連結不存在');
         return;
@@ -942,24 +967,24 @@ export default function StudentMediaTimeline({
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      
+
       // 創建下載連結
       const link = document.createElement('a');
       link.href = url;
       link.download = media.title || media.file_name || 'media_file';
       link.style.display = 'none';
-      
+
       // 觸發下載
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       // 清理 URL 對象
       window.URL.revokeObjectURL(url);
-      
+
       toast.success(`正在下載: ${media.title || media.file_name}`);
     } catch (error) {
       console.error('下載失敗:', error);
@@ -1026,7 +1051,7 @@ export default function StudentMediaTimeline({
               地鐵站線路圖風格 - 探索每個課堂的精彩時刻
             </p>
           </div>
-          
+
           {/* 視圖模式切換 */}
           <div className="flex items-center space-x-1 md:space-x-2 overflow-x-auto">
             {[
@@ -1036,11 +1061,10 @@ export default function StudentMediaTimeline({
               <motion.button
                 key={key}
                 onClick={() => setViewMode(key as any)}
-                className={`flex items-center px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all whitespace-nowrap ${
-                  viewMode === key
-                    ? 'bg-orange-500 text-white shadow-lg'
-                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
-                }`}
+                className={`flex items-center px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-medium transition-all whitespace-nowrap ${viewMode === key
+                  ? 'bg-orange-500 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                  }`}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -1064,7 +1088,7 @@ export default function StudentMediaTimeline({
                   <MapPin className="w-5 h-5 mr-2 text-orange-500" />
                   課程時間軸
                 </h3>
-                
+
                 {/* 時間軸說明 */}
                 <div className="text-sm text-gray-600">
                   左邊：過去的課程 | 中間：今天 | 右邊：未來的課程
@@ -1078,8 +1102,8 @@ export default function StudentMediaTimeline({
                   onClick={handlePreviousLessons}
                   disabled={!canGoPrevious}
                   className={`absolute left-4 z-20 w-10 h-10 rounded-full flex items-center justify-center
-                    ${canGoPrevious 
-                      ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-lg hover:shadow-xl' 
+                    ${canGoPrevious
+                      ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-lg hover:shadow-xl'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     } transition-all duration-200`}
                   whileHover={canGoPrevious ? { scale: 1.1 } : {}}
@@ -1110,8 +1134,8 @@ export default function StudentMediaTimeline({
                   onClick={handleNextLessons}
                   disabled={!canGoNext}
                   className={`absolute right-4 z-20 w-10 h-10 rounded-full flex items-center justify-center
-                    ${canGoNext 
-                      ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-lg hover:shadow-xl' 
+                    ${canGoNext
+                      ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-lg hover:shadow-xl'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     } transition-all duration-200`}
                   whileHover={canGoNext ? { scale: 1.1 } : {}}
@@ -1157,69 +1181,14 @@ export default function StudentMediaTimeline({
 
                 {/* 課程內容 */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-                    {/* 課程活動 */}
-                    <div className="lg:col-span-2 space-y-4 md:space-y-6">
-                      <h5 className="font-semibold text-gray-800 mb-3 flex items-center">
-                        <BookOpen className="w-4 h-4 mr-2 text-blue-500" />
-                        本次課堂活動
-                      </h5>
-                      <div className="bg-white rounded-lg p-4 border border-gray-200">
-                        <div className="space-y-4">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-600">本次課堂活動</span>
-                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">進行中</span>
-                          </div>
-                          
-                          {/* 正在學習的活動 */}
-                          <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-gray-800">
-                                {selectedLesson.lesson_activities || todayLessonRecord?.lesson_activities || '暫無活動記錄'}
-                              </span>
-                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">正在學習</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-                              <div className="flex space-x-2">
-                                <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                                  {selectedLesson.course_type || '課程'}
-                                </span>
-                                <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
-                                  {selectedLesson.lesson_teacher || '教師'}
-                                </span>
-                              </div>
-                              <span>課程時間: {selectedLesson.actual_timeslot || '未設定'}</span>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-500">
-                              分配時間: {new Date(selectedLesson.lesson_date).toLocaleDateString('zh-TW')}
-                            </div>
-                          </div>
-
-                          {/* 未開始的活動 */}
-                          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-gray-600">未開始活動</span>
-                              <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">待開始</span>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">0002-手指練習</span>
-                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">難度 2</span>
-                              </div>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">0003-節奏訓練</span>
-                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">難度 1</span>
-                              </div>
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">0004-音階練習</span>
-                                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">難度 3</span>
-                              </div>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-500">
-                              預計完成時間: 下週課程
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                  {/* 本次課堂活動 - 使用 StudentActivitiesPanel 取代原有的顯示 */}
+                  <div className="lg:col-span-2 space-y-4 md:space-y-6">
+                    <StudentActivitiesPanel
+                      studentId={studentId}
+                      lessonDate={selectedLesson.lesson_date}
+                      timeslot={selectedLesson.actual_timeslot}
+                      isReadOnly={isReadOnly}
+                    />
 
                     {/* 進度筆記 */}
                     <h5 className="font-semibold text-gray-800 mb-3 mt-4 flex items-center">
@@ -1237,7 +1206,13 @@ export default function StudentMediaTimeline({
                                 <button
                                   onClick={() => {
                                     const currentNotes = selectedLesson.progress_notes || todayLessonRecord?.progress_notes || '';
+                                    // 獲取公開狀態
+                                    const isPublic = selectedLesson.progress_notes
+                                      ? (selectedLesson.progress_notes_public ?? false)
+                                      : (todayLessonRecord?.progress_notes_public ?? false);
+
                                     setEditedProgressNotes(currentNotes);
+                                    setEditedProgressNotesPublic(isPublic);
                                     setIsEditingProgressNotes(true);
                                   }}
                                   className="p-1.5 rounded-lg bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] hover:from-[#EBC9A4] hover:to-[#FFD59A] text-[#2B3A3B] transition-colors shadow-sm hover:shadow-md"
@@ -1275,6 +1250,35 @@ export default function StudentMediaTimeline({
                                 rows={4}
                                 placeholder="請輸入學習進度..."
                               />
+
+                              {/* 公開狀態切換 */}
+                              <div className="flex items-center justify-between px-1">
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium text-gray-700">
+                                    {editedProgressNotesPublic ? '公開給家長' : '隱藏'}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {editedProgressNotesPublic ? '家長可見此筆記' : '此評語僅導師可見'}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditedProgressNotesPublic(!editedProgressNotesPublic)}
+                                  className={`
+                                    relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2
+                                    ${editedProgressNotesPublic ? 'bg-[#FFD59A]' : 'bg-gray-200'}
+                                  `}
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className={`
+                                      pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+                                      ${editedProgressNotesPublic ? 'translate-x-5' : 'translate-x-0'}
+                                    `}
+                                  />
+                                </button>
+                              </div>
+
                               <div className="flex justify-end gap-2">
                                 <button
                                   onClick={() => {
@@ -1298,7 +1302,34 @@ export default function StudentMediaTimeline({
                           ) : (
                             <>
                               <div className="text-sm text-[#4B4036] mb-2 whitespace-pre-wrap leading-relaxed">
-                                {selectedLesson.progress_notes || todayLessonRecord?.progress_notes || '暫無進度筆記'}
+                                {(() => {
+                                  // 優先使用 selectedLesson，如果沒有則嘗試 use todayLessonRecord
+                                  const notes = selectedLesson.progress_notes || todayLessonRecord?.progress_notes;
+                                  // 獲取公開狀態，優先從有 notes 的對象獲取
+                                  const isPublic = selectedLesson.progress_notes
+                                    ? (selectedLesson.progress_notes_public ?? false)
+                                    : (todayLessonRecord?.progress_notes_public ?? false);
+
+                                  if (!notes) return '暫無進度筆記';
+
+                                  // 如果是老師，總是顯示，並標註隱私狀態
+                                  if (isTeacher) {
+                                    return (
+                                      <>
+                                        {notes}
+                                        {!isPublic && (
+                                          <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">
+                                            <Eye className="w-3 h-3 mr-1" />
+                                            僅導師可見
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  }
+
+                                  // 如果是家長/學生，只顯示公開的
+                                  return isPublic ? notes : '暫無公開進度筆記';
+                                })()}
                               </div>
                               <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
                                 <div className="flex space-x-2">
@@ -1495,7 +1526,7 @@ export default function StudentMediaTimeline({
           >
             {/* 背景遮罩 */}
             <div className="absolute inset-0 bg-transparent" />
-            
+
             {/* 媒體播放器 */}
             <motion.div
               className="relative bg-white rounded-2xl shadow-2xl max-w-4xl max-h-[90vh] w-full mx-4 overflow-y-auto"
@@ -1569,14 +1600,14 @@ export default function StudentMediaTimeline({
                         <span>課程日期: {new Date(selectedMediaLessonDate).toLocaleDateString('zh-TW')}</span>
                       </div>
                     )}
-                    
+
                     {/* 上傳日期 */}
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <Clock className="w-4 h-4" />
                       <span>上傳時間: {new Date(selectedMedia.created_at).toLocaleString('zh-TW')}</span>
                     </div>
                   </div>
-                  
+
                   {/* 檔案資訊 */}
                   <div className="flex items-center justify-between text-sm text-gray-600">
                     <span>檔案大小: {formatFileSize(selectedMedia.file_size || 0)}</span>
@@ -1607,6 +1638,6 @@ export default function StudentMediaTimeline({
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 }

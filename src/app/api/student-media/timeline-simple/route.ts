@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
       .from('hanami_student_media')
       .select('*')
       .eq('student_id', studentId)
+      .eq('is_approved', true) // Only show approved media to parents
       .order('created_at', { ascending: false });
 
     if (mediaError) {
@@ -48,27 +49,27 @@ export async function GET(request: NextRequest) {
     }
 
     // 為每個課程添加真實的媒體資料
-    const typedLessonsData = (lessonsData || []) as Array<{ id: string; lesson_date: string; [key: string]: any }>;
-    const typedMediaData = (mediaData || []) as Array<{ lesson_id?: string; created_at: string; [key: string]: any }>;
-    
+    const typedLessonsData = (lessonsData || []) as Array<{ id: string; lesson_date: string;[key: string]: any }>;
+    const typedMediaData = (mediaData || []) as Array<{ lesson_id?: string; created_at: string;[key: string]: any }>;
+
     const lessonsWithMedia = typedLessonsData.map(lesson => {
       // 根據 lesson_id 關聯媒體檔案（優先使用課程關聯）
       let lessonMedia = typedMediaData.filter(media => media.lesson_id === lesson.id);
-      
+
       // 如果沒有通過 lesson_id 關聯的媒體，則使用日期匹配作為備用方案
       // 但需要確保該媒體沒有被其他課程的 lesson_id 關聯
       if (lessonMedia.length === 0) {
         const lessonDate = new Date(lesson.lesson_date);
         lessonMedia = typedMediaData.filter(media => {
           // 檢查該媒體是否已經被其他課程的 lesson_id 關聯
-          const isAlreadyLinked = typedLessonsData.some(otherLesson => 
+          const isAlreadyLinked = typedLessonsData.some(otherLesson =>
             otherLesson.id !== lesson.id && media.lesson_id === otherLesson.id
           );
-          
+
           if (isAlreadyLinked) {
             return false; // 如果已經被其他課程關聯，則不進行日期匹配
           }
-          
+
           const mediaDate = new Date(media.created_at);
           // 檢查媒體是否在課程日期的前後幾天內
           const timeDiff = Math.abs(mediaDate.getTime() - lessonDate.getTime());
@@ -96,7 +97,7 @@ export async function GET(request: NextRequest) {
         console.log(`📅 ${lesson.lesson_date} (課程ID: ${lesson.id}):`, {
           mediaCount: lesson.media.length
         });
-        
+
         lesson.media.forEach((media: any, index: number) => {
           const isDirectlyLinked = media.lesson_id === lesson.id;
           console.log(`  📁 媒體 ${index + 1}:`, {

@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, 
-  TreePine, 
-  TrendingUp, 
-  Star, 
-  RefreshCw, 
-  AlertCircle, 
+import {
+  User,
+  TreePine,
+  TrendingUp,
+  Star,
+  RefreshCw,
+  AlertCircle,
   Info,
   PlayCircle,
   Volume2,
@@ -28,10 +28,10 @@ import {
   Edit,
   Trash2
 } from 'lucide-react';
-import { 
-  StudentAvatarWidget, 
-  GrowthTreeVisualization, 
-  LearningProgressCards 
+import {
+  StudentAvatarWidget,
+  GrowthTreeVisualization,
+  LearningProgressCards
 } from '@/components/ui';
 import Student3DCharacter from './Student3DCharacter';
 import LearningPathLevels from '@/components/ui/LearningPathLevels';
@@ -63,15 +63,15 @@ const DynamicCard: React.FC<{
       className={`bg-gradient-to-br from-white via-[#FEFCFB] to-[#FDF8F6] rounded-2xl border border-[#E8E1DC] shadow-lg backdrop-blur-sm ${className}`}
       initial={{ opacity: 0, y: 30, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ 
-        duration: 0.6, 
+      transition={{
+        duration: 0.6,
         delay,
         type: "spring",
         stiffness: 100,
         damping: 15
       }}
-      whileHover={hover ? { 
-        y: -8, 
+      whileHover={hover ? {
+        y: -8,
         scale: 1.02,
         boxShadow: "0 20px 40px rgba(232, 225, 220, 0.3), 0 15px 25px rgba(248, 234, 225, 0.2)"
       } : {}}
@@ -96,7 +96,7 @@ const FloatingIcon: React.FC<{
     <motion.div
       className={`absolute ${className}`}
       initial={{ opacity: 0, scale: 0 }}
-      animate={{ 
+      animate={{
         opacity: [0, 1, 1, 0],
         scale: [0, 1, 1.2, 0],
         y: [0, -20, -40, -60]
@@ -124,8 +124,8 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [currentProgress, setCurrentProgress] = useState<{totalProgress: number, currentLevel: number}>({totalProgress: 0, currentLevel: 1});
-  const [chartData, setChartData] = useState<Array<{date: string, progress: number, level: number}>>([]);
+  const [currentProgress, setCurrentProgress] = useState<{ totalProgress: number, currentLevel: number }>({ totalProgress: 0, currentLevel: 1 });
+  const [chartData, setChartData] = useState<Array<{ date: string, progress: number, level: number }>>([]);
   const [hoveredDataPoint, setHoveredDataPoint] = useState<number | null>(null);
   const [abilityProgress, setAbilityProgress] = useState<Array<{
     id: string;
@@ -147,7 +147,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
   const [selectedBackground, setSelectedBackground] = useState<string>('classroom');
   const [selectedAbility, setSelectedAbility] = useState<string | null>(null);
   const [showTrendModal, setShowTrendModal] = useState<boolean>(false);
-  const [latestProgressNotes, setLatestProgressNotes] = useState<{notes: string; lessonId: string; lessonDate: string} | null>(null);
+  const [latestProgressNotes, setLatestProgressNotes] = useState<{ notes: string; lessonId: string; lessonDate: string } | null>(null);
   const [isEditingProgressNotes, setIsEditingProgressNotes] = useState(false);
   const [editedProgressNotes, setEditedProgressNotes] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
@@ -176,13 +176,13 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
 
   // 載入學生活動
   useEffect(() => {
-      const loadStudentActivities = async () => {
+    const loadStudentActivities = async () => {
       if (!student?.id || !isPremiumOrg) {
         setStudentActivities([]);
         setLoadingActivities(false);
         return;
       }
-      
+
       setLoadingActivities(true);
       try {
         const response = await fetch(`/api/student-activities?studentId=${student.id}&lessonDate=${new Date().toISOString().split('T')[0]}`);
@@ -190,7 +190,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
           const result = await response.json();
           if (result.success) {
             const { currentLessonActivities, ongoingActivities, completedOngoingActivities, previousLessonActivities } = result.data;
-            
+
             // 合併所有類型的活動，包括已完成的正在學習活動
             const allActivities = [
               ...currentLessonActivities,
@@ -198,24 +198,24 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
               ...(completedOngoingActivities || []),
               ...previousLessonActivities
             ];
-            
+
             // 轉換數據格式以匹配組件期望的格式
             const activities = allActivities.map((activity: any) => ({
               id: activity.id || activity.activityId,
               name: activity.activityName,
-              status: activity.progress >= 100 ? '已完成' : 
-                     activity.progress > 0 ? '進行中' : '未開始',
+              status: activity.progress >= 100 ? '已完成' :
+                activity.progress > 0 ? '進行中' : '未開始',
               difficulty: activity.difficultyLevel || 1,
               type: activity.activityType,
               progress: activity.progress || 0,
-              assignedDate: activity.assignedAt ? 
-                new Date(activity.assignedAt).toLocaleDateString('zh-TW').replace(/\//g, '/') : 
-                activity.lessonDate ? 
-                  new Date(activity.lessonDate).toLocaleDateString('zh-TW').replace(/\//g, '/') : 
+              assignedDate: activity.assignedAt ?
+                new Date(activity.assignedAt).toLocaleDateString('zh-TW').replace(/\//g, '/') :
+                activity.lessonDate ?
+                  new Date(activity.lessonDate).toLocaleDateString('zh-TW').replace(/\//g, '/') :
                   '未知',
               description: activity.activityDescription || ''
             }));
-            
+
             setStudentActivities(activities);
           }
         }
@@ -243,12 +243,12 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
       try {
         // 從 API 載入真實的評估日期
         const response = await fetch(`/api/student-assessment-progress?student_id=${student.id}`);
-        
+
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
             const { availableDates, trendData } = result.data;
-            
+
             // 設置可用的評估日期
             if (availableDates && availableDates.length > 0) {
               setAvailableDates(availableDates);
@@ -259,7 +259,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
               setAvailableDates([currentDate]);
               setSelectedDate(currentDate);
             }
-            
+
             // 設置圖表數據
             if (trendData && trendData.length > 0) {
               setChartData(trendData);
@@ -299,17 +299,22 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
   useEffect(() => {
     const loadLatestProgressNotes = async () => {
       if (!student?.id) return;
-      
+
       try {
         let query = supabase
           .from('hanami_student_lesson')
-          .select('id, progress_notes, lesson_date')
+          .select('id, progress_notes, progress_notes_public, lesson_date')
           .eq('student_id', student.id)
           .order('lesson_date', { ascending: false });
 
         // 如果有 orgId，添加 org_id 過濾
         if (orgId) {
           query = query.eq('org_id', orgId);
+        }
+
+        // 如果不是老師，只顯示公開的筆記
+        if (!isTeacher) {
+          query = query.eq('progress_notes_public', true);
         }
 
         const { data, error } = await query;
@@ -347,7 +352,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
   // 保存進度筆記
   const handleSaveProgressNotes = async () => {
     if (!latestProgressNotes) return;
-    
+
     setIsSaving(true);
     try {
       const updateData: Record<string, any> = {
@@ -438,12 +443,12 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
       }
       try {
         console.log(`載入學生 ${student.id} 的評估數據`);
-        
+
         // 從 API 載入真實的評估資料
         const response = await fetch(
           `/api/student-assessment-progress?student_id=${student.id}${selectedDate ? `&assessment_date=${selectedDate}` : ''}`
         );
-        
+
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.data) {
@@ -451,17 +456,17 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
               totalProgress: result.data.totalProgress,
               currentLevel: result.data.currentLevel
             });
-            
+
             // 更新能力評估資料
             if (result.data.abilities) {
               setAbilityProgress(result.data.abilities);
             }
-            
+
             // 更新趨勢資料
             if (result.data.trendData) {
               setChartData(result.data.trendData);
             }
-            
+
             console.log('成功載入評估資料:', result.data);
           } else {
             console.error('載入評估資料失敗:', result.error);
@@ -479,7 +484,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
             currentLevel: 1
           });
         }
-        
+
       } catch (error) {
         console.error('載入評估數據失敗:', error);
         // 設置默認數據
@@ -575,23 +580,23 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
     <div className={`min-h-screen bg-gradient-to-br from-[#FEFCFB] via-[#FDF9F7] to-[#FCF6F3] relative overflow-hidden ${className}`}>
       {/* 背景裝飾元素 */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <FloatingIcon 
-          icon={<Music className="w-6 h-6 text-orange-300" />} 
+        <FloatingIcon
+          icon={<Music className="w-6 h-6 text-orange-300" />}
           className="top-20 left-10"
           delay={0}
         />
-        <FloatingIcon 
-          icon={<Sparkles className="w-5 h-5 text-purple-300" />} 
+        <FloatingIcon
+          icon={<Sparkles className="w-5 h-5 text-purple-300" />}
           className="top-32 right-20"
           delay={1}
         />
-        <FloatingIcon 
-          icon={<Star className="w-4 h-4 text-yellow-300" />} 
+        <FloatingIcon
+          icon={<Star className="w-4 h-4 text-yellow-300" />}
           className="top-64 left-1/4"
           delay={2}
         />
-        <FloatingIcon 
-          icon={<Award className="w-5 h-5 text-green-300" />} 
+        <FloatingIcon
+          icon={<Award className="w-5 h-5 text-green-300" />}
           className="top-40 right-1/3"
           delay={1.5}
         />
@@ -610,7 +615,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                 <User className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500" />
               </motion.div>
               <div>
-                <motion.h1 
+                <motion.h1
                   className="text-xl sm:text-3xl font-bold text-gray-800 mb-1 sm:mb-2"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -618,7 +623,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                 >
                   {student.nick_name || student.full_name} 的學生狀態
                 </motion.h1>
-                <motion.p 
+                <motion.p
                   className="text-gray-600 flex items-center text-sm sm:text-base"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -629,16 +634,15 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                 </motion.p>
               </div>
             </div>
-            
+
             {/* 控制按鈕區域 */}
             <div className="flex items-center space-x-2 sm:space-x-3">
               <motion.button
                 onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`p-2 sm:p-3 rounded-xl transition-all duration-300 ${
-                  soundEnabled 
-                    ? 'bg-gradient-to-br from-green-100 to-green-200 text-green-600 shadow-lg' 
+                className={`p-2 sm:p-3 rounded-xl transition-all duration-300 ${soundEnabled
+                    ? 'bg-gradient-to-br from-green-100 to-green-200 text-green-600 shadow-lg'
                     : 'bg-gray-100 text-gray-400'
-                }`}
+                  }`}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
@@ -659,7 +663,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
 
           {/* 狀態指示器 */}
           {lastUpdated && (
-            <motion.div 
+            <motion.div
               className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm text-gray-500"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -670,7 +674,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
               <span className="sm:hidden">更新：</span>
               {lastUpdated.toLocaleString('zh-TW')}
               {isDataStale && (
-                <motion.span 
+                <motion.span
                   className="ml-3 px-2 py-1 bg-yellow-100 text-yellow-600 rounded-lg text-xs"
                   animate={{ scale: [1, 1.05, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
@@ -703,9 +707,8 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                 transition={{ delay: 0.3 + index * 0.1 }}
               >
                 <motion.div
-                  className={`p-1.5 sm:p-2 rounded-lg mr-2 sm:mr-3 ${
-                    activeSection === key ? 'bg-white shadow-md' : 'bg-gray-100'
-                  }`}
+                  className={`p-1.5 sm:p-2 rounded-lg mr-2 sm:mr-3 ${activeSection === key ? 'bg-white shadow-md' : 'bg-gray-100'
+                    }`}
                   whileHover={{ rotate: 15 }}
                 >
                   <Icon className={`w-3 h-3 sm:w-4 sm:h-4 ${activeSection === key ? iconColor : 'text-gray-400'}`} />
@@ -808,24 +811,24 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {[
-                        { 
-                          label: '成長樹', 
-                          value: studentStats?.activeGrowthTrees || 0, 
-                          icon: TreePine, 
+                        {
+                          label: '成長樹',
+                          value: studentStats?.activeGrowthTrees || 0,
+                          icon: TreePine,
                           color: 'from-orange-100 to-orange-200',
                           iconColor: 'text-orange-500'
                         },
-                        { 
-                          label: '進度筆記', 
-                          value: latestProgressNotes ? '✓' : '-', 
-                          icon: Target, 
+                        {
+                          label: '進度筆記',
+                          value: latestProgressNotes ? '✓' : '-',
+                          icon: Target,
                           color: 'from-purple-100 to-purple-200',
                           iconColor: 'text-purple-500'
                         },
-                        { 
-                          label: '學習的活動', 
-                          value: studentStats?.totalActivities || 0, 
-                          icon: BookOpen, 
+                        {
+                          label: '學習的活動',
+                          value: studentStats?.totalActivities || 0,
+                          icon: BookOpen,
                           color: 'from-green-100 to-green-200',
                           iconColor: 'text-green-500'
                         }
@@ -877,7 +880,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         </motion.div>
                         正在學習的活動
                       </h3>
-                      
+
                       {/* 狀態篩選器 */}
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-600">狀態篩選：</span>
@@ -885,11 +888,10 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                           <motion.button
                             key={status}
                             onClick={() => setSelectedActivityStatus(status)}
-                            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                              selectedActivityStatus === status
-                                ? 'bg-purple-500 text-white border-purple-500 shadow-md' 
+                            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${selectedActivityStatus === status
+                                ? 'bg-purple-500 text-white border-purple-500 shadow-md'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                              }`}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             initial={{ opacity: 0, y: 10 }}
@@ -901,7 +903,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         ))}
                       </div>
                     </div>
-                    
+
                     {/* 活動列表 */}
                     <div className="space-y-4">
                       {(() => {
@@ -924,7 +926,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         }
 
                         // 篩選活動
-                        const filteredActivities = activities.filter(activity => 
+                        const filteredActivities = activities.filter(activity =>
                           selectedActivityStatus === '全部' || activity.status === selectedActivityStatus
                         );
 
@@ -958,17 +960,16 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                               <div className="flex items-center space-x-4">
                                 {/* 狀態指示器 */}
                                 <div className="flex items-center space-x-2">
-                                  <div className={`w-3 h-3 rounded-full ${
-                                    activity.status === '已完成' ? 'bg-green-400' :
-                                    activity.status === '進行中' ? 'bg-blue-400' :
-                                    activity.status === '未開始' ? 'bg-gray-400' :
-                                    'bg-orange-400'
-                                  }`} />
+                                  <div className={`w-3 h-3 rounded-full ${activity.status === '已完成' ? 'bg-green-400' :
+                                      activity.status === '進行中' ? 'bg-blue-400' :
+                                        activity.status === '未開始' ? 'bg-gray-400' :
+                                          'bg-orange-400'
+                                    }`} />
                                   <span className="text-xs text-gray-500 font-medium">
                                     {activity.status}
                                   </span>
                                 </div>
-                                
+
                                 {/* 活動名稱 */}
                                 <div>
                                   <h4 className="font-medium text-gray-800">{activity.name}</h4>
@@ -979,18 +980,17 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="flex items-center space-x-4">
                                 {/* 進度條 */}
                                 <div className="w-24">
                                   <div className="text-xs text-gray-500 mb-1">完成進度</div>
                                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                     <motion.div
-                                      className={`h-full bg-gradient-to-r ${
-                                        activity.progress >= 80 ? 'from-green-400 to-green-500' :
-                                        activity.progress >= 40 ? 'from-blue-400 to-blue-500' :
-                                        'from-orange-400 to-orange-500'
-                                      } rounded-full`}
+                                      className={`h-full bg-gradient-to-r ${activity.progress >= 80 ? 'from-green-400 to-green-500' :
+                                          activity.progress >= 40 ? 'from-blue-400 to-blue-500' :
+                                            'from-orange-400 to-orange-500'
+                                        } rounded-full`}
                                       initial={{ width: 0 }}
                                       animate={{ width: `${activity.progress}%` }}
                                       transition={{ duration: 1, delay: 1 + index * 0.1 }}
@@ -998,7 +998,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                                   </div>
                                   <div className="text-xs text-gray-600 mt-1">{activity.progress}%</div>
                                 </div>
-                                
+
                                 {/* 分配時間 */}
                                 <div className="text-right">
                                   <div className="text-xs text-gray-500">分配時間</div>
@@ -1010,7 +1010,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         ));
                       })()}
                     </div>
-                    
+
                   </DynamicCard>
 
                   {/* 進度筆記 */}
@@ -1037,8 +1037,8 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                       enableSound={soundEnabled}
                       className="mx-auto"
                     />
-                    
-                    <motion.div 
+
+                    <motion.div
                       className="mt-8 p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1057,253 +1057,248 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                     </motion.div>
                   </DynamicCard>
 
-                {/* 3D背景切換元件 */}
-                <DynamicCard className="max-w-5xl mx-auto p-8" delay={0.5}>
-                  <div className="text-center">
-                    
-                    {/* 背景選擇器 */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
-                      {[
-                        { 
-                          id: 'classroom',
-                          name: '教室', 
-                          icon: 'Building', 
-                          color: 'from-blue-400 to-blue-500',
-                          bgColor: 'from-blue-50 to-blue-100',
-                          hoverColor: 'from-blue-100 to-blue-200',
-                          iconColor: 'text-blue-500'
-                        },
-                        { 
-                          id: 'music-room',
-                          name: '音樂室', 
-                          icon: 'Music', 
-                          color: 'from-purple-400 to-purple-500',
-                          bgColor: 'from-purple-50 to-purple-100',
-                          hoverColor: 'from-purple-100 to-purple-200',
-                          iconColor: 'text-purple-500'
-                        },
-                        { 
-                          id: 'outdoor',
-                          name: '戶外', 
-                          icon: 'TreePine', 
-                          color: 'from-green-400 to-green-500',
-                          bgColor: 'from-green-50 to-green-100',
-                          hoverColor: 'from-green-100 to-green-200',
-                          iconColor: 'text-green-500'
-                        },
-                        { 
-                          id: 'home',
-                          name: '家中', 
-                          icon: 'Home', 
-                          color: 'from-orange-400 to-orange-500',
-                          bgColor: 'from-orange-50 to-orange-100',
-                          hoverColor: 'from-orange-100 to-orange-200',
-                          iconColor: 'text-orange-500'
-                        },
-                        { 
-                          id: 'studio',
-                          name: '錄音室', 
-                          icon: 'Mic', 
-                          color: 'from-pink-400 to-pink-500',
-                          bgColor: 'from-pink-50 to-pink-100',
-                          hoverColor: 'from-pink-100 to-pink-200',
-                          iconColor: 'text-pink-500'
-                        },
-                        { 
-                          id: 'playground',
-                          name: '遊樂場', 
-                          icon: 'Gamepad2', 
-                          color: 'from-yellow-400 to-yellow-500',
-                          bgColor: 'from-yellow-50 to-yellow-100',
-                          hoverColor: 'from-yellow-100 to-yellow-200',
-                          iconColor: 'text-yellow-500'
-                        }
-                      ].map((background, index) => {
-                        const IconComponent = background.icon === 'Building' ? User :
-                                            background.icon === 'Music' ? Music :
-                                            background.icon === 'TreePine' ? TreePine :
-                                            background.icon === 'Home' ? User :
-                                            background.icon === 'Mic' ? Volume2 :
-                                            background.icon === 'Gamepad2' ? Sparkles : User;
-                        
-                        const isSelected = selectedBackground === background.id;
-                        
-                        return (
-                          <motion.button
-                            key={background.name}
-                            onClick={() => setSelectedBackground(background.id)}
-                            className={`group relative p-4 rounded-2xl bg-gradient-to-br ${
-                              isSelected ? 'from-[#FFD59A] to-[#EBC9A4]' : background.bgColor
-                            } border-2 ${
-                              isSelected ? 'border-[#FFD59A] shadow-lg' : 'border-transparent hover:border-white/50'
-                            } transition-all duration-300 overflow-hidden`}
-                            whileHover={{ 
-                              scale: 1.05, 
-                              y: -5,
-                              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-                            }}
-                            whileTap={{ scale: 0.95 }}
-                            initial={{ opacity: 0, y: 30, rotateX: -15 }}
-                            animate={{ opacity: 1, y: 0, rotateX: 0 }}
-                            transition={{ 
-                              delay: 0.6 + index * 0.1,
-                              type: "spring",
-                              stiffness: 100,
-                              damping: 15
-                            }}
-                          >
-                            {/* 背景光效 */}
-                            <motion.div
-                              className={`absolute inset-0 bg-gradient-to-br ${background.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
-                              initial={{ scale: 0.8 }}
-                              whileHover={{ scale: 1.2 }}
-                            />
-                            
-                            {/* 圖標容器 */}
-                            <motion.div
-                              className={`relative w-12 h-12 mx-auto mb-3 bg-gradient-to-br ${
-                                isSelected ? 'from-white to-white/90' : background.color
-                              } rounded-xl flex items-center justify-center shadow-lg`}
-                              whileHover={{ rotate: 360, scale: 1.1 }}
-                              transition={{ duration: 0.6, type: "spring" }}
+                  {/* 3D背景切換元件 */}
+                  <DynamicCard className="max-w-5xl mx-auto p-8" delay={0.5}>
+                    <div className="text-center">
+
+                      {/* 背景選擇器 */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
+                        {[
+                          {
+                            id: 'classroom',
+                            name: '教室',
+                            icon: 'Building',
+                            color: 'from-blue-400 to-blue-500',
+                            bgColor: 'from-blue-50 to-blue-100',
+                            hoverColor: 'from-blue-100 to-blue-200',
+                            iconColor: 'text-blue-500'
+                          },
+                          {
+                            id: 'music-room',
+                            name: '音樂室',
+                            icon: 'Music',
+                            color: 'from-purple-400 to-purple-500',
+                            bgColor: 'from-purple-50 to-purple-100',
+                            hoverColor: 'from-purple-100 to-purple-200',
+                            iconColor: 'text-purple-500'
+                          },
+                          {
+                            id: 'outdoor',
+                            name: '戶外',
+                            icon: 'TreePine',
+                            color: 'from-green-400 to-green-500',
+                            bgColor: 'from-green-50 to-green-100',
+                            hoverColor: 'from-green-100 to-green-200',
+                            iconColor: 'text-green-500'
+                          },
+                          {
+                            id: 'home',
+                            name: '家中',
+                            icon: 'Home',
+                            color: 'from-orange-400 to-orange-500',
+                            bgColor: 'from-orange-50 to-orange-100',
+                            hoverColor: 'from-orange-100 to-orange-200',
+                            iconColor: 'text-orange-500'
+                          },
+                          {
+                            id: 'studio',
+                            name: '錄音室',
+                            icon: 'Mic',
+                            color: 'from-pink-400 to-pink-500',
+                            bgColor: 'from-pink-50 to-pink-100',
+                            hoverColor: 'from-pink-100 to-pink-200',
+                            iconColor: 'text-pink-500'
+                          },
+                          {
+                            id: 'playground',
+                            name: '遊樂場',
+                            icon: 'Gamepad2',
+                            color: 'from-yellow-400 to-yellow-500',
+                            bgColor: 'from-yellow-50 to-yellow-100',
+                            hoverColor: 'from-yellow-100 to-yellow-200',
+                            iconColor: 'text-yellow-500'
+                          }
+                        ].map((background, index) => {
+                          const IconComponent = background.icon === 'Building' ? User :
+                            background.icon === 'Music' ? Music :
+                              background.icon === 'TreePine' ? TreePine :
+                                background.icon === 'Home' ? User :
+                                  background.icon === 'Mic' ? Volume2 :
+                                    background.icon === 'Gamepad2' ? Sparkles : User;
+
+                          const isSelected = selectedBackground === background.id;
+
+                          return (
+                            <motion.button
+                              key={background.name}
+                              onClick={() => setSelectedBackground(background.id)}
+                              className={`group relative p-4 rounded-2xl bg-gradient-to-br ${isSelected ? 'from-[#FFD59A] to-[#EBC9A4]' : background.bgColor
+                                } border-2 ${isSelected ? 'border-[#FFD59A] shadow-lg' : 'border-transparent hover:border-white/50'
+                                } transition-all duration-300 overflow-hidden`}
+                              whileHover={{
+                                scale: 1.05,
+                                y: -5,
+                                boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+                              }}
+                              whileTap={{ scale: 0.95 }}
+                              initial={{ opacity: 0, y: 30, rotateX: -15 }}
+                              animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                              transition={{
+                                delay: 0.6 + index * 0.1,
+                                type: "spring",
+                                stiffness: 100,
+                                damping: 15
+                              }}
                             >
-                              <IconComponent className={`w-6 h-6 ${
-                                isSelected ? 'text-[#2B3A3B]' : 'text-white'
-                              }`} />
-                            </motion.div>
-                            
-                            {/* 標題 */}
-                            <div className="relative text-center">
-                              <h4 className={`font-semibold text-sm ${
-                                isSelected ? 'text-[#2B3A3B]' : 'text-gray-800'
-                              }`}>{background.name}</h4>
-                            </div>
-                            
-                            {/* 選中指示器 */}
-                            {isSelected && (
+                              {/* 背景光效 */}
                               <motion.div
-                                className="absolute top-2 right-2 w-3 h-3 bg-[#FFB6C1] rounded-full"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ type: "spring", stiffness: 300 }}
+                                className={`absolute inset-0 bg-gradient-to-br ${background.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
+                                initial={{ scale: 0.8 }}
+                                whileHover={{ scale: 1.2 }}
                               />
-                            )}
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                    
-                    {/* 背景預覽區域 */}
-                    <motion.div
-                      className="w-full max-w-6xl mx-auto h-96"
-                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ delay: 1, type: "spring", stiffness: 100 }}
-                    >
-                      <motion.div 
-                        className="relative w-full h-full overflow-hidden rounded-2xl border border-[#EADBC8] shadow-lg"
-                        whileHover={{ scale: 1.01 }}
-                        transition={{ type: "spring", stiffness: 200 }}
-                      >
-                        {/* 背景圖片 */}
-                        <div 
-                          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-                          style={{
-                            backgroundImage: selectedBackground === 'classroom' 
-                              ? "url('/3d-character-backgrounds/classroom/classroom.png')"
-                              : selectedBackground === 'music-room'
-                              ? "linear-gradient(135deg, #8B5CF6 0%, #A855F7 50%, #C084FC 100%)"
-                              : selectedBackground === 'outdoor'
-                              ? "linear-gradient(135deg, #10B981 0%, #34D399 50%, #6EE7B7 100%)"
-                              : selectedBackground === 'home'
-                              ? "linear-gradient(135deg, #F97316 0%, #FB923C 50%, #FDBA74 100%)"
-                              : selectedBackground === 'studio'
-                              ? "linear-gradient(135deg, #EC4899 0%, #F472B6 50%, #F9A8D4 100%)"
-                              : selectedBackground === 'playground'
-                              ? "linear-gradient(135deg, #EAB308 0%, #FACC15 50%, #FDE047 100%)"
-                              : "linear-gradient(to bottom right, #FFF9F2, #FFFDF8)"
-                          }}
-                        />
-                        
-                        
-                        {/* 3D角色顯示 */}
-                        <div className="relative z-10 h-full flex items-end justify-center">
-                          <div className="text-center">
-                            {formattedStudent && (
+
+                              {/* 圖標容器 */}
                               <motion.div
-                                className="mb-0"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 0.5, duration: 0.8 }}
+                                className={`relative w-12 h-12 mx-auto mb-3 bg-gradient-to-br ${isSelected ? 'from-white to-white/90' : background.color
+                                  } rounded-xl flex items-center justify-center shadow-lg`}
+                                whileHover={{ rotate: 360, scale: 1.1 }}
+                                transition={{ duration: 0.6, type: "spring" }}
                               >
-                                <Student3DCharacter
-                                  student={formattedStudent}
-                                  size="lg"
-                                  enableAnimation={true}
-                                  enableControls={true}
-                                  className="mx-auto"
-                                />
+                                <IconComponent className={`w-6 h-6 ${isSelected ? 'text-[#2B3A3B]' : 'text-white'
+                                  }`} />
                               </motion.div>
-                            )}
-                            
-                            {/* 狀態標籤 */}
-                            <motion.div
-                              className="inline-flex items-center px-6 py-3 bg-white/90 backdrop-blur-sm rounded-full shadow-lg"
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: 1.5 }}
-                            >
-                              <div className="w-3 h-3 bg-green-400 rounded-full mr-3 animate-pulse" />
-                              <p className="text-[#4B4036] font-medium">3D角色已顯示</p>
-                            </motion.div>
-                            
-                            <motion.p 
-                              className="text-white/90 font-medium text-lg mt-4 drop-shadow-lg"
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ delay: 1.7 }}
-                            >
-                              {selectedBackground === 'classroom' ? '教室背景' :
-                               selectedBackground === 'music-room' ? '音樂室背景' :
-                               selectedBackground === 'outdoor' ? '戶外背景' :
-                               selectedBackground === 'home' ? '家中背景' :
-                               selectedBackground === 'studio' ? '錄音室背景' :
-                               selectedBackground === 'playground' ? '遊樂場背景' :
-                               '選擇背景'}
-                            </motion.p>
+
+                              {/* 標題 */}
+                              <div className="relative text-center">
+                                <h4 className={`font-semibold text-sm ${isSelected ? 'text-[#2B3A3B]' : 'text-gray-800'
+                                  }`}>{background.name}</h4>
+                              </div>
+
+                              {/* 選中指示器 */}
+                              {isSelected && (
+                                <motion.div
+                                  className="absolute top-2 right-2 w-3 h-3 bg-[#FFB6C1] rounded-full"
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  transition={{ type: "spring", stiffness: 300 }}
+                                />
+                              )}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 背景預覽區域 */}
+                      <motion.div
+                        className="w-full max-w-6xl mx-auto h-96"
+                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ delay: 1, type: "spring", stiffness: 100 }}
+                      >
+                        <motion.div
+                          className="relative w-full h-full overflow-hidden rounded-2xl border border-[#EADBC8] shadow-lg"
+                          whileHover={{ scale: 1.01 }}
+                          transition={{ type: "spring", stiffness: 200 }}
+                        >
+                          {/* 背景圖片 */}
+                          <div
+                            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                            style={{
+                              backgroundImage: selectedBackground === 'classroom'
+                                ? "url('/3d-character-backgrounds/classroom/classroom.png')"
+                                : selectedBackground === 'music-room'
+                                  ? "linear-gradient(135deg, #8B5CF6 0%, #A855F7 50%, #C084FC 100%)"
+                                  : selectedBackground === 'outdoor'
+                                    ? "linear-gradient(135deg, #10B981 0%, #34D399 50%, #6EE7B7 100%)"
+                                    : selectedBackground === 'home'
+                                      ? "linear-gradient(135deg, #F97316 0%, #FB923C 50%, #FDBA74 100%)"
+                                      : selectedBackground === 'studio'
+                                        ? "linear-gradient(135deg, #EC4899 0%, #F472B6 50%, #F9A8D4 100%)"
+                                        : selectedBackground === 'playground'
+                                          ? "linear-gradient(135deg, #EAB308 0%, #FACC15 50%, #FDE047 100%)"
+                                          : "linear-gradient(to bottom right, #FFF9F2, #FFFDF8)"
+                            }}
+                          />
+
+
+                          {/* 3D角色顯示 */}
+                          <div className="relative z-10 h-full flex items-end justify-center">
+                            <div className="text-center">
+                              {formattedStudent && (
+                                <motion.div
+                                  className="mb-0"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: 0.5, duration: 0.8 }}
+                                >
+                                  <Student3DCharacter
+                                    student={formattedStudent}
+                                    size="lg"
+                                    enableAnimation={true}
+                                    enableControls={true}
+                                    className="mx-auto"
+                                  />
+                                </motion.div>
+                              )}
+
+                              {/* 狀態標籤 */}
+                              <motion.div
+                                className="inline-flex items-center px-6 py-3 bg-white/90 backdrop-blur-sm rounded-full shadow-lg"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 1.5 }}
+                              >
+                                <div className="w-3 h-3 bg-green-400 rounded-full mr-3 animate-pulse" />
+                                <p className="text-[#4B4036] font-medium">3D角色已顯示</p>
+                              </motion.div>
+
+                              <motion.p
+                                className="text-white/90 font-medium text-lg mt-4 drop-shadow-lg"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 1.7 }}
+                              >
+                                {selectedBackground === 'classroom' ? '教室背景' :
+                                  selectedBackground === 'music-room' ? '音樂室背景' :
+                                    selectedBackground === 'outdoor' ? '戶外背景' :
+                                      selectedBackground === 'home' ? '家中背景' :
+                                        selectedBackground === 'studio' ? '錄音室背景' :
+                                          selectedBackground === 'playground' ? '遊樂場背景' :
+                                            '選擇背景'}
+                              </motion.p>
+                            </div>
                           </div>
-                        </div>
-                        
-                        {/* 裝飾元素 */}
-                        <motion.div
-                          className="absolute top-4 right-4 w-4 h-4 bg-[#FFB6C1]/60 rounded-full"
-                          animate={{ 
-                            y: [0, -8, 0],
-                            opacity: [0.6, 1, 0.6]
-                          }}
-                          transition={{ 
-                            duration: 3, 
-                            repeat: Infinity, 
-                            delay: 0.5 
-                          }}
-                        />
-                        <motion.div
-                          className="absolute bottom-6 left-6 w-3 h-3 bg-[#FFD59A]/60 rounded-full"
-                          animate={{ 
-                            y: [0, 6, 0],
-                            opacity: [0.4, 0.8, 0.4]
-                          }}
-                          transition={{ 
-                            duration: 3.5, 
-                            repeat: Infinity, 
-                            delay: 1 
-                          }}
-                        />
+
+                          {/* 裝飾元素 */}
+                          <motion.div
+                            className="absolute top-4 right-4 w-4 h-4 bg-[#FFB6C1]/60 rounded-full"
+                            animate={{
+                              y: [0, -8, 0],
+                              opacity: [0.6, 1, 0.6]
+                            }}
+                            transition={{
+                              duration: 3,
+                              repeat: Infinity,
+                              delay: 0.5
+                            }}
+                          />
+                          <motion.div
+                            className="absolute bottom-6 left-6 w-3 h-3 bg-[#FFD59A]/60 rounded-full"
+                            animate={{
+                              y: [0, 6, 0],
+                              opacity: [0.4, 0.8, 0.4]
+                            }}
+                            transition={{
+                              duration: 3.5,
+                              repeat: Infinity,
+                              delay: 1
+                            }}
+                          />
+                        </motion.div>
                       </motion.div>
-                    </motion.div>
-                    
-                  </div>
-                </DynamicCard>
+
+                    </div>
+                  </DynamicCard>
                 </div>
               )}
 
@@ -1332,7 +1327,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         </motion.div>
                         正在學習的活動
                       </h3>
-                      
+
                       {/* 狀態篩選器 */}
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-600">狀態篩選：</span>
@@ -1340,11 +1335,10 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                           <motion.button
                             key={status}
                             onClick={() => setSelectedActivityStatus(status)}
-                            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                              selectedActivityStatus === status
-                                ? 'bg-purple-500 text-white border-purple-500 shadow-md' 
+                            className={`px-3 py-1 rounded-lg text-xs font-medium border transition-colors ${selectedActivityStatus === status
+                                ? 'bg-purple-500 text-white border-purple-500 shadow-md'
                                 : 'bg-white border-gray-200 hover:bg-gray-50 text-gray-700'
-                            }`}
+                              }`}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             initial={{ opacity: 0, y: 10 }}
@@ -1356,7 +1350,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         ))}
                       </div>
                     </div>
-                    
+
                     {/* 活動列表 */}
                     <div className="space-y-4">
                       {(() => {
@@ -1379,7 +1373,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         }
 
                         // 篩選活動
-                        const filteredActivities = activities.filter(activity => 
+                        const filteredActivities = activities.filter(activity =>
                           selectedActivityStatus === '全部' || activity.status === selectedActivityStatus
                         );
 
@@ -1413,17 +1407,16 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                               <div className="flex items-center space-x-4">
                                 {/* 狀態指示器 */}
                                 <div className="flex items-center space-x-2">
-                                  <div className={`w-3 h-3 rounded-full ${
-                                    activity.status === '已完成' ? 'bg-green-400' :
-                                    activity.status === '進行中' ? 'bg-blue-400' :
-                                    activity.status === '未開始' ? 'bg-gray-400' :
-                                    'bg-orange-400'
-                                  }`} />
+                                  <div className={`w-3 h-3 rounded-full ${activity.status === '已完成' ? 'bg-green-400' :
+                                      activity.status === '進行中' ? 'bg-blue-400' :
+                                        activity.status === '未開始' ? 'bg-gray-400' :
+                                          'bg-orange-400'
+                                    }`} />
                                   <span className="text-xs text-gray-500 font-medium">
                                     {activity.status}
                                   </span>
                                 </div>
-                                
+
                                 {/* 活動名稱 */}
                                 <div>
                                   <h4 className="font-medium text-gray-800">{activity.name}</h4>
@@ -1434,18 +1427,17 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="flex items-center space-x-4">
                                 {/* 進度條 */}
                                 <div className="w-24">
                                   <div className="text-xs text-gray-500 mb-1">完成進度</div>
                                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                     <motion.div
-                                      className={`h-full bg-gradient-to-r ${
-                                        activity.progress >= 80 ? 'from-green-400 to-green-500' :
-                                        activity.progress >= 40 ? 'from-blue-400 to-blue-500' :
-                                        'from-orange-400 to-orange-500'
-                                      } rounded-full`}
+                                      className={`h-full bg-gradient-to-r ${activity.progress >= 80 ? 'from-green-400 to-green-500' :
+                                          activity.progress >= 40 ? 'from-blue-400 to-blue-500' :
+                                            'from-orange-400 to-orange-500'
+                                        } rounded-full`}
                                       initial={{ width: 0 }}
                                       animate={{ width: `${activity.progress}%` }}
                                       transition={{ duration: 1, delay: 0.8 + index * 0.1 }}
@@ -1453,7 +1445,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                                   </div>
                                   <div className="text-xs text-gray-600 mt-1">{activity.progress}%</div>
                                 </div>
-                                
+
                                 {/* 分配時間 */}
                                 <div className="text-right">
                                   <div className="text-xs text-gray-500">分配時間</div>
@@ -1483,7 +1475,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         >
                           <TreePine className="w-10 h-10 text-orange-500" />
                         </motion.div>
-                        
+
                         {/* 評估信息 */}
                         <div>
                           <h3 className="text-2xl font-bold text-gray-800 mb-2">
@@ -1541,7 +1533,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* 進度條 */}
                     <div className="mb-8">
                       <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
@@ -1553,7 +1545,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         />
                       </div>
                     </div>
-                    
+
                     {/* 能力評估點點展示 */}
                     <div className="grid grid-cols-3 gap-8 mb-8">
                       {abilityProgress.length > 0 ? (
@@ -1573,13 +1565,12 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                           >
                             <div className="relative">
                               <motion.div
-                                className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3 ${
-                                  ability.status === 'completed' 
-                                    ? 'bg-yellow-400' 
-                                    : ability.status === 'in_progress' 
-                                    ? 'bg-blue-400' 
-                                    : 'bg-gray-300'
-                                }`}
+                                className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3 ${ability.status === 'completed'
+                                    ? 'bg-yellow-400'
+                                    : ability.status === 'in_progress'
+                                      ? 'bg-blue-400'
+                                      : 'bg-gray-300'
+                                  }`}
                                 whileHover={{ scale: ability.status !== 'locked' ? 1.1 : 1.05 }}
                                 transition={{ type: "spring", stiffness: 300 }}
                                 style={{ backgroundColor: ability.color }}
@@ -1618,7 +1609,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         </div>
                       )}
                     </div>
-                    
+
                     {/* 進度筆記 */}
                     {latestProgressNotes && (
                       <DynamicCard className="p-6 mt-8" delay={0.7}>
@@ -1660,7 +1651,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                               </div>
                             )}
                           </div>
-                          
+
                           {isEditingProgressNotes ? (
                             <div className="space-y-3">
                               <textarea
@@ -1712,7 +1703,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         <div className="w-4 h-4 border-2 border-gray-400 rounded-full"></div>
                         <span className="text-sm text-gray-600">未解鎖</span>
                       </motion.div>
-                      
+
                       <motion.div
                         className="flex items-center space-x-2"
                         initial={{ opacity: 0, y: 20 }}
@@ -1722,7 +1713,7 @@ export default function EnhancedStudentAvatarTab({ student, className = '', isTe
                         <div className="w-4 h-4 border-2 border-gray-800 bg-white rounded-full"></div>
                         <span className="text-sm text-gray-800 font-medium">進行中</span>
                       </motion.div>
-                      
+
                       <motion.div
                         className="flex items-center space-x-2"
                         initial={{ opacity: 0, x: 20 }}
