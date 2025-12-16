@@ -1,6 +1,22 @@
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.ai_credits_ledger (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  batch_type text NOT NULL CHECK (batch_type = ANY (ARRAY['monthly_quota'::text, 'top_up'::text, 'grant'::text, 'refund'::text])),
+  amount_initial integer NOT NULL,
+  amount_remaining integer NOT NULL,
+  priority integer NOT NULL DEFAULT 20,
+  expires_at timestamp with time zone NOT NULL,
+  activated_at timestamp with time zone DEFAULT now(),
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'exhausted'::text, 'expired'::text])),
+  created_at timestamp with time zone DEFAULT now(),
+  trans_ref_id text,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT ai_credits_ledger_pkey PRIMARY KEY (id),
+  CONSTRAINT ai_credits_ledger_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.saas_users(id)
+);
 CREATE TABLE public.ai_messages (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   room_id uuid,
@@ -361,7 +377,23 @@ CREATE TABLE public.hanami_task_list (
   follow_up_content text,
   assigned_to ARRAY,
   org_id uuid,
+  points integer DEFAULT 0,
+  is_approved boolean DEFAULT false,
+  approved_by text,
+  approved_at timestamp with time zone,
+  checklist jsonb DEFAULT '[]'::jsonb,
+  visible_to_roles ARRAY,
   CONSTRAINT hanami_task_list_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.hanami_task_templates (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  description text,
+  task_data jsonb NOT NULL,
+  created_by text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hanami_task_templates_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.hanami_user_organizations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -483,7 +515,7 @@ CREATE TABLE public.mind_blocks (
 );
 CREATE TABLE public.model_configs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  provider text NOT NULL CHECK (provider ~ '^[a-z0-9][a-z0-9\-]*$'::text),
+  provider text NOT NULL,
   model_name text NOT NULL,
   display_name text NOT NULL,
   description text,
@@ -500,8 +532,8 @@ CREATE TABLE public.model_configs (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   model_id text NOT NULL UNIQUE,
-  input_cost_usd numeric,
-  output_cost_usd numeric,
+  input_cost_hkd numeric,
+  output_cost_hkd numeric,
   model_type text NOT NULL DEFAULT 'text'::text,
   is_free boolean DEFAULT false,
   metadata jsonb DEFAULT '{}'::jsonb,
@@ -957,18 +989,24 @@ CREATE TABLE public.saas_story_library (
   CONSTRAINT saas_story_library_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.saas_users(id)
 );
 CREATE TABLE public.saas_subscription_plans (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  plan_name text NOT NULL,
-  plan_type text NOT NULL CHECK (plan_type = ANY (ARRAY['free'::text, 'basic'::text, 'premium'::text, 'professional'::text])),
+  id text NOT NULL DEFAULT gen_random_uuid(),
+  plan_name text,
+  plan_type text CHECK (plan_type = ANY (ARRAY['free'::text, 'basic'::text, 'premium'::text, 'professional'::text])),
   price_monthly numeric,
   price_yearly numeric,
-  usage_limit integer NOT NULL,
+  usage_limit integer,
   features jsonb NOT NULL,
   stripe_price_id_monthly text,
   stripe_price_id_yearly text,
   hk_payment_plan_id text,
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
+  name text,
+  price numeric DEFAULT 0,
+  currency text DEFAULT 'HKD'::text,
+  monthly_credits integer DEFAULT 0,
+  daily_l1_limit integer,
+  updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT saas_subscription_plans_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.saas_task_definitions (
@@ -1060,7 +1098,7 @@ CREATE TABLE public.saas_user_rewards (
 CREATE TABLE public.saas_user_subscriptions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
-  plan_id uuid,
+  plan_id text,
   status text NOT NULL CHECK (status = ANY (ARRAY['active'::text, 'cancelled'::text, 'expired'::text, 'pending'::text])),
   start_date timestamp with time zone NOT NULL,
   end_date timestamp with time zone,
@@ -1107,7 +1145,7 @@ CREATE TABLE public.saas_users (
   full_name text NOT NULL,
   avatar_url text,
   subscription_status text DEFAULT 'free'::text CHECK (subscription_status = ANY (ARRAY['free'::text, 'trial'::text, 'active'::text, 'cancelled'::text, 'expired'::text])),
-  subscription_plan_id uuid,
+  subscription_plan_id text,
   subscription_start_date timestamp with time zone,
   subscription_end_date timestamp with time zone,
   usage_count integer DEFAULT 0,

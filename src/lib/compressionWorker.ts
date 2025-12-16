@@ -52,59 +52,50 @@ export class CompressionWorker {
       };
 
       // 壓縮圖片
-      function compressImage(file, config) {
-        return new Promise((resolve, reject) => {
+      async function compressImage(file, config) {
+        try {
+          // 使用 createImageBitmap 替代 FileReader + Image，節省記憶體並提高效能
+          const bitmap = await createImageBitmap(file);
+          
           const canvas = new OffscreenCanvas(1, 1);
           const ctx = canvas.getContext('2d');
-          const img = new Image();
-
-          img.onload = () => {
-            try {
-              // 計算新尺寸
-              let { width, height } = img;
-              const { maxWidth = 1920, maxHeight = 1080 } = config;
-
-              if (width > maxWidth || height > maxHeight) {
-                const ratio = Math.min(maxWidth / width, maxHeight / height);
-                width *= ratio;
-                height *= ratio;
-              }
-
-              canvas.width = width;
-              canvas.height = height;
-
-              // 繪製壓縮後的圖片
-              ctx.drawImage(img, 0, 0, width, height);
-
-              // 轉換為指定格式
-              const mimeType = config.format === 'webp' ? 'image/webp' : 
-                              config.format === 'png' ? 'image/png' : 'image/jpeg';
-              
-              canvas.convertToBlob({
-                type: mimeType,
-                quality: config.quality || 0.8
-              }).then(blob => {
-                const compressedFile = new File([blob], file.name, {
-                  type: mimeType,
-                  lastModified: Date.now()
-                });
-                resolve(compressedFile);
-              }).catch(reject);
-            } catch (error) {
-              reject(error);
-            }
-          };
-
-          img.onerror = () => reject(new Error('圖片載入失敗'));
           
-          // 使用 FileReader 讀取檔案
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            img.src = e.target.result;
-          };
-          reader.onerror = () => reject(new Error('檔案讀取失敗'));
-          reader.readAsDataURL(file);
-        });
+          // 計算新尺寸
+          let { width, height } = bitmap;
+          const { maxWidth = 1920, maxHeight = 1080 } = config;
+
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width *= ratio;
+            height *= ratio;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          // 繪製壓縮後的圖片
+          ctx.drawImage(bitmap, 0, 0, width, height);
+          
+          // 釋放 bitmap 資源
+          bitmap.close();
+
+          // 轉換為指定格式
+          const mimeType = config.format === 'webp' ? 'image/webp' : 
+                          config.format === 'png' ? 'image/png' : 'image/jpeg';
+          
+          const blob = await canvas.convertToBlob({
+            type: mimeType,
+            quality: config.quality || 0.8
+          });
+
+          return new File([blob], file.name, {
+            type: mimeType,
+            lastModified: Date.now()
+          });
+
+        } catch (error) {
+          throw new Error('圖片壓縮失敗: ' + error.message);
+        }
       }
 
       // 處理壓縮任務
@@ -146,12 +137,12 @@ export class CompressionWorker {
     this.worker.onmessage = (e) => {
       const result: CompressionResult = e.data;
       const callback = this.activeTasks.get(result.id);
-      
+
       if (callback) {
         callback(result);
         this.activeTasks.delete(result.id);
       }
-      
+
       this.processNext();
     };
 
@@ -163,7 +154,7 @@ export class CompressionWorker {
 
   // 添加壓縮任務
   async compressFile(
-    file: File, 
+    file: File,
     config: CompressionTask['config'] = {}
   ): Promise<CompressionResult> {
     return new Promise((resolve) => {
@@ -181,36 +172,36 @@ export class CompressionWorker {
 
   // 批量壓縮
   async compressFiles(
-    files: File[], 
+    files: File[],
     config: CompressionTask['config'] = {},
     onProgress?: (progress: number) => void
   ): Promise<CompressionResult[]> {
     const tasks = files.map(file => this.compressFile(file, config));
     const results: CompressionResult[] = [];
-    
+
     for (let i = 0; i < tasks.length; i++) {
       const result = await tasks[i];
       results.push(result);
-      
+
       if (onProgress) {
         onProgress(((i + 1) / tasks.length) * 100);
       }
     }
-    
+
     return results;
   }
 
   // 處理下一個任務
   private processNext() {
     if (this.isProcessing || this.taskQueue.length === 0) return;
-    
+
     this.isProcessing = true;
     const task = this.taskQueue.shift();
-    
+
     if (task && this.worker) {
       this.worker.postMessage(task);
     }
-    
+
     this.isProcessing = false;
   }
 

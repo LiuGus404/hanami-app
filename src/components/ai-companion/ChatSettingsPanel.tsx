@@ -8,7 +8,10 @@ import {
     ClipboardDocumentListIcon,
     PlusIcon,
     CpuChipIcon,
-    PuzzlePieceIcon
+    PuzzlePieceIcon,
+    MicrophoneIcon,
+    PhotoIcon,
+    SparklesIcon
 } from '@heroicons/react/24/outline';
 import { RoleInstance } from '@/types/ai-companion';
 import { MindBlock } from '@/types/mind-block';
@@ -21,6 +24,9 @@ interface ChatSettingsPanelProps extends TaskPanelContentProps {
     onUpdateRoleInstance: (roleId: string, updates: Partial<RoleInstance>) => Promise<void>;
     className?: string;
     onClose?: () => void;
+    availableModels?: any[];
+    onUpdateRoomConfig?: (updates: any) => Promise<void>;
+    room: any;
 }
 
 type SlotType = 'role' | 'style' | 'task';
@@ -38,10 +44,14 @@ export function ChatSettingsPanel({
     onUpdateRoleInstance,
     className = '',
     onClose,
+    availableModels = [],
+    onUpdateRoomConfig,
+    room,
     ...taskPanelProps
 }: ChatSettingsPanelProps) {
     const [isUpdating, setIsUpdating] = useState(false);
     const [mindSectionExpanded, setMindSectionExpanded] = useState(true);
+
 
     // 根據角色名稱 / slug 推斷對應的夥伴 ID（hibi / mori / pico）
     const inferCompanionId = (instance: RoleInstance): 'hibi' | 'mori' | 'pico' | null => {
@@ -171,7 +181,7 @@ export function ChatSettingsPanel({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto p-4 pb-32">
                 {/* 專案資訊編輯區域 */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
@@ -248,14 +258,155 @@ export function ChatSettingsPanel({
                         <div className="p-3 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border border-purple-200">
                             <div className="mb-2">
                                 <div className="text-xs font-medium text-purple-700 mb-0.5">專案名稱</div>
-                                <div className="text-sm text-[#4B4036] font-semibold">{taskPanelProps.room.title}</div>
+                                <div className="text-sm text-[#4B4036] font-semibold">{room.title}</div>
                             </div>
                             <div>
                                 <div className="text-xs font-medium text-purple-700 mb-0.5">專案指引</div>
-                                <div className="text-xs text-[#2B3A3B] leading-relaxed">{taskPanelProps.room.description || '暫無指引'}</div>
+                                <div className="text-xs text-[#2B3A3B] leading-relaxed">{room.description || '暫無指引'}</div>
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Room Assistant Models Section */}
+                <div className="mb-6 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold text-[#4B4036] flex items-center space-x-2">
+                            <div className="w-4 h-4 bg-orange-400 rounded-full flex items-center justify-center">
+                                <SparklesIcon className="w-2.5 h-2.5 text-white" />
+                            </div>
+                            <span>助理模型 (Assistants)</span>
+                        </h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                        {/* Voice Assistant */}
+                        <div
+                            className="bg-white rounded-lg border border-gray-200 p-3 flex flex-col justify-between min-h-[80px] relative group hover:border-orange-300 transition-all cursor-pointer"
+                            onClick={() => {
+                                const event = new CustomEvent('open-model-selector', {
+                                    detail: { capability: 'audio_input' }
+                                });
+                                window.dispatchEvent(event);
+                            }}
+                        >
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                <MicrophoneIcon className="w-4 h-4" />
+                                語音助理 (Voice)
+                            </div>
+                            <div className="font-bold text-gray-800 text-xs mt-1">
+                                {(() => {
+                                    const mId = room?.config?.audio_model;
+                                    if (!mId || mId === '__default__') return 'System Default (L1)';
+                                    const m = availableModels?.find((x: any) => x.model_id === mId);
+                                    if (!m) return mId;
+
+                                    // Helper to calculate level (Ported from ModelSelector)
+                                    const getModelLevel = (model: any) => {
+                                        if (model.metadata?.level) return model.metadata.level;
+
+                                        const lowerId = model.model_id.toLowerCase();
+                                        // Specific overrides
+                                        if (lowerId.includes('flux')) return 'L2';
+                                        if (lowerId.includes('flash') && lowerId.includes('image')) return 'L2';
+                                        if (lowerId.includes('gpt-5') && lowerId.includes('image') && lowerId.includes('mini')) return 'L2';
+
+                                        // Generic heuristics
+                                        if (lowerId.includes('pro') && !lowerId.includes('flux')) return 'L3';
+                                        if (lowerId.includes('flash') || lowerId.includes('mini') || lowerId.includes('lite') || lowerId.includes('haiku')) return 'L1';
+                                        if (lowerId.includes('standard')) return 'L2';
+                                        if (lowerId.includes('gpt-4')) return 'L2'; // Default GPT-4 to L2 usually, or L3? Assuming L2 for now unless Turbo/Omni specific logic exists
+
+                                        return 'L3'; // Fallback
+                                    };
+
+                                    // Helper to extract clean Family Name
+                                    const getFamilyName = (model: any) => {
+                                        const n = (model.display_name || '').toLowerCase();
+                                        const i = model.model_id.toLowerCase();
+
+                                        if (n.includes('gemini') || i.includes('google')) return 'Gemini';
+                                        if (n.includes('gpt') || n.includes('openai') || i.includes('openai')) return 'ChatGPT';
+                                        if (n.includes('claude') || i.includes('anthropic')) return 'Claude';
+                                        if (n.includes('deepseek')) return 'DeepSeek';
+                                        if (n.includes('grok') || i.includes('x-ai')) return 'Grok';
+                                        if (n.includes('flux')) return 'Flux';
+
+                                        // Fallback: strip common provider prefixes
+                                        let label = model.display_name || model.model_id.split('/').pop() || 'Unknown';
+                                        label = label.replace(/^(Google|OpenAI|Anthropic|DeepSeek|xAI)\s+/i, '');
+                                        return label;
+                                    };
+
+                                    const family = getFamilyName(m);
+                                    const level = getModelLevel(m);
+                                    return `${family} ${level ? '(' + level + ')' : ''}`;
+                                })()}
+                            </div>
+                            <div className="text-[10px] text-gray-500">點擊更換語音模型</div>
+                        </div>
+
+                        {/* Vision Assistant */}
+                        <div
+                            className="bg-white rounded-lg border border-gray-200 p-3 flex flex-col justify-between min-h-[80px] relative group hover:border-orange-300 transition-all cursor-pointer"
+                            onClick={() => {
+                                const event = new CustomEvent('open-model-selector', {
+                                    detail: { capability: 'image_input' }
+                                });
+                                window.dispatchEvent(event);
+                            }}
+                        >
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                <PhotoIcon className="w-4 h-4" />
+                                OCR 圖片識別 (Vision)
+                            </div>
+                            <div className="font-bold text-gray-800 text-xs mt-1">
+                                {(() => {
+                                    const mId = room?.config?.vision_model;
+                                    if (!mId || mId === '__default__') return 'System Default (L1)';
+                                    const m = availableModels?.find((x: any) => x.model_id === mId);
+                                    if (!m) return mId;
+
+                                    const getModelLevel = (model: any) => {
+                                        if (model.metadata?.level) return model.metadata.level;
+                                        const lowerId = model.model_id.toLowerCase();
+                                        if (lowerId.includes('flux')) return 'L2';
+                                        if (lowerId.includes('flash') && lowerId.includes('image')) return 'L2';
+                                        if (lowerId.includes('gpt-5') && lowerId.includes('image') && lowerId.includes('mini')) return 'L2';
+
+                                        if (lowerId.includes('pro') && !lowerId.includes('flux')) return 'L3';
+                                        if (lowerId.includes('flash') || lowerId.includes('mini') || lowerId.includes('lite') || lowerId.includes('haiku')) return 'L1';
+                                        if (lowerId.includes('standard')) return 'L2';
+                                        if (lowerId.includes('gpt-4')) return 'L2';
+                                        return 'L3';
+                                    };
+
+                                    // Helper to extract clean Family Name
+                                    const getFamilyName = (model: any) => {
+                                        const n = (model.display_name || '').toLowerCase();
+                                        const i = model.model_id.toLowerCase();
+
+                                        if (n.includes('gemini') || i.includes('google')) return 'Gemini';
+                                        if (n.includes('gpt') || n.includes('openai') || i.includes('openai')) return 'ChatGPT';
+                                        if (n.includes('claude') || i.includes('anthropic')) return 'Claude';
+                                        if (n.includes('deepseek')) return 'DeepSeek';
+                                        if (n.includes('grok') || i.includes('x-ai')) return 'Grok';
+                                        if (n.includes('flux')) return 'Flux';
+
+                                        // Fallback: strip common provider prefixes
+                                        let label = model.display_name || model.model_id.split('/').pop() || 'Unknown';
+                                        label = label.replace(/^(Google|OpenAI|Anthropic|DeepSeek|xAI)\s+/i, '');
+                                        return label;
+                                    };
+
+                                    const family = getFamilyName(m);
+                                    const level = getModelLevel(m);
+                                    return `${family} ${level ? '(' + level + ')' : ''}`;
+                                })()}
+                            </div>
+                            <div className="text-[10px] text-gray-500">點擊更換識別模型</div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Mind Blocks Section */}
@@ -423,7 +574,10 @@ export function ChatSettingsPanel({
                             </div>
                         )}
                     </div>
+
                 </div>
+
+
             </div>
         </div>
     );

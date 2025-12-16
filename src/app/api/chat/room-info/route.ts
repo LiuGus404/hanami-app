@@ -1,6 +1,8 @@
 import { createSaasAdminClient } from '@/lib/supabase-saas';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
     try {
         const { roomId, userId } = await req.json();
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest) {
 
             // 4. 預載入最新訊息 (加速顯示)
             supabase
-                .from('chat_messages')
+                .from('ai_messages')
                 .select('*')
                 .eq('room_id', roomId)
                 .neq('status', 'deleted')
@@ -118,6 +120,10 @@ export async function POST(req: NextRequest) {
                     // Consolidate Data
                     const roomSettings = roomData?.settings || {};
                     const mindBlockOverrides = roomSettings.mind_block_overrides || {};
+                    const modelOverrides = roomSettings.model_overrides || {};
+                    console.log('🔍 [API] Room Settings:', JSON.stringify(roomSettings));
+                    console.log('🔍 [API] Mind Block Overrides:', JSON.stringify(mindBlockOverrides));
+                    console.log('🔍 [API] Model Overrides:', JSON.stringify(modelOverrides));
 
                     roleInstances.forEach((ri: any) => {
                         const roleDef = rolesData?.find((r: any) => r.id === ri.role_id);
@@ -138,14 +144,25 @@ export async function POST(req: NextRequest) {
                         else if (slug.includes('mori-researcher')) internalName = 'mori';
                         else if (slug.includes('pico-artist')) internalName = 'pico';
 
-                        // Apply Overrides
+                        // Apply Mind Block Overrides
                         if (internalName && mindBlockOverrides[internalName]) {
+                            console.log(`✅ [API] Applying Mind Block Overrides for ${internalName}:`, JSON.stringify(mindBlockOverrides[internalName]));
                             if (!enrichedInstance.settings) enrichedInstance.settings = {};
                             if (!enrichedInstance.settings.equipped_blocks) enrichedInstance.settings.equipped_blocks = {};
                             enrichedInstance.settings.equipped_blocks = {
                                 ...enrichedInstance.settings.equipped_blocks,
                                 ...mindBlockOverrides[internalName]
                             };
+                        } else {
+                            console.log(`ℹ️ [API] No Mind Block Overrides for ${internalName} (slug: ${slug})`);
+                        }
+
+                        // Apply Model Overrides
+                        if (internalName && modelOverrides[internalName]) {
+                            console.log(`✅ [API] Applying Model Override for ${internalName}:`, modelOverrides[internalName]);
+                            enrichedInstance.model_override = modelOverrides[internalName];
+                        } else {
+                            console.log(`ℹ️ [API] No Model Override for ${internalName}`);
                         }
 
                         if (internalName) {
@@ -168,6 +185,10 @@ export async function POST(req: NextRequest) {
                 roomRoles: Array.from(new Set(roomRoles)),
                 modelConfigs: modelConfigs || [],
                 initialMessages
+            }
+        }, {
+            headers: {
+                'Cache-Control': 'no-store, max-age=0'
             }
         });
 

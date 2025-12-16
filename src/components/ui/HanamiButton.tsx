@@ -7,7 +7,7 @@ interface HanamiButtonProps {
   children: ReactNode;
   variant?: 'primary' | 'secondary' | 'cute' | 'soft' | 'success' | 'danger';
   size?: 'sm' | 'md' | 'lg';
-  onClick?: () => void;
+  onClick?: (e?: any) => void;
   disabled?: boolean;
   loading?: boolean;
   className?: string;
@@ -25,7 +25,7 @@ function HanamiButton({
   type = 'button'
 }: HanamiButtonProps) {
   const baseClasses = 'font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-  
+
   const variantClasses = {
     primary: 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] hover:from-[#EBC9A4] hover:to-[#FFD59A] focus:ring-[#FFD59A] shadow-lg hover:shadow-xl',
     secondary: 'bg-[#FFFDF8] text-[#4B4036] border-2 border-[#EADBC8] hover:bg-[#FFD59A] hover:border-[#FFD59A] focus:ring-[#FFD59A]',
@@ -34,7 +34,7 @@ function HanamiButton({
     success: 'bg-[#E0F2E0] text-[#2B3A3B] hover:bg-[#C8E6C8] focus:ring-[#E0F2E0]',
     danger: 'bg-[#FFE0E0] text-[#2B3A3B] hover:bg-[#FFCCCC] focus:ring-[#FFE0E0]'
   };
-  
+
   const sizeClasses = {
     sm: 'px-4 py-2 text-sm',
     md: 'px-6 py-3 text-base',

@@ -106,7 +106,7 @@ export class QuotaChecker {
       // 3. 檢查檔案大小限制
       const fileSizeMB = fileSize / (1024 * 1024);
       const sizeLimit = mediaType === 'video' ? quotaLevel.video_size_limit_mb : quotaLevel.photo_size_limit_mb;
-      
+
       if (fileSizeMB > sizeLimit) {
         return {
           allowed: false,
@@ -126,33 +126,33 @@ export class QuotaChecker {
         };
       }
 
-      // 4. 檢查數量限制
-      const currentCount = mediaType === 'video' ? studentQuota.video_count : studentQuota.photo_count;
-      const countLimit = mediaType === 'video' ? quotaLevel.video_limit : quotaLevel.photo_limit;
-      
-      if (currentCount >= countLimit) {
-        return {
-          allowed: false,
-          reason: `${mediaType === 'video' ? '影片' : '相片'}數量已達上限 (${currentCount}/${countLimit})`,
-          currentUsage: {
-            video_count: studentQuota.video_count || 0,
-            photo_count: studentQuota.photo_count || 0,
-            total_used_space: studentQuota.total_used_space || 0
-          },
-          limits: {
-            video_limit: quotaLevel.video_limit,
-            photo_limit: quotaLevel.photo_limit,
-            storage_limit_bytes: quotaLevel.storage_limit_mb * 1024 * 1024,
-            video_size_limit_mb: quotaLevel.video_size_limit_mb,
-            photo_size_limit_mb: quotaLevel.photo_size_limit_mb
-          }
-        };
-      }
+      // 4. 檢查數量限制 (已移除，改為僅限制容量)
+      // const currentCount = mediaType === 'video' ? studentQuota.video_count : studentQuota.photo_count;
+      // const countLimit = mediaType === 'video' ? quotaLevel.video_limit : quotaLevel.photo_limit;
+
+      // if (currentCount >= countLimit) {
+      //   return {
+      //     allowed: false,
+      //     reason: `${mediaType === 'video' ? '影片' : '相片'}數量已達上限 (${currentCount}/${countLimit})`,
+      //     currentUsage: {
+      //       video_count: studentQuota.video_count || 0,
+      //       photo_count: studentQuota.photo_count || 0,
+      //       total_used_space: studentQuota.total_used_space || 0
+      //     },
+      //     limits: {
+      //       video_limit: quotaLevel.video_limit,
+      //       photo_limit: quotaLevel.photo_limit,
+      //       storage_limit_bytes: quotaLevel.storage_limit_mb * 1024 * 1024,
+      //       video_size_limit_mb: quotaLevel.video_size_limit_mb,
+      //       photo_size_limit_mb: quotaLevel.photo_size_limit_mb
+      //     }
+      //   };
+      // }
 
       // 5. 檢查儲存空間限制
       const newTotalSpace = (studentQuota.total_used_space || 0) + fileSize;
       const storageLimitBytes = quotaLevel.storage_limit_mb * 1024 * 1024;
-      
+
       if (newTotalSpace > storageLimitBytes) {
         return {
           allowed: false,
@@ -210,7 +210,7 @@ export class QuotaChecker {
       'premium': '進階版',
       'professional': '專業版'
     };
-    
+
     return mapping[planType] || '基礎版';
   }
 

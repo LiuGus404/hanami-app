@@ -15,6 +15,7 @@ export const ReferenceImagePicker: React.FC<ReferenceImagePickerProps> = ({
     onSelectCamera,
     onFilesSelected
 }) => {
+    console.log('🖼️ [Render] ReferenceImagePicker Rendered');
     const [isDragging, setIsDragging] = useState(false);
 
     // Drag handlers
