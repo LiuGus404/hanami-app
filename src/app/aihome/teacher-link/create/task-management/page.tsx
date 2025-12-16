@@ -154,6 +154,74 @@ function TaskManagementContent() {
     setShowTaskForm(true);
   };
 
+  const handleTaskDelete = async (task: Task) => {
+    if (!confirm('確定要刪除此任務嗎？')) return;
+    
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('刪除任務失敗');
+
+      await fetchTasks();
+    } catch (error) {
+      console.error('刪除任務失敗:', error);
+      alert('刪除任務失敗');
+    }
+  };
+
+  const handleTaskStatusChange = async (task: Task, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...task, status: newStatus }),
+      });
+
+      if (!response.ok) throw new Error('更新任務狀態失敗');
+
+      await fetchTasks();
+    } catch (error) {
+      console.error('更新任務狀態失敗:', error);
+      alert('更新任務狀態失敗');
+    }
+  };
+
+  const handleTaskProgressUpdate = async (task: Task, progress: number) => {
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...task, progress }),
+      });
+
+      if (!response.ok) throw new Error('更新任務進度失敗');
+
+      await fetchTasks();
+    } catch (error) {
+      console.error('更新任務進度失敗:', error);
+      alert('更新任務進度失敗');
+    }
+  };
+
+  const handleTaskAssign = async (task: Task, assignedTo: string[]) => {
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...task, assigned_to: assignedTo }),
+      });
+
+      if (!response.ok) throw new Error('分配任務失敗');
+
+      await fetchTasks();
+    } catch (error) {
+      console.error('分配任務失敗:', error);
+      alert('分配任務失敗');
+    }
+  };
+
   const handleTaskSubmit = async (data: CreateTaskForm | UpdateTaskForm) => {
     try {
       setIsSubmitting(true);
@@ -359,6 +427,10 @@ function TaskManagementContent() {
             orgId={resolvedOrgId || undefined}
             userEmail={saasUser?.email}
             onTaskEdit={handleTaskEdit}
+            onTaskDelete={handleTaskDelete}
+            onTaskStatusChange={handleTaskStatusChange}
+            onTaskProgressUpdate={handleTaskProgressUpdate}
+            onTaskAssign={handleTaskAssign}
             onTaskCreate={handleTaskCreate}
             taskFilter={taskFilter}
             userSession={{ email: saasUser?.email, name: saasUser?.full_name }}
