@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     // 直接使用服務角色 key 確保繞過 RLS
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
+
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('API: 缺少 Supabase 環境變數');
       return NextResponse.json(
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
       .from('Hanami_Students')
       .select('*')
       .eq('org_id', orgId);
-    
+
     // 如果提供了 studentIds 參數（逗號分隔的 ID 列表），則只查詢這些學生
     const studentIdsParam = searchParams.get('studentIds');
     if (studentIdsParam) {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         query = query.in('id', studentIds);
       }
     }
-    
+
     // 如果指定了 studentType 且不是 'all'，則過濾學生類型
     if (studentType && studentType !== 'all') {
       query = query.eq('student_type', studentType);

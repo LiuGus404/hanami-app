@@ -184,6 +184,62 @@ export default function TaskCard({
             {task.category && (
               <span className="text-xs text-gray-400 font-medium mt-0.5">{task.category}</span>
             )}
+
+            {/* Status Badge (Clickable) */}
+            <div className="relative mt-1 inline-block">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowStatusMenu(!showStatusMenu);
+                }}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider transition-colors flex items-center gap-1
+                  ${task.status === 'completed' ? 'bg-green-100 text-green-700' :
+                    task.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                      task.status === 'blocked' ? 'bg-red-100 text-red-700' :
+                        task.status === 'cancelled' ? 'bg-gray-100 text-gray-500 line-through' :
+                          'bg-yellow-100 text-yellow-700'
+                  }
+                `}
+              >
+                {statusConfig?.label || task.status}
+                <svg className="w-2.5 h-2.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <AnimatePresence>
+                {showStatusMenu && (
+                  <motion.div
+                    ref={statusMenuRef}
+                    initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                    className="absolute top-full left-0 mt-1 w-32 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-50 overflow-hidden"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {DEFAULT_STATUS_CONFIG.filter(s => s.value !== 'cancelled').map(s => (
+                      <button
+                        key={s.value}
+                        onClick={() => handleStatusSelect(s.value)}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold hover:bg-gray-50 transition-colors flex items-center gap-2
+                          ${task.status === s.value ? 'text-[#2B3A3B] bg-gray-50' : 'text-gray-500'}
+                        `}
+                      >
+                        <div className={`w-1.5 h-1.5 rounded-full
+                          ${s.value === 'completed' ? 'bg-green-500' :
+                            s.value === 'in_progress' ? 'bg-blue-500' :
+                              s.value === 'blocked' ? 'bg-red-500' :
+                                s.value === 'cancelled' ? 'bg-gray-400' :
+                                  'bg-yellow-500'
+                          }
+                        `} />
+                        {s.label}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 

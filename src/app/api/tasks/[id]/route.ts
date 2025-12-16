@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSaasAdminClient } from '@/lib/supabase-saas';
 import { UpdateTaskForm } from '@/types/task-management';
 
+export const dynamic = 'force-dynamic';
+
 // 獲取單個任務
 export async function GET(
   request: NextRequest,
@@ -82,6 +84,7 @@ export async function PUT(
     if (body.time_block_end !== undefined) {
       updateData.time_block_end = body.time_block_end && body.time_block_end.trim() !== '' ? body.time_block_end : null;
     }
+    if (body.estimated_duration !== undefined) updateData.estimated_duration = body.estimated_duration;
     if (body.actual_duration !== undefined) updateData.actual_duration = body.actual_duration;
     if (body.progress_percentage !== undefined) updateData.progress_percentage = body.progress_percentage;
     if (body.is_public !== undefined) updateData.is_public = body.is_public;
@@ -94,6 +97,9 @@ export async function PUT(
     if (body.is_approved !== undefined) updateData.is_approved = body.is_approved;
     if (body.approved_by !== undefined) updateData.approved_by = body.approved_by;
     if (body.approved_at !== undefined) updateData.approved_at = body.approved_at;
+
+    if (body.visible_to_roles !== undefined) updateData.visible_to_roles = body.visible_to_roles;
+    if (body.checklist !== undefined) updateData.checklist = body.checklist;
 
     // 如果提供了 org_id，更新它
     // 如果字段不存在，更新會失敗，但我們會捕獲錯誤

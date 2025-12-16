@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSaasAdminClient } from '@/lib/supabase-saas';
 import { Task, CreateTaskForm, TaskFilter, TaskSort, Pagination } from '@/types/task-management';
 
+export const dynamic = 'force-dynamic';
+
 // 獲取任務列表
 export async function GET(request: NextRequest) {
   try {
@@ -268,7 +270,6 @@ export async function POST(request: NextRequest) {
           (body.assigned_to as string).split(',').map(name => name.trim()).filter(name => name !== '') : null),
       due_date: body.due_date && body.due_date.trim() !== '' ? body.due_date : null,
       time_block_start: body.time_block_start && body.time_block_start.trim() !== '' ? body.time_block_start : null,
-      time_block_end: body.time_block_end && body.time_block_end.trim() !== '' ? body.time_block_end : null,
       is_public: body.is_public || false,
       project_id: body.project_id && body.project_id.trim() !== '' ? body.project_id : null,
       points: (body as any).points || 0,
@@ -292,7 +293,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating task:', error);
       return NextResponse.json(
-        { error: 'Failed to create task' },
+        { error: 'Failed to create task', details: error.message, fullError: error },
         { status: 500 }
       );
     }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Task, DEFAULT_STATUS_CONFIG, DEFAULT_PRIORITY_CONFIG } from '@/types/task-management';
 import TaskCard from './TaskCard';
 import SharedTaskSection from './SharedTaskSection';
@@ -86,6 +87,27 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
     }
   };
 
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    if (!destination) return;
+
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
+
+    const newStatus = destination.droppableId;
+    const task = tasks.find(t => t.id === draggableId);
+
+    if (task) {
+      // Optimistic update
+      handleTaskStatusChange(task, newStatus);
+    }
+  };
+
   const handleTaskStatusChange = async (task: Task, newStatus: string) => {
     const taskId = task.id;
     try {
@@ -104,7 +126,11 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update status');
+        const errorText = await response.text();
+        console.log('Update failed body:', errorText);
+        let errorData: any = {};
+        try { errorData = JSON.parse(errorText); } catch (e) { }
+        throw new Error(`Failed to update status: ${errorData?.details || errorData?.error || response.statusText}`);
       }
 
       const updatedTask = await response.json();
@@ -405,57 +431,81 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
           handleTaskApprove={handleTaskApprove}
         />
       ) : (
-        /* Personal Tasks: Kanban Columns */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {['pending', 'in_progress', 'completed'].map((status) => {
-            const statusTasks = filteredTasks.filter(t => t.status === status);
-            const statusConfig = DEFAULT_STATUS_CONFIG.find(s => s.value === status);
+        /* Personal Tasks: Kanban Columns with Drag and Drop */
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 select-none">
+            {['pending', 'in_progress', 'blocked', 'completed'].map((status) => {
+              const statusTasks = filteredTasks.filter(t => t.status === status);
+              const statusConfig = DEFAULT_STATUS_CONFIG.find(s => s.value === status);
 
-            return (
-              <div key={status} className="flex flex-col gap-4">
-                <div className="flex items-center justify-between px-4 py-2">
-                  <h3 className="text-[#2B3A3B] font-bold text-lg">{statusConfig?.label}</h3>
-                  <span className="bg-white px-3 py-1 rounded-full text-xs font-bold text-gray-400 shadow-sm border border-gray-100">
-                    {statusTasks.length}
-                  </span>
-                </div>
+              return (
+                <div key={status} className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between px-4 py-2">
+                    <h3 className="text-[#2B3A3B] font-bold text-lg">{statusConfig?.label}</h3>
+                    <span className="bg-white px-3 py-1 rounded-full text-xs font-bold text-gray-400 shadow-sm border border-gray-100">
+                      {statusTasks.length}
+                    </span>
+                  </div>
 
-                <div className="flex flex-col gap-4 min-h-[200px]">
-                  <AnimatePresence>
-                    {statusTasks.map(task => (
-                      <motion.div
-                        key={task.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
+                  <Droppable droppableId={status}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex flex-col gap-4 min-h-[200px] rounded-[2rem] p-2 transition-colors duration-200
+                          ${snapshot.isDraggingOver ? 'bg-gray-50/80 border-2 border-dashed border-[#FFD59A]' : ''}
+                        `}
                       >
-                        <TaskCard
-                          task={task}
-                          currentUser={userSession}
-                          onEdit={onTaskEdit}
-                          onDelete={handleTaskDelete}
-                          onStatusChange={handleTaskStatusChange}
-                          onProgressUpdate={handleTaskProgressUpdate}
-                          onAssign={handleTaskAssign}
-                          canApprove={canApprove}
-                          onApprove={handleTaskApprove}
-                          className="bg-white !rounded-[2rem] !border-none !shadow-sm hover:!shadow-lg transition-all duration-300 p-6 group"
-                        />
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
+                        <AnimatePresence>
+                          {statusTasks.map((task, index) => (
+                            <Draggable key={task.id} draggableId={task.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  {...provided.dragHandleProps}
+                                  style={{ ...provided.draggableProps.style }}
+                                  className={`${snapshot.isDragging ? 'z-50 rotate-2 scale-105 opacity-90' : ''}`}
+                                >
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    transition={{ duration: 0.2 }}
+                                  >
+                                    <TaskCard
+                                      task={task}
+                                      currentUser={userSession}
+                                      onEdit={onTaskEdit}
+                                      onDelete={handleTaskDelete}
+                                      onStatusChange={handleTaskStatusChange}
+                                      onProgressUpdate={handleTaskProgressUpdate}
+                                      onAssign={handleTaskAssign}
+                                      canApprove={canApprove}
+                                      onApprove={handleTaskApprove}
+                                      className="bg-white !rounded-[2rem] !border-none !shadow-sm hover:!shadow-lg transition-all duration-300 p-6 group"
+                                    />
+                                  </motion.div>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                        </AnimatePresence>
+                        {provided.placeholder}
 
-                  {statusTasks.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-gray-200 rounded-[2rem] opacity-50">
-                      <p className="text-gray-400 text-sm font-bold">暫無任務</p>
-                    </div>
-                  )}
+                        {statusTasks.length === 0 && !snapshot.isDraggingOver && (
+                          <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-gray-200 rounded-[2rem] opacity-50">
+                            <p className="text-gray-400 text-sm font-bold">暫無任務</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </DragDropContext>
       )}
 
       {/* Error Toast */}

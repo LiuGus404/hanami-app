@@ -99,7 +99,9 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false, 
         is_public: !!task.is_public,
         project_id: task.project_id || '',
         points: task.points || 0,
-        checklist: (task as any).checklist || []
+        checklist: (task as any).checklist || [],
+        visible_to_roles: (task as any).visible_to_roles || null,
+        estimated_duration: task.estimated_duration || 0
       });
     } else {
       const tomorrow = new Date();
@@ -118,7 +120,8 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false, 
         is_public: false,
         project_id: '',
         points: 0,
-        checklist: []
+        checklist: [],
+        estimated_duration: 0
       });
     }
   }, [task]);
@@ -137,15 +140,25 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false, 
     return Object.keys(newErrors).length === 0;
   };
 
+  // Helper: Convert local datetime-local string to ISO string for DB (preserving local time)
+  const toLocalISOString = (dateStr: string | undefined | null) => {
+    if (!dateStr) return undefined;
+    const date = new Date(dateStr);
+    // Adjust for timezone offset to keep strict local time
+    const offset = date.getTimezoneOffset() * 60000;
+    const localDate = new Date(date.getTime() - offset);
+    return localDate.toISOString();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     const submitData = {
       ...formData,
-      due_date: formData.due_date ? new Date(formData.due_date).toISOString() : undefined,
-      time_block_start: formData.time_block_start ? new Date(formData.time_block_start).toISOString() : undefined,
-      time_block_end: formData.time_block_end ? new Date(formData.time_block_end).toISOString() : undefined,
+      due_date: toLocalISOString(formData.due_date),
+      time_block_start: toLocalISOString(formData.time_block_start),
+      time_block_end: toLocalISOString(formData.time_block_end),
     };
     onSubmit(submitData);
   };
@@ -659,6 +672,28 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false, 
                   />
                 </div>
 
+                {/* Time Block (Start/End) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-[#2B3A3B]/60 mb-1 block">預定開始時間</label>
+                    <input
+                      type="datetime-local"
+                      value={formData.time_block_start}
+                      onChange={e => setFormData({ ...formData, time_block_start: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border-none rounded-xl p-3 text-sm font-medium text-[#2B3A3B]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#2B3A3B]/60 mb-1 block">預定結束時間</label>
+                    <input
+                      type="datetime-local"
+                      value={formData.time_block_end}
+                      onChange={e => setFormData({ ...formData, time_block_end: e.target.value })}
+                      className="w-full bg-[#FAFAFA] border-none rounded-xl p-3 text-sm font-medium text-[#2B3A3B]"
+                    />
+                  </div>
+                </div>
+
                 {/* Estimated Duration */}
                 <div>
                   <label className="text-xs font-bold text-[#2B3A3B]/60 mb-1 block">預計完成時間 (分鐘)</label>
@@ -682,10 +717,12 @@ export default function TaskForm({ task, onSubmit, onCancel, isLoading = false, 
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => {
                     const d = new Date(); d.setDate(d.getDate() + 1);
+                    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
                     setFormData({ ...formData, due_date: d.toISOString().slice(0, 16) })
                   }} className="px-2 py-1 bg-green-50 text-green-600 text-xs font-bold rounded-lg hover:bg-green-100">+24小時</button>
                   <button type="button" onClick={() => {
                     const d = new Date(); d.setDate(d.getDate() + 7);
+                    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
                     setFormData({ ...formData, due_date: d.toISOString().slice(0, 16) })
                   }} className="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100">+1週</button>
                 </div>
