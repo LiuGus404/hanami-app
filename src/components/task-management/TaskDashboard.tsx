@@ -44,6 +44,51 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
   const [error, setError] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>(['pending', 'in_progress']);
+  const [employeeName, setEmployeeName] = useState<string | null>(null);
+
+  // Load employee name from sessionStorage (cached from teacher verification)
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('hanami_teacher_access');
+      if (stored) {
+        const data = JSON.parse(stored);
+        const name = data?.employeeData?.teacher_fullname || data?.employeeData?.teacher_nickname;
+        if (name) {
+          console.log('[TaskDashboard] Found employee name from session:', name);
+          setEmployeeName(name);
+        }
+      }
+    } catch (e) {
+      console.error('[TaskDashboard] Error reading employee name from session:', e);
+    }
+  }, []);
+
+  // Helper function to find user in leaderboard by name or email
+  const findUserInLeaderboard = (leaderboard: any[] | undefined) => {
+    if (!leaderboard) return undefined;
+    const userName = userSession?.full_name || userSession?.name;
+    const email = userSession?.email || userEmail;
+
+    // First try to match by employee name from session (most reliable)
+    if (employeeName) {
+      const entry = leaderboard.find(l => l.user_name === employeeName);
+      if (entry) {
+        console.log('[TaskDashboard] Matched by employee name:', employeeName);
+        return entry;
+      }
+    }
+
+    // Then try to match by name
+    let entry = leaderboard.find(l => l.user_name === userName);
+    if (entry) return entry;
+
+    // If not found, try to match by email
+    if (email) {
+      entry = leaderboard.find(l => l.email && l.email.toLowerCase() === email.toLowerCase());
+    }
+
+    return entry;
+  };
 
   useEffect(() => {
     fetchTasks();
@@ -98,6 +143,18 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
       if (!response.ok) throw new Error('Failed to fetch stats');
 
       const data = await response.json();
+      // Debug logging to understand the stats data
+      console.log('[TaskDashboard] Stats response:', data);
+      console.log('[TaskDashboard] Leaderboard with emails:', data?.leaderboard?.map((l: any) => ({ name: l.user_name, email: l.email, points: l.points })));
+      console.log('[TaskDashboard] User matching info:', {
+        name: userSession?.full_name || userSession?.name,
+        email: userSession?.email || userEmail
+      });
+      const matched = data?.leaderboard?.find((l: any) =>
+        l.user_name === (userSession?.full_name || userSession?.name) ||
+        (l.email && (userSession?.email || userEmail) && l.email.toLowerCase() === (userSession?.email || userEmail).toLowerCase())
+      );
+      console.log('[TaskDashboard] Matched entry:', matched);
       setStats(data);
     } catch (err) {
       console.error('Failed to fetch stats:', err);
@@ -148,7 +205,7 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
         // If moving OUT of completed:
         // - Reset approval (is_approved = false)
         is_approved: autoApprove,
-        approved_by: autoApprove ? (userSession?.name || 'Admin') : null,
+        approved_by: autoApprove ? ((userSession?.full_name || userSession?.name) || 'Admin') : null,
         approved_at: autoApprove ? new Date().toISOString() : null
       };
 
@@ -258,7 +315,7 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           is_approved: true,
-          approved_by: userSession?.name || 'Admin', // In real app, get from session
+          approved_by: (userSession?.full_name || userSession?.name) || 'Admin', // In real app, get from session
           approved_at: new Date().toISOString()
         }),
       });
@@ -299,7 +356,7 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
       <div className="flex justify-between items-start mb-8">
         <div>
           <div className="text-xs font-bold tracking-wider text-gray-400 uppercase mb-1">歡迎</div>
-          <h1 className="text-3xl font-bold text-[#2B3A3B]">{userSession?.name || 'User'}</h1>
+          <h1 className="text-3xl font-bold text-[#2B3A3B]">{(userSession?.full_name || userSession?.name) || 'User'}</h1>
           <h2 className="text-4xl font-extrabold text-[#2B3A3B] mt-1">
             任務中心
             {canApprove && (
@@ -329,7 +386,7 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
       <RewardsSection
         orgId={orgId || localStorage.getItem('hanami_org_id') || undefined}
         isAdmin={canApprove}
-        totalEarnedPoints={stats?.leaderboard?.find(l => l.user_name === userSession?.name)?.points || 0}
+        totalEarnedPoints={findUserInLeaderboard(stats?.leaderboard)?.points || 0}
         currentUserId={userSession?.id}
       />
 
@@ -357,13 +414,13 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
                     stroke="white"
                     strokeWidth="8"
                     strokeDasharray="289"
-                    strokeDashoffset={289 - (289 * (stats?.leaderboard?.length ? ((stats.leaderboard.length - (stats.leaderboard.findIndex(l => l.user_name === userSession?.name) || 0)) / stats.leaderboard.length) : 0))}
+                    strokeDashoffset={289 - (289 * (stats?.leaderboard?.length ? ((stats.leaderboard.length - (findUserInLeaderboard(stats?.leaderboard)?.rank || stats.leaderboard.length)) / stats.leaderboard.length) : 0))}
                     strokeLinecap="round"
                   />
                 </svg>
                 <div className="text-center absolute inset-0 flex flex-col items-center justify-center">
                   <div className="text-4xl font-extrabold text-[#2B3A3B]">
-                    {stats?.leaderboard?.find(l => l.user_name === userSession?.name)?.points || 0}
+                    {findUserInLeaderboard(stats?.leaderboard)?.points || 0}
                   </div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-[#2B3A3B]/60 mt-1">PTS</div>
                 </div>
@@ -375,13 +432,13 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
                 <div>
                   <div className="text-[#2B3A3B]/60 text-xs font-bold uppercase mb-1">排名</div>
                   <div className="text-2xl font-bold text-[#2B3A3B]">
-                    #{stats?.leaderboard?.find(l => l.user_name === userSession?.name)?.rank || '-'}
+                    #{findUserInLeaderboard(stats?.leaderboard)?.rank || '-'}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-[#2B3A3B]/60 text-xs font-bold uppercase mb-1">前標</div>
                   <div className="text-2xl font-bold text-[#2B3A3B]">
-                    {stats?.leaderboard?.length ? Math.round(((stats.leaderboard.length - (stats.leaderboard.findIndex(l => l.user_name === userSession?.name))) / stats.leaderboard.length) * 100) : 0}%
+                    {stats?.leaderboard?.length ? Math.round(((stats.leaderboard.length - (findUserInLeaderboard(stats?.leaderboard)?.rank || stats.leaderboard.length)) / stats.leaderboard.length) * 100 + 1) : 0}%
                   </div>
                 </div>
               </div>

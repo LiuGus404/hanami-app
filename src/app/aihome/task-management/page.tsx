@@ -109,7 +109,7 @@ export default function AihomeTaskManagementPage() {
 
   const handleTaskDelete = async (task: Task) => {
     if (!confirm('確定要刪除此任務嗎？')) return;
-    
+
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: 'DELETE',

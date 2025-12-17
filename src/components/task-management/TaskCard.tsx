@@ -17,6 +17,7 @@ interface TaskCardProps {
   currentUser?: any;
   showActions?: boolean;
   className?: string;
+  orgId?: string;
 }
 
 export default function TaskCard({
@@ -30,7 +31,8 @@ export default function TaskCard({
   onApprove,
   canApprove = false,
   showActions = true,
-  className = ''
+  className = '',
+  orgId
 }: TaskCardProps) {
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [showAssignMenu, setShowAssignMenu] = useState(false);
@@ -45,40 +47,42 @@ export default function TaskCard({
   // Helper for current assignees (handles string or array)
   const currentAssignees = Array.isArray(task.assigned_to) ? task.assigned_to : (task.assigned_to ? [task.assigned_to] : []);
 
-  // Load Staff Data
+  // Load Staff Data - 從 hanami_employee 獲取機構成員（與 TaskForm 保持一致）
   useEffect(() => {
     const loadData = async () => {
       try {
-        const { data: employeesData } = await (supabase
-          .from('hanami_employee') as any)
-          .select('id, teacher_fullname, teacher_nickname')
+        let members: { id: string; name: string; type: string }[] = [];
+
+        // 從 hanami_employee 獲取機構成員（與編輯任務視窗的負責成員邏輯一致）
+        let employeesQuery = supabase
+          .from('hanami_employee')
+          .select('id, teacher_fullname, teacher_nickname, teacher_email')
           .order('teacher_fullname');
 
-        const { data: adminsData } = await (supabase
-          .from('hanami_admin') as any)
-          .select('id, admin_name')
-          .order('admin_name');
+        if (orgId) {
+          employeesQuery = employeesQuery.eq('org_id', orgId);
+        }
 
-        const employees = (employeesData || []).map((emp: any) => ({
-          id: emp.id,
-          name: emp.teacher_nickname || emp.teacher_fullname || '',
-          type: 'employee'
-        }));
+        const { data: employeesData, error } = await employeesQuery;
 
-        const admins = (adminsData || []).map((admin: any) => ({
-          id: admin.id,
-          name: admin.admin_name || '',
-          type: 'admin'
-        }));
+        if (error) {
+          console.error('獲取員工資料失敗:', error);
+        } else {
+          members = (employeesData || []).map((emp: any) => ({
+            id: emp.id,
+            name: emp.teacher_fullname || emp.teacher_nickname || '',
+            type: 'employee'
+          }));
+        }
 
-        setAllStaff([...employees, ...admins]);
+        setAllStaff(members);
       } catch (error) {
         console.error('Failed to load staff data:', error);
       }
     };
 
     loadData();
-  }, []);
+  }, [orgId]);
 
   // Initialize selected staff
   useEffect(() => {

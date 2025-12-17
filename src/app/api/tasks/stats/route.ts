@@ -78,14 +78,14 @@ export async function GET(request: NextRequest) {
     // 1. 獲取該機構的所有老師/員工
     let employeesQuery = (supabase as any)
       .from('hanami_employee')
-      .select('teacher_fullname, teacher_nickname');
+      .select('teacher_fullname, teacher_nickname, teacher_email');
 
     if (orgId) {
       employeesQuery = employeesQuery.eq('org_id', orgId);
     }
 
-    // 初始化积分映射
-    const userPointsMap = new Map<string, number>();
+    // 初始化积分映射 (key: name, value: { points, email })
+    const userPointsMap = new Map<string, { points: number; email: string }>();
 
     try {
       const { data: employees } = await employeesQuery;
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
           // 優先使用全名作為 key
           const name = emp.teacher_fullname || emp.teacher_nickname;
           if (name) {
-            userPointsMap.set(name, 0);
+            userPointsMap.set(name, { points: 0, email: emp.teacher_email || '' });
           }
         });
       }
@@ -137,22 +137,31 @@ export async function GET(request: NextRequest) {
         task.assigned_to.forEach((user: string) => {
           // 只更新已经在员工列表中的用户，或者如果允许非员工也在排行榜，则直接设置
           // 这里我们假设任务可能分配给不在 hanami_employee 的人（如 admin），也应该显示
-          const currentPoints = userPointsMap.get(user) || 0;
-          userPointsMap.set(user, currentPoints + (task.points || 0));
+          const existing = userPointsMap.get(user);
+          if (existing) {
+            userPointsMap.set(user, { ...existing, points: existing.points + (task.points || 0) });
+          } else {
+            userPointsMap.set(user, { points: task.points || 0, email: '' });
+          }
         });
       } else if (typeof task.assigned_to === 'string' && task.points) {
         const users = task.assigned_to.split(',').map((u: string) => u.trim()).filter((u: string) => u);
         users.forEach((user: string) => {
-          const currentPoints = userPointsMap.get(user) || 0;
-          userPointsMap.set(user, currentPoints + (task.points || 0));
+          const existing = userPointsMap.get(user);
+          if (existing) {
+            userPointsMap.set(user, { ...existing, points: existing.points + (task.points || 0) });
+          } else {
+            userPointsMap.set(user, { points: task.points || 0, email: '' });
+          }
         });
       }
     });
 
     const leaderboard = Array.from(userPointsMap.entries())
-      .map(([user_name, points]) => ({
+      .map(([user_name, data]) => ({
         user_name,
-        points,
+        points: data.points,
+        email: data.email,
         rank: 0,
         avatar: undefined
       }))
