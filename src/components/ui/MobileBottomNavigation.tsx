@@ -242,7 +242,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
         id: 'mobile-nav-ai-companions',
         icon: ChatBubbleLeftRightIcon,
         href: '/aihome/ai-companions',
-        label: 'AI夥伴'
+        label: '換腦工房'
       },
       {
         id: 'mobile-nav-parent-connect',

@@ -180,7 +180,7 @@ export function ChatLoadoutPanel({
             <div className="flex-1 overflow-y-auto p-4">
                 <div className="mb-6">
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-                        思維積木裝備欄
+                        思維零件裝備欄
                     </h4>
 
                     <Slot

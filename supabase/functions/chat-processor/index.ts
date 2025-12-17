@@ -119,7 +119,7 @@ export async function callLLM(config: ModelConfig, messages: Message[]): Promise
 
         // List of providers that are OpenAI compatible or supported via OpenRouter
         const openAICompatibleProviders = [
-            'openai', 'openrouter', 'deepseek', 'x-ai', 'mistralai', 'perplexity',
+            'openai', 'openrouter', 'deepseek', 'x-ai', 'xai', 'mistralai', 'perplexity',
             'qwen', 'moonshotai', 'ai21', 'meituan', 'microsoft', 'bytedance',
             'meta-llama', 'baidu', 'alibaba', 'stepfun-ai', 'nvidia', 'deepcogito',
             'opengvlab', 'nousresearch', 'z-ai'

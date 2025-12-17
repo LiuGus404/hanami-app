@@ -269,7 +269,7 @@ export default function MindLibraryPage() {
                         className="flex items-center space-x-2 text-[#4B4036]/60 hover:text-[#4B4036] transition-colors group"
                     >
                         <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-medium">返回思維積木</span>
+                        <span className="font-medium">返回思維零件</span>
                     </button>
                 </div>
 
@@ -285,7 +285,7 @@ export default function MindLibraryPage() {
                                 className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[#4B4036]/60 hover:text-[#4B4036] transition-all min-w-[140px] justify-center"
                             >
                                 <UserIcon className="w-5 h-5" />
-                                <span>我的積木庫</span>
+                                <span>我的零件庫</span>
                             </motion.button>
                             <motion.button
                                 onClick={() => router.push('/aihome/mind-library')}
@@ -299,7 +299,7 @@ export default function MindLibraryPage() {
                                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                 />
                                 <UserGroupIcon className="w-5 h-5 relative z-10 text-white" />
-                                <span className="relative z-10 text-white">社群積木</span>
+                                <span className="relative z-10 text-white">社群零件</span>
                             </motion.button>
                         </div>
                     </div>
@@ -315,7 +315,7 @@ export default function MindLibraryPage() {
                             <MagnifyingGlassIcon className="w-6 h-6 text-[#4B4036]/40 ml-3" />
                             <input
                                 type="text"
-                                placeholder="搜尋積木、作者或標籤..."
+                                placeholder="搜尋零件、作者或標籤..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full px-4 py-2 bg-transparent border-none text-[#4B4036] placeholder-[#4B4036]/30 focus:ring-0 text-base font-medium"
@@ -334,7 +334,7 @@ export default function MindLibraryPage() {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             className="p-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-                            title="創建新積木"
+                            title="創建新零件"
                         >
                             <PlusIcon className="w-6 h-6" />
                         </motion.button>
@@ -349,7 +349,7 @@ export default function MindLibraryPage() {
                                     }`}
                             >
                                 <Square2StackIcon className="w-5 h-5" />
-                                思維積木組合
+                                思維零件組合
                             </button>
                             <button
                                 onClick={() => setActiveTab('block')}
@@ -359,7 +359,7 @@ export default function MindLibraryPage() {
                                     }`}
                             >
                                 <CubeIcon className="w-5 h-5" />
-                                單一積木
+                                單一零件
                             </button>
                         </div>
                     </div>
@@ -377,7 +377,7 @@ export default function MindLibraryPage() {
                     ) : filteredBlocks.length === 0 ? (
                         <div className="text-center py-20 text-gray-400">
                             <PuzzlePieceIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                            <p className="text-lg font-medium">沒有找到相關的{activeTab === 'composition' ? '組合' : '積木'}</p>
+                            <p className="text-lg font-medium">沒有找到相關的{activeTab === 'composition' ? '組合' : '零件'}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -409,7 +409,7 @@ export default function MindLibraryPage() {
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 text-[#4B4036] border border-[#EADBC8]">
-                                                                {isComposition ? '組合' : '積木'}
+                                                                {isComposition ? '組合' : '零件'}
                                                             </span>
                                                             {item.is_official && (
                                                                 <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white">
@@ -543,7 +543,7 @@ export default function MindLibraryPage() {
                                                     className="flex items-center px-4 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white text-xs font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all shadow-md active:scale-95"
                                                 >
                                                     <PuzzlePieceIcon className="w-3.5 h-3.5 mr-2" />
-                                                    載入積木
+                                                    載入零件
                                                 </button>
                                             </div>
                                         </div>

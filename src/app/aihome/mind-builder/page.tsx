@@ -127,7 +127,7 @@ export default function MindBuilderPage() {
                         className="flex items-center space-x-2 text-[#4B4036]/60 hover:text-[#4B4036] transition-colors group"
                     >
                         <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-medium">返回思維積木</span>
+                        <span className="font-medium">返回思維零件</span>
                     </button>
                 </div>
                 <MindBlockBuilder />

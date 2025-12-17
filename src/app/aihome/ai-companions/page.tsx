@@ -2474,7 +2474,7 @@ export default function AICompanionsPage() {
                     >
                       <ChatBubbleLeftRightIcon className="w-8 h-8 text-[#FFB6C1] mr-3" />
                     </motion.div>
-                    <h1 className="text-4xl font-bold text-[#4B4036]">AI 協作聊天室</h1>
+                    <h1 className="text-4xl font-bold text-[#4B4036]">腦力工作台 (Workbench)</h1>
                   </div>
                   <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
                     與 Hibi、墨墨和皮可三位 AI 助手協作，透過對話完成各種任務和專案
@@ -2571,9 +2571,9 @@ export default function AICompanionsPage() {
                     </motion.div>
                   </div>
 
-                  <h3 className="text-2xl font-semibold text-[#4B4036] mb-3">歡迎來到 AI 伙伴系統！</h3>
+                  <h3 className="text-2xl font-semibold text-[#4B4036] mb-3">歡迎來到換腦工房！</h3>
                   <p className="text-[#2B3A3B] mb-6 max-w-md mx-auto">
-                    希希 系統總管和專業助手墨墨、皮可正在等待與您協作。創建專案開始智能對話，讓 AI 團隊幫您完成各種任務。
+                    希希 系統總管和專業助手墨墨、皮可正在等待與您協作。創建專案開始智能對話，讓換腦工房幫您完成各種任務。
                   </p>
 
                   {/* 快速開始按鈕 */}
@@ -2979,10 +2979,10 @@ export default function AICompanionsPage() {
                     >
                       <CpuChipIcon className="w-8 h-8 text-[#FFB6C1] mr-3" />
                     </motion.div>
-                    <h1 className="text-4xl font-bold text-[#4B4036]">AI 角色夥伴</h1>
+                    <h1 className="text-4xl font-bold text-[#4B4036]">換腦工房 MindSwitch</h1>
                   </div>
                   <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
-                    認識我們的 AI 角色夥伴，每個成員都有獨特的專長和個性
+                    你的第二大腦組裝廠 - 認識我們的 AI 角色夥伴，每個成員都有獨特的專長和個性
                   </p>
                   <div className="mt-4 inline-flex items-center px-4 py-2 bg-[#FFD59A]/20 border border-[#FFD59A] rounded-full text-sm text-[#4B4036]">
                     <CpuChipIcon className="w-4 h-4 mr-2" />
@@ -3197,10 +3197,10 @@ export default function AICompanionsPage() {
                     >
                       <PuzzlePieceIcon className="w-8 h-8 text-[#FFB6C1] mr-3" />
                     </motion.div>
-                    <h1 className="text-4xl font-bold text-[#4B4036]">思維積木 (MindBlock)</h1>
+                    <h1 className="text-4xl font-bold text-[#4B4036]">思維零件 (Mind Blocks)</h1>
                   </div>
                   <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
-                    為 AI 夥伴裝備強大的思維流程，或創造屬於你的獨特積木
+                    為換腦工房裝備強大的思維流程，或創造屬於你的獨特零件
                   </p>
                 </div>
 
@@ -3214,8 +3214,8 @@ export default function AICompanionsPage() {
                     <div className="w-16 h-16 bg-[#FFD59A]/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                       <PlusIcon className="w-8 h-8 text-[#4B4036]" />
                     </div>
-                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">創建新積木</h3>
-                    <p className="text-[#4B4036]/70">使用直觀的積木堆疊介面，設計 AI 的思考邏輯。</p>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">創建新零件</h3>
+                    <p className="text-[#4B4036]/70">使用直觀的零件組裝介面，設計 AI 的思考邏輯。</p>
                   </motion.div>
 
                   {/* My Library Card */}
@@ -3227,8 +3227,8 @@ export default function AICompanionsPage() {
                     <div className="w-16 h-16 bg-[#A78BFA]/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                       <PuzzlePieceIcon className="w-8 h-8 text-[#4B4036]" />
                     </div>
-                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">我的積木庫</h3>
-                    <p className="text-[#4B4036]/70">管理您儲存的思維積木組合，隨時載入並繼續編輯。</p>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">我的零件庫</h3>
+                    <p className="text-[#4B4036]/70">管理您儲存的思維零件組合，隨時載入並繼續編輯。</p>
                   </motion.div>
 
                   {/* Library Card */}
@@ -3240,8 +3240,8 @@ export default function AICompanionsPage() {
                     <div className="w-16 h-16 bg-[#FFB6C1]/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                       <ArrowPathIcon className="w-8 h-8 text-[#4B4036]" />
                     </div>
-                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">瀏覽積木庫</h3>
-                    <p className="text-[#4B4036]/70">探索社群分享的思維積木，一鍵 Remix 成為你的專屬工具。</p>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">瀏覽零件庫</h3>
+                    <p className="text-[#4B4036]/70">探索社群分享的思維零件，一鍵 Remix 成為你的專屬工具。</p>
                   </motion.div>
                 </div>
               </motion.div>
@@ -3391,7 +3391,7 @@ export default function AICompanionsPage() {
                     >
                       <ChartBarIcon className="w-8 h-8 text-[#FFB6C1] mr-3" />
                     </motion.div>
-                    <h1 className="text-4xl font-bold text-[#4B4036]">使用統計</h1>
+                    <h1 className="text-4xl font-bold text-[#4B4036]">數據面板 (Data Dashboard)</h1>
                   </div>
                   <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
                     追蹤 AI 使用情況，監控效能和優化體驗
@@ -3644,7 +3644,7 @@ export default function AICompanionsPage() {
                       >
                         <div className="flex items-center gap-2">
                           <PuzzlePieceIcon className="w-5 h-5 text-[#4B4036]" />
-                          <h3 className="text-lg font-semibold text-[#4B4036]">思維積木 (MindBlock)</h3>
+                          <h3 className="text-lg font-semibold text-[#4B4036]">思維零件 (Mind Blocks)</h3>
                         </div>
                         <motion.span animate={{ rotate: openPanels.mind ? 180 : 0 }}>
                           <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>

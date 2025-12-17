@@ -130,7 +130,7 @@ export default function DashboardPage() {
   // 快速導航
   const quickNav = [
     { icon: HomeIcon, label: '首頁', href: '/aihome' },
-    { icon: SparklesIcon, label: 'AI夥伴', href: '/aihome/ai-companions' },
+    { icon: SparklesIcon, label: '換腦工房', href: '/aihome/ai-companions' },
     { icon: UsersIcon, label: '家長連結', href: '/aihome/parent/bound-students' },
     { icon: UserIcon, label: '設定', href: '/aihome/profile' }
   ];

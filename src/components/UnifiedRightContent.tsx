@@ -285,11 +285,11 @@ export default function UnifiedRightContent({ user, onLogout, onNavigate, extraM
                         )}
 
                         {[
-                            { name: '思維積木', action: 'view:mind', icon: <PuzzlePieceIcon className="w-4 h-4" /> },
-                            { name: '協作室', action: 'view:chat', icon: <UserGroupIcon className="w-4 h-4" /> },
+                            { name: '思維零件', action: 'view:mind', icon: <PuzzlePieceIcon className="w-4 h-4" /> },
+                            { name: '腦力工作台', action: 'view:chat', icon: <UserGroupIcon className="w-4 h-4" /> },
                             { name: '角色', action: 'view:roles', icon: <UsersIcon className="w-4 h-4" /> },
                             { name: '記憶', action: 'view:memory', icon: <ArchiveBoxIcon className="w-4 h-4" /> },
-                            { name: '統計', action: 'view:stats', icon: <ChartBarIcon className="w-4 h-4" /> },
+                            { name: '數據面板', action: 'view:stats', icon: <ChartBarIcon className="w-4 h-4" /> },
                         ].map((item) => (
                             <div
                                 key={item.name}

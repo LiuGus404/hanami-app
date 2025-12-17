@@ -197,9 +197,9 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       },
       {
         icon: SparklesIcon,
-        label: 'AI伙伴',
+        label: '換腦工房',
         href: '/aihome/ai-companions',
-        description: '您的工作和學習伙伴'
+        description: '你的第二大腦組裝廠'
       },
     ];
 
@@ -270,7 +270,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             initial={{ x: -300 }}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            className="fixed top-16 bottom-0 left-0 w-80 bg-white shadow-xl z-50 lg:fixed lg:top-16 lg:shadow-lg lg:z-50 lg:flex-shrink-0 flex flex-col h-full"
+            className="fixed top-16 bottom-0 left-0 w-80 bg-white shadow-xl z-50 lg:fixed lg:top-16 lg:shadow-lg lg:z-50 lg:flex-shrink-0 flex flex-col h-full overflow-y-auto"
           >
             {/* 標題區域 */}
             <div className="p-6 border-b border-[#EADBC8] flex-shrink-0">

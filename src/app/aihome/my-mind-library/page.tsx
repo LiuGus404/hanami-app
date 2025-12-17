@@ -390,7 +390,7 @@ export default function MyMindLibraryPage() {
                         className="flex items-center space-x-2 text-[#4B4036]/60 hover:text-[#4B4036] transition-colors group"
                     >
                         <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-medium">返回思維積木</span>
+                        <span className="font-medium">返回思維零件</span>
                     </button>
                 </div>
 
@@ -411,7 +411,7 @@ export default function MyMindLibraryPage() {
                                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                 />
                                 <UserIcon className="w-5 h-5 relative z-10 text-white" />
-                                <span className="relative z-10 text-white">我的積木庫</span>
+                                <span className="relative z-10 text-white">我的零件庫</span>
                             </motion.button>
                             <motion.button
                                 onClick={() => router.push('/aihome/mind-library')}
@@ -420,13 +420,13 @@ export default function MyMindLibraryPage() {
                                 className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[#4B4036]/60 hover:text-[#4B4036] transition-all min-w-[140px] justify-center"
                             >
                                 <UserGroupIcon className="w-5 h-5" />
-                                <span>社群積木</span>
+                                <span>社群零件</span>
                             </motion.button>
                         </div>
                     </div>
 
                     <p className="text-lg text-[#4B4036]/60 max-w-2xl mx-auto mb-8">
-                        管理您儲存的思維積木組合，隨時載入並繼續編輯
+                        管理您儲存的思維零件組合，隨時載入並繼續編輯
                     </p>
 
                     {/* Search Bar */}
@@ -436,7 +436,7 @@ export default function MyMindLibraryPage() {
                             <MagnifyingGlassIcon className="w-6 h-6 text-[#4B4036]/40 ml-3" />
                             <input
                                 type="text"
-                                placeholder="搜尋我的積木..."
+                                placeholder="搜尋我的零件..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full px-4 py-2 bg-transparent border-none text-[#4B4036] placeholder-[#4B4036]/30 focus:ring-0 text-base font-medium"
@@ -455,7 +455,7 @@ export default function MyMindLibraryPage() {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             className="p-3 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
-                            title="創建新積木"
+                            title="創建新零件"
                         >
                             <PlusIcon className="w-6 h-6" />
                         </motion.button>
@@ -470,7 +470,7 @@ export default function MyMindLibraryPage() {
                                     }`}
                             >
                                 <Square2StackIcon className="w-5 h-5" />
-                                思維積木組合
+                                思維零件組合
                             </button>
                             <button
                                 onClick={() => setActiveTab('block')}
@@ -480,7 +480,7 @@ export default function MyMindLibraryPage() {
                                     }`}
                             >
                                 <CubeIcon className="w-5 h-5" />
-                                單一積木
+                                單一零件
                             </button>
                         </div>
                     </div>
@@ -495,7 +495,7 @@ export default function MyMindLibraryPage() {
                     ) : displayItems.length === 0 ? (
                         <div className="text-center py-20 text-gray-400">
                             <PuzzlePieceIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                            <p className="text-lg font-medium">您還沒有儲存任何{activeTab === 'composition' ? '積木組合' : '單一積木'}</p>
+                            <p className="text-lg font-medium">您還沒有儲存任何{activeTab === 'composition' ? '零件組合' : '單一零件'}</p>
                             <button
                                 onClick={() => router.push('/aihome/mind-builder')}
                                 className="mt-4 px-6 py-2 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold hover:shadow-lg transition-all"
@@ -533,7 +533,7 @@ export default function MyMindLibraryPage() {
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-2 mb-1">
                                                             <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gradient-to-r from-[#FFB6C1]/20 to-[#FFD59A]/20 text-[#4B4036] border border-[#EADBC8]">
-                                                                {isComposition ? '組合' : '積木'}
+                                                                {isComposition ? '組合' : '零件'}
                                                             </span>
                                                             <div className="text-xs text-[#4B4036]/40">
                                                                 {new Date(item.updated_at).toLocaleDateString()}
@@ -729,7 +729,7 @@ export default function MyMindLibraryPage() {
                                                     className="w-full py-2.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-xl font-bold transition-all shadow-md hover:shadow-lg hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
                                                 >
                                                     <PuzzlePieceIcon className="w-4 h-4" />
-                                                    載入積木
+                                                    載入零件
                                                 </button>
                                                 <button
                                                     onClick={(e) => {

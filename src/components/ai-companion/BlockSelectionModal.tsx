@@ -64,11 +64,11 @@ export function BlockSelectionModal({
             const params = new URLSearchParams({
                 tab: activeTab,
             });
-            
+
             if (user?.id) {
                 params.append('userId', user.id);
             }
-            
+
             if (slotType) {
                 params.append('slotType', slotType);
             }
@@ -299,7 +299,7 @@ export function BlockSelectionModal({
                             選擇{slotType === 'role' ? '角色' : slotType === 'style' ? '風格' : '任務'}積木
                         </h3>
                         <p className="text-xs text-[#4B4036]/60">
-                            為您的 AI 夥伴裝備新的思維能力
+                            為換腦工房裝備新的思維零件
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors">
