@@ -21,6 +21,7 @@ import { toast } from 'react-hot-toast';
 import { HanamiCard, HanamiButton, HanamiInput } from '@/components/ui';
 import { PlanUpgradeModal } from '@/components/ui/PlanUpgradeModal';
 import MediaEditor from './MediaEditor';
+import MediaFilePreview from '@/components/ui/MediaFilePreview';
 import { supabase } from '@/lib/supabase';
 import { StudentMedia, StudentMediaQuota, DEFAULT_MEDIA_LIMITS } from '@/types/progress';
 import {
@@ -227,6 +228,8 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
   const loadStudentMedia = async () => {
     if (!student) return;
 
+    // 先清空舊資料，釋放記憶體（防止第二次上傳時記憶體累積崩潰）
+    setMedia([]);
     setLoading(true);
     try {
       const { data: dataRaw, error } = await supabase
@@ -865,19 +868,30 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
         }
       };
 
-      // 並行上傳邏輯
-      const CONCURRENCY = 1; // 降低並行數以防止記憶體崩潰
+      // 智慧並行上傳邏輯：照片可同時 2 個，影片一次 1 個
       const files = [...selectedFiles];
+      const photoFiles = files.filter(f => f.type.startsWith('image/'));
+      const videoFiles = files.filter(f => f.type.startsWith('video/'));
 
-      // 將檔案分組
-      const chunks = [];
-      for (let i = 0; i < files.length; i += CONCURRENCY) {
-        chunks.push(files.slice(i, i + CONCURRENCY));
+      const PHOTO_CONCURRENCY = 2; // 照片：同時上傳 2 個
+      const VIDEO_CONCURRENCY = 1; // 影片：一次 1 個（防止記憶體崩潰）
+
+      // 先上傳照片（較快）
+      if (photoFiles.length > 0) {
+        const photoChunks = [];
+        for (let i = 0; i < photoFiles.length; i += PHOTO_CONCURRENCY) {
+          photoChunks.push(photoFiles.slice(i, i + PHOTO_CONCURRENCY));
+        }
+        for (const chunk of photoChunks) {
+          await Promise.all(chunk.map(file => processFile(file)));
+        }
       }
 
-      // 批量處理
-      for (const chunk of chunks) {
-        await Promise.all(chunk.map(file => processFile(file)));
+      // 再上傳影片（一個接一個）
+      if (videoFiles.length > 0) {
+        for (const videoFile of videoFiles) {
+          await processFile(videoFile);
+        }
       }
 
       if (localSuccessCount > 0) {
@@ -891,10 +905,17 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
           toast.error('所有檔案上傳失敗！');
         }
       }
+      // 延遲清理狀態和重新載入媒體，防止手機記憶體崩潰
+      // Step 1: Clear large objects (selected files contain blob references)
       setSelectedFiles([]);
       setUploadProgress({});
+
+      // Step 2: Give browser time to garbage collect before loading new media
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Step 3: Hide upload area and reload
       setShowUploadArea(false);
-      loadStudentMedia(); // 重新載入媒體列表
+      await loadStudentMedia();
 
       // 通知父組件配額已更改，觸發按鈕顏色更新
       if (onQuotaChanged) {
@@ -1254,6 +1275,14 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
     // 安全措施：如果是影片，跳過客戶端壓縮以防止低階設備崩潰
     // 影片壓縮消耗大量記憶體和CPU，容易導致 iOS/Android Webview 閃退
     if (file.type.startsWith('video/')) {
+      const fileSizeMB = file.size / (1024 * 1024);
+      // 大於 10MB 的影片顯示提示
+      if (fileSizeMB > 10) {
+        toast(`影片 ${file.name} (${fileSizeMB.toFixed(1)}MB) 較大，正在直接上傳...`, {
+          icon: '🎬',
+          duration: 4000
+        });
+      }
       console.log('跳過影片客戶端壓縮以防止崩潰:', file.name);
       return file;
     }
@@ -1785,6 +1814,20 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
                       查看檔案上傳指南
                     </a>
                   </div>
+
+                  {/* 上傳並行限制說明 */}
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                    <div className="flex items-center gap-1 font-medium mb-1">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      上傳速度說明
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      <span>📷 照片：同時上傳 2 張</span>
+                      <span>🎬 影片：逐一上傳（防止崩潰）</span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* 選中的檔案 - 水平預覽清單 */}
@@ -1792,73 +1835,17 @@ export default function StudentMediaModal({ isOpen, onClose, canManageApproval =
                   <div className="mt-4 animate-in fade-in duration-300 w-full overflow-hidden">
                     <h4 className="font-medium mb-2 text-sm sm:text-base text-gray-700 text-left">選中的檔案:</h4>
                     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-                      {selectedFiles.map((file, index) => {
-                        const isVideo = file.type.startsWith('video/');
-                        const isPhoto = file.type.startsWith('image/');
-
-                        return (
-                          <div key={index} className="relative flex-shrink-0 w-24 h-24 rounded-xl border border-[#EADBC8] shadow-sm overflow-hidden group">
-                            {/* Thumbnail / Icon */}
-                            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                              {isPhoto ? (
-                                <img
-                                  src={URL.createObjectURL(file)}
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : isVideo ? (
-                                <div className="flex flex-col items-center justify-center p-2 text-center">
-                                  <Video className="w-8 h-8 text-blue-400 mb-1" />
-                                  <span className="text-[10px] text-gray-500 truncate w-full px-1">{file.name}</span>
-                                </div>
-                              ) : (
-                                <div className="flex flex-col items-center justify-center p-2 text-center">
-                                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mb-1">
-                                    <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                  <span className="text-[10px] text-gray-500 truncate w-full px-1">{file.name}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Remove Button (Top Right) */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const newFiles = selectedFiles.filter((_, i) => i !== index);
-                                setSelectedFiles(newFiles);
-                              }}
-                              className="absolute top-1 right-1 bg-white/90 text-gray-500 rounded-full p-1 shadow-md hover:bg-white transition-all hover:scale-110 opacity-0 group-hover:opacity-100"
-                              title="移除"
-                            >
-                              <XMarkIcon className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Size Badge (Bottom) */}
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 text-center truncate">
-                              {getFileSize(file.size)}
-                            </div>
-
-                            {/* Upload Progress Overlay */}
-                            {uploadProgress[file.name] !== undefined && uploadProgress[file.name] >= 0 && (
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center flex-col gap-1 backdrop-blur-[1px]">
-                                <div className="text-white font-bold text-xs drop-shadow-md">
-                                  {uploadProgress[file.name]}%
-                                </div>
-                                <div className="w-16 h-1.5 bg-gray-200/30 rounded-full overflow-hidden backdrop-blur-sm shadow-inner">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-200 shadow-[0_0_10px_rgba(52,211,153,0.5)]"
-                                    style={{ width: `${uploadProgress[file.name]}%` }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {selectedFiles.map((file, index) => (
+                        <MediaFilePreview
+                          key={`${file.name}-${index}`}
+                          file={file}
+                          progress={uploadProgress[file.name]}
+                          onRemove={() => {
+                            const newFiles = selectedFiles.filter((_, i) => i !== index);
+                            setSelectedFiles(newFiles);
+                          }}
+                        />
+                      ))}
                     </div>
 
                     <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">

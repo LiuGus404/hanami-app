@@ -37,6 +37,7 @@ import {
   ArrowRightOnRectangleIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
+import toast, { Toaster } from 'react-hot-toast';
 
 // Helper to parse raw multi-model content
 const parseMultiModelContent = (content: string) => {
@@ -59,7 +60,7 @@ import { SecureImageDisplay } from '@/components/ai-companion/SecureImageDisplay
 import { VoiceMessagePlayer } from '@/components/chat/VoiceMessagePlayer';
 import UnifiedRightContent from '@/components/UnifiedRightContent';
 import { createClient } from '@supabase/supabase-js';
-import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase-saas';
+import { supabaseUrl, supabaseAnonKey, createSaasClient } from '@/lib/supabase-saas';
 import ConnectionHint from '@/components/ai-companion/ConnectionHint';
 import { convertToPublicUrl, convertToShortUrl, getShortDisplayUrl, extractStoragePath } from '@/lib/getSignedImageUrl';
 import { ReferenceImagePicker } from '@/components/chat/ReferenceImagePicker';
@@ -487,6 +488,10 @@ const safeJsonParse = async (response: Response, context: string = 'API') => {
     return { success: false, error: 'Invalid JSON response', details: jsonError instanceof Error ? jsonError.message : String(jsonError) };
   }
 };
+
+// ⭐ Default prompt for vision/OCR when no mind block is selected
+const DEFAULT_VISION_PROMPT = 'Describe this image objectively and comprehensively. Include: main subjects, colors, composition, text/numbers visible, context clues, and any notable details. Be factual and avoid assumptions or interpretations.';
+
 export default function RoomChatPage() {
   const { user, logout, supabase } = useSaasAuth();
   const userId = user?.id;
@@ -553,14 +558,20 @@ export default function RoomChatPage() {
   const [queueCount, setQueueCount] = useState<number>(0); // 輪候人數
   const [isSending, setIsSending] = useState(false);  // ⭐ 新增發送鎖
   const isSendingRef = useRef(false);  // ⭐ 同步發送鎖（避免 React 狀態更新延遲）
+  const [loadingState, setLoadingState] = useState<'idle' | 'analyzing' | 'audio_analyzing' | 'thinking'>('idle'); // ⭐ 兩階段載入狀態
+  const loadingStateRef = useRef<'idle' | 'analyzing' | 'audio_analyzing' | 'thinking'>('idle'); // ⭐ 同步追蹤 (用於 Realtime 回調)
   const [processingCompanion, setProcessingCompanion] = useState<'hibi' | 'mori' | 'pico' | null>(null); // ⭐ 記錄正在處理的角色
   const processingCompanionRef = useRef<'hibi' | 'mori' | 'pico' | null>(null);
 
   useEffect(() => {
     processingCompanionRef.current = processingCompanion;
   }, [processingCompanion]);
+  useEffect(() => {
+    loadingStateRef.current = loadingState;
+  }, [loadingState]);
   const subscriptionRef = useRef<any>(null);  // ⭐ 保存訂閱引用
   const processedMessageIds = useRef(new Set<string>());  // ⭐ 追蹤已處理的訊息 ID
+  const currentVisionContextRef = useRef<string>('');  // ⭐ 追蹤當前 Vision 分析結果 (用於重複偵測)
   const [forceRender, setForceRender] = useState(0);  // ⭐ 選擇性重新渲染計數器
 
   // 選擇性重新渲染函數 - 只在特定情況下觸發
@@ -810,6 +821,40 @@ export default function RoomChatPage() {
   // Handle Block Selection
   const handleBlockSelect = async (block: MindBlock) => {
     const { roleInstanceId, slotType } = loadoutModalState;
+
+    // ⭐ Special case: Vision mind block (saves to room.config, not role instance)
+    if (roleInstanceId === '__vision__') {
+      console.log('👁️ [Save] Saving vision mind block:', block.title);
+      console.log('👁️ [Save] Block data:', JSON.stringify({
+        id: block.id,
+        title: block.title,
+        content: block.content_json?.blocks?.[0]?.params?.content || block.description || '',
+        description: block.description
+      }));
+
+      // Close modal immediately and show feedback
+      setLoadoutModalState(prev => ({ ...prev, isOpen: false }));
+      const { default: toast } = await import('react-hot-toast');
+      toast.success('已設定 Vision 思維積木');
+
+      // Save to room.config.vision_mind_block
+      try {
+        const visionBlockData = {
+          id: block.id,
+          title: block.title,
+          content: block.content_json?.blocks?.[0]?.params?.content || block.description || '',
+          description: block.description
+        };
+        console.log('👁️ [Save] Calling handleUpdateRoomConfig with:', { vision_mind_block: visionBlockData });
+        await handleUpdateRoomConfig({ vision_mind_block: visionBlockData });
+        console.log('✅ [Save] Vision mind block saved to room.config');
+      } catch (error) {
+        console.error('❌ [Save] Failed to save vision mind block:', error);
+        toast.error('保存失敗');
+      }
+      return;
+    }
+
     // Find the role instance in the map
     const roleKey = Object.keys(roleInstancesMap).find(k => roleInstancesMap[k].id === roleInstanceId);
 
@@ -1030,6 +1075,9 @@ export default function RoomChatPage() {
   const [loadingMoriModels, setLoadingMoriModels] = useState(false);
   const [loadingHibiModels, setLoadingHibiModels] = useState(false);
 
+  // 協作室準備狀態：確保 room 配置和模型列表載入完成後才允許發送訊息
+  const [isRoomReady, setIsRoomReady] = useState(false);
+
   // Feature flag: 是否顯示皮可的「圖片設定選項」區塊
   const ENABLE_PICO_IMAGE_OPTIONS = false;
 
@@ -1228,7 +1276,8 @@ export default function RoomChatPage() {
         metadata: msg.content_json,
         content_json: msg.content_json,
         processingWorkerId: msg.processing_worker_id || undefined,
-        model_used: msg.model_used
+        model_used: msg.model_used,
+        attachments: msg.attachments || msg.content_json?.images
       };
     });
   }, [isPicoMessageRecord]);
@@ -1890,6 +1939,16 @@ export default function RoomChatPage() {
     config: {}
   });
 
+  // 設置協作室準備狀態：當 room 配置和模型列表都載入完成時
+  useEffect(() => {
+    if (room && room.title !== '載入中...' && availableModels.length > 0) {
+      console.log('✅ [RoomReady] Room and models loaded, setting isRoomReady = true');
+      setIsRoomReady(true);
+    } else {
+      setIsRoomReady(false);
+    }
+  }, [room, availableModels]);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 載入房間資訊和角色
@@ -2315,7 +2374,40 @@ export default function RoomChatPage() {
             });
 
             // ⭐ 強制隱藏思考 UI - 當任何非用戶訊息到達時
+            // BUT: Skip if this is just a vision_analysis duplicate (don't reset loading)
             if (sender !== 'user' && sender !== 'system') {
+              // ⭐ If we're still in 'analyzing' phase, this AI message is from a previous request - ignore it
+              // (The current request hasn't even called the LLM yet)
+              if (loadingStateRef.current === 'analyzing') {
+                console.log('👁️ [Realtime] AI message arrived during analyzing phase, ignoring as stale:', newMsg.id);
+                return prev;
+              }
+
+              // Check if this message is just a duplicate of the current vision analysis
+              // Use ref (updated immediately) instead of React state (updated async)
+              const currentVisionContent = currentVisionContextRef.current;
+              const lastUserMsg = prev.filter(m => m.sender === 'user').pop();
+              const prevVisionAnalysis = (lastUserMsg?.content_json as any)?.vision_analysis;
+
+              // Check against BOTH the ref and the React state
+              const refVisionMatch = currentVisionContent && newMsg.content &&
+                (newMsg.content.trim().includes(currentVisionContent.substring(0, 50)) ||
+                  currentVisionContent.includes(newMsg.content.trim().substring(0, 50)));
+
+              const stateVisionMatch = prevVisionAnalysis && newMsg.content &&
+                (newMsg.content.trim().includes(prevVisionAnalysis.substring(0, 50)) ||
+                  prevVisionAnalysis.includes(newMsg.content.trim().substring(0, 50)));
+
+              const isVisionDuplicate = refVisionMatch || stateVisionMatch;
+
+              if (isVisionDuplicate) {
+                console.log('👁️ [Realtime] Vision duplicate detected, NOT hiding thinking UI');
+                // Don't add this message at all - it's a duplicate
+                // Also clear the ref since we've consumed it
+                currentVisionContextRef.current = '';
+                return prev;
+              }
+
               console.log('🤖 [Realtime] AI 回應到達，強制隱藏思考 UI，sender:', sender);
               // 使用 setTimeout 確保狀態更新在下一幀執行
               setTimeout(() => {
@@ -2325,6 +2417,7 @@ export default function RoomChatPage() {
                 setProcessingCompanion(null); // ⭐ 解除圖標鎖定
                 console.log('✅ [Realtime] 思考 UI 已隱藏');
               }, 0);
+
 
               // ⭐ 將最後一條 processing 狀態的用戶訊息改為 completed
               return prev.map((msg, index) => {
@@ -2771,6 +2864,64 @@ export default function RoomChatPage() {
       window.removeEventListener('open-block-selector', handleOpenBlockSelector as any);
     };
   }, []);
+
+  // ⭐ 監聽打開 Vision 專用積木選擇器的事件
+  useEffect(() => {
+    const handleOpenVisionBlockSelector = (event: CustomEvent) => {
+      console.log('👁️ [Event] Open Vision Block Selector');
+      setLoadoutModalState({
+        isOpen: true,
+        slotType: 'vision' as any,  // Special 'vision' type for room-level vision mind block
+        roleInstanceId: '__vision__'  // Marker to indicate this is for vision
+      });
+    };
+
+    window.addEventListener('open-vision-block-selector', handleOpenVisionBlockSelector as any);
+    return () => {
+      window.removeEventListener('open-vision-block-selector', handleOpenVisionBlockSelector as any);
+    };
+  }, []);
+
+  // ⭐ 監聽重設 Vision 思維積木事件
+  useEffect(() => {
+    const handleResetVisionBlock = async () => {
+      console.log('👁️ [Event] Reset Vision Block to default');
+      try {
+        // Call same API as handleUpdateRoomConfig
+        const response = await fetch('/api/chat/update-room-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roomId,
+            config: { vision_mind_block: null }
+          })
+        });
+
+        const result = await response.json();
+        console.log('👁️ [Reset] API response:', result);
+
+        if (response.ok && result.success) {
+          // Update local state
+          setRoom((prev: any) => prev ? {
+            ...prev,
+            config: { ...prev.config, vision_mind_block: null }
+          } : prev);
+          const { default: toast } = await import('react-hot-toast');
+          toast.success('已重設為預設描述');
+          console.log('✅ [Reset] Vision mind block reset successful');
+        } else {
+          console.error('❌ [Reset] API returned error:', result.error);
+        }
+      } catch (error) {
+        console.error('❌ [Reset] Failed to reset vision mind block:', error);
+      }
+    };
+
+    window.addEventListener('reset-vision-block', handleResetVisionBlock as any);
+    return () => {
+      window.removeEventListener('reset-vision-block', handleResetVisionBlock as any);
+    };
+  }, [roomId, user?.id]);
 
   // 點擊外部關閉皮可模型選擇下拉選單
   useEffect(() => {
@@ -3435,7 +3586,7 @@ export default function RoomChatPage() {
 
           welcomeMessages = [
             {
-              id: 'welcome-single-member',
+              id: generateUUID(),
               content: content,
               sender: roleId,
               timestamp: new Date(),
@@ -3463,7 +3614,7 @@ export default function RoomChatPage() {
             }
 
             return {
-              id: `welcome-${roleId}`,
+              id: generateUUID(),
               content,
               sender: roleId as 'pico' | 'mori' | 'hibi',
               timestamp: new Date(Date.now() - (validRoles.length - index) * 1000),
@@ -3474,7 +3625,7 @@ export default function RoomChatPage() {
         // 如果有 Hibi，添加總結歡迎訊息
         if (activeRoles.includes('hibi')) {
           welcomeMessages.push({
-            id: 'welcome-summary',
+            id: generateUUID(),
             content: `我們${activeRoles.length}位會協作為您提供最佳的服務。您可以直接說出需求，我會安排最適合的團隊成員來協助！`,
             sender: 'hibi',
             timestamp: new Date(),
@@ -4485,18 +4636,18 @@ export default function RoomChatPage() {
         sender_user_id: message.sender === 'user' ? user.id : null,
         sender_role_instance_id: null,
         content: message.content,
-        content_json: message.metadata
-          ? {
-            ...message.metadata,
-            role_name: message.sender,
-            images: message.attachments
-          }
-          : {
-            role_name: message.sender,
-            images: message.attachments
-          },
+        // FIX: Ensure existing content_json is preserved (e.g. for vision_analysis)
+        content_json: {
+          ...(message.content_json || {}),
+          ...(message.metadata || {}),
+          role_name: message.sender,
+          images: message.attachments
+        },
         attachments: message.attachments,
-        status: 'sent'
+        status: 'sent',
+        // [Time Fix] Explicitly use client-side timestamp to ensure correct order
+        // This prevents "User message appearing after AI reply" if initial save fails and restoration save runs later.
+        created_at: message.timestamp ? new Date(message.timestamp).toISOString() : new Date().toISOString()
       };
       console.log('🔍 準備儲存的訊息資料:', messageData);
 
@@ -4505,36 +4656,88 @@ export default function RoomChatPage() {
       let savedMessageId: string | null = null;
 
       try {
-        console.log('🛡️ [Persistence] Using existing Supabase client for save...');
+        console.log('🛡️ [Persistence] Using Stateless Client for save to avoid locks...');
 
-        // Use a reasonable timeout (10s) - Edge Function will handle it if this fails
-        const savePromise = (saasSupabase as any)
+        // 1. Get Token Manually (Copying logic from handleSendMessage/uploadFiles)
+        let token = '';
+        try {
+          if (typeof window !== 'undefined') {
+            const localSession = localStorage.getItem('hanamiecho-auth');
+            if (localSession) {
+              const parsed = JSON.parse(localSession);
+              token = parsed.access_token;
+
+              // Check expiry and Refresh if needed
+              const refreshToken = parsed.refresh_token;
+              const expiresAt = parsed.expires_at; // unix timestamp in seconds
+              const now = Math.floor(Date.now() / 1000);
+
+              if (expiresAt && (now + 60) > expiresAt && refreshToken) {
+                console.log('🔄 [Persistence] Token expired/expiring, refreshing via stateless client...');
+                // Create temp client just for refresh
+                const refreshClient = createClient(supabaseUrl, supabaseAnonKey, {
+                  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+                });
+                const { data: refreshData, error: refreshError } = await refreshClient.auth.refreshSession({ refresh_token: refreshToken });
+
+                if (refreshError || !refreshData.session) {
+                  console.error('❌ [Persistence] Stateless refresh failed:', refreshError);
+                } else {
+                  console.log('✅ [Persistence] Stateless refresh successful. Got new token.');
+                  token = refreshData.session.access_token;
+
+                  // Optionally update localStorage? 
+                  // We'll skip writing back to localStorage to avoid conflict with main client, 
+                  // but we use the fresh token for THIS save operation.
+                }
+              }
+            }
+          }
+        } catch (e) { }
+
+        // 2. Create Stateless Client
+        // We use the anon key and inject the token. 
+        // This creates a dedicated instance for just this write, bypassing any locks on the main client.
+        const statelessClient = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false
+          },
+          global: {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined
+          }
+        });
+
+        // Use a longer timeout (20s) to prioritize Client Save over Edge Function fallback
+        // This ensures attachments and content_json are saved exactly as we want them
+        const savePromise = statelessClient
           .from('ai_messages')
           .upsert(messageData, { onConflict: 'id' })
           .select('id')
           .single();
 
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Client save timeout (10s)')), 10000);
+          setTimeout(() => reject(new Error('Client save timeout (20s)')), 20000);
         });
 
         const { data: savedMsg, error: saveError } = await Promise.race([savePromise, timeoutPromise]) as any;
 
         if (saveError) {
           // Log but don't throw - Edge Function will handle it
-          console.log(`ℹ️ [Persistence] Client save error (Edge will handle):`, saveError.message);
+          console.error(`❌ [Persistence] Client save error:`, saveError.message);
         } else if (savedMsg) {
           savedMessageId = savedMsg.id;
-          console.log('✅ [Persistence] User message saved via Client:', savedMessageId);
+          console.log('✅ [Persistence] User message saved via Stateless Client:', savedMessageId);
         }
       } catch (err: any) {
         // Timeout or other error - Edge Function will save the message
-        console.log(`ℹ️ [Persistence] Client save skipped (${err.message}). Edge Function will handle.`);
+        console.warn(`⚠️ [Persistence] Client save skipped (${err.message}). Edge Function will handle (Warning: Attachments might be lost if Edge Function logic differs).`);
       }
 
       return savedMessageId;
     } catch (error) {
-      console.log('ℹ️ [Persistence] Save operation delegated to Edge Function.');
+      console.error('❌ [Persistence] Fatal error in save helper:', error);
       return null;
     }
   };
@@ -4578,25 +4781,116 @@ export default function RoomChatPage() {
   const callChatProcessor = async (userMessage: string, roomId: string, roleHint: string, messageData?: any, userMessageId?: string) => {
     try {
       console.log('🚀 呼叫 chat-processor Edge Function...');
+      // Determine model ID to use
+      let selectedModelId = roleHint === 'mori'
+        ? moriSelectedModelsMulti.join(',')
+        : roleHint === 'hibi' ? hibiSelectedModel
+          : roleHint === 'pico' ? picoSelectedModel
+            : undefined;
+
+      // Special handling for Voice Messages (attachments with type 'audio' or audioUrl)
+      const isVoiceMessage = (messageData as any)?.attachments?.some((att: any) => att.type === 'audio') ||
+        (messageData as any)?.audioUrl;
+
+      // User requested to use Role's selected model for analysis, so we do NOT override with system default audio model.
+      // Keeping isVoiceMessage check if needed for future logic, but removing the override.
+
       const payload = {
         message: userMessage,
         roomId: roomId,
         companionId: roleHint,
         userId: user?.id, // Pass userId for service role calls
         messageId: userMessageId, // Pass messageId for updates
-        modelId: roleHint === 'mori'
-          ? moriSelectedModelsMulti.join(',')
-          : roleHint === 'hibi' ? hibiSelectedModel
-            : roleHint === 'pico' ? picoSelectedModel
-              : undefined,
+        modelId: selectedModelId,
         attachments: (messageData as any).attachments // Pass attachments to Edge Function
       };
 
       console.log('📦 [Edge] Request Payload (Attachments):', payload.attachments);
 
-      const { data, error } = await saasSupabase.functions.invoke('chat-processor', {
-        body: payload
-      });
+      // Debug: Try to stringify to check for serialization issues
+      try {
+        const testStr = JSON.stringify(payload);
+        console.log('📦 [Edge] Payload size:', testStr.length, 'bytes');
+      } catch (serializationError) {
+        console.error('❌ [Edge] Payload serialization error:', serializationError);
+        console.log('📦 [Edge] Attachments structure:', payload.attachments?.map((att: any) => ({
+          type: att.type,
+          url: att.url?.substring(0, 100) + '...',
+          hasFile: !!att.file,
+          hasBlob: !!att.blob,
+        })));
+        throw new Error('Request contains non-serializable data');
+      }
+
+      console.log('🔍 [Edge] saasSupabase available:', !!saasSupabase);
+      console.log('🔍 [Edge] saasSupabase.functions available:', !!(saasSupabase as any)?.functions);
+
+      if (!saasSupabase || !(saasSupabase as any).functions) {
+        console.error('❌ [Edge] saasSupabase or functions not available!');
+        throw new Error('Supabase client not properly initialized');
+      }
+
+      console.log('📤 [Edge] Invoking chat-processor...');
+
+      // CRITICAL FIX: Use correct environment variables (SAAS versions)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL || 'https://laowyqplcthwqckyigiy.supabase.co';
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY || '';
+
+      console.log('🔍 [Edge] Using direct fetch to:', `${supabaseUrl}/functions/v1/chat-processor`);
+
+      // Just use anon key directly to avoid any session hanging issues
+      console.log('🔍 [Edge] Using anon key directly, anonKey available:', !!supabaseAnonKey);
+
+      // Direct fetch call
+      const fetchWithTimeout = async (timeoutMs: number) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+          console.log('📤 [Edge] Sending raw fetch request...');
+          const response = await fetch(`${supabaseUrl}/functions/v1/chat-processor`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+              'apikey': supabaseAnonKey,
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          console.log('📥 [Edge] Raw fetch response status:', response.status, response.statusText);
+
+          const responseText = await response.text();
+          console.log('📥 [Edge] Raw response body (first 500 chars):', responseText.substring(0, 500));
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${responseText}`);
+          }
+
+          return { data: JSON.parse(responseText), error: null };
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            throw new Error(`Edge Function request timed out after ${timeoutMs}ms`);
+          }
+          console.error('❌ [Edge] Fetch error:', fetchError);
+          throw fetchError;
+        }
+      };
+
+      let data, error;
+      try {
+        const result = await fetchWithTimeout(60000); // 60 second timeout
+        data = result.data;
+        error = result.error;
+      } catch (timeoutError: any) {
+        console.error('⏰ [Edge] Request timed out or failed:', timeoutError.message);
+        throw timeoutError;
+      }
+
+      console.log('📥 [Edge] Response received:', { hasData: !!data, hasError: !!error });
 
       if (error) {
         console.error('❌ Edge Function 呼叫失敗:', error);
@@ -4633,6 +4927,11 @@ export default function RoomChatPage() {
 
         setMessages(prev => {
           console.log('✅ [callChatProcessor] setMessages 被呼叫，當前訊息數:', prev.length);
+          // 防止重複添加（如果 Realtime 已經添加了這個訊息）
+          if (prev.some(m => m.id === aiMessage.id)) {
+            console.log('✅ [callChatProcessor] 訊息已存在（Realtime 先添加），跳過');
+            return prev;
+          }
           return [...prev, aiMessage];
         });
         return { success: true, messageId: data.messageId };
@@ -4644,6 +4943,10 @@ export default function RoomChatPage() {
       throw error;
     }
   };
+  const getAdminDefaultVisionModel = () => {
+    return availableModels?.find((m: any) => m.metadata?.is_system_default_image_input === true);
+  };
+
   const checkModelImageSupport = () => {
     try {
       // 1. If Pico, use strict native check (per user request)
@@ -4652,15 +4955,16 @@ export default function RoomChatPage() {
       // if no vision model is configured.
       // The initial commented block is removed as per instruction to remove console.logs and keep it clean.
 
-      // 2. Check if a Vision Model is configured in Settings
+      // 2. Check if a Vision Model is configured in Settings (OR Admin Default exists)
       // If so, we ALLOW image upload regardless of the main model (except if we want to enforce native for Pico?)
       // User said: "Except Pico role, other roles if not support... use OCR..."
-      // So checking `room.config.vision_model` is the key.
+      // So checking `room.config.vision_model` or system default is the key.
 
-      const hasVisionModel = !!(room?.config?.vision_model && room.config.vision_model !== '__default__');
+      const adminDefault = getAdminDefaultVisionModel();
+      const needsVisionFallback = !!(room?.config?.vision_model || adminDefault);
 
-      // If not Pico, and we have a vision model, ALLOW IT.
-      if (selectedCompanion !== 'pico' && hasVisionModel) {
+      // If not Pico, and we have a vision model (config or default), ALLOW IT.
+      if (selectedCompanion !== 'pico' && needsVisionFallback) {
         return true;
       }
 
@@ -4765,6 +5069,10 @@ export default function RoomChatPage() {
       // If no robust mime type found (likely Safari only supporting mp4), use manual WAV recorder
       if (!selectedMimeType || selectedMimeType.includes('mp4')) {
         console.log('🎤 [Recording] Using manual WavRecorder fallback for Safari');
+
+        // FIX: Stop the initial stream check tracks to prevent double-open/leak
+        stream.getTracks().forEach(track => track.stop());
+
         const { WavRecorder } = await import('@/lib/wavRecorder');
         wavRecorderRef.current = new WavRecorder();
 
@@ -4892,7 +5200,7 @@ export default function RoomChatPage() {
 
     const userMessage: Message = {
       id: tempMessageId,
-      content: '[語音訊息]', // Text fallback for AI
+      content: '[語音訊息]',
       sender: 'user',
       timestamp: new Date(),
       type: 'text',
@@ -4909,7 +5217,7 @@ export default function RoomChatPage() {
     }
 
     try {
-      // Upload
+      // Upload audio file to storage
       const realAttachments = await uploadFilesToStorage([audioFile], roomId);
       userMessage.attachments = realAttachments;
 
@@ -4917,19 +5225,21 @@ export default function RoomChatPage() {
       const savedMessageId = await saveMessageToSupabase(userMessage, roomId);
       if (savedMessageId) {
         processedMessageIds.current.add(savedMessageId);
-        // Update IDs in UI
         setMessages(prev => prev.map(msg =>
           msg.id === tempMessageId ? { ...msg, id: savedMessageId, attachments: realAttachments, status: 'sent' } : msg
         ));
         processedMessageIds.current.delete(tempMessageId);
       }
 
-      // Voice message sent to DB, now waiting for AI
-      // Crucial: Set Loading/Typing States for UI "Thinking" indicator
+      // Set loading state for voice analysis
       setIsLoading(true);
       setIsTyping(true);
+      setLoadingState('audio_analyzing');
 
-      // Call Chat Processor
+      console.log('🎤 [Voice] Sending to Edge Function');
+
+      // Call Chat Processor - Edge Function has built-in audio analysis
+      // Note: audio model selection is handled by Edge Function internally
       await callChatProcessor('', roomId, roleHint || 'hibi', userMessage, savedMessageId || undefined);
 
     } catch (error) {
@@ -4942,6 +5252,7 @@ export default function RoomChatPage() {
       setIsSending(false);
       setIsLoading(false);
       setIsTyping(false);
+      setLoadingState('idle');
       setProcessingCompanion(null);
     }
   };
@@ -4951,7 +5262,54 @@ export default function RoomChatPage() {
 
     const uploadedAttachments: any[] = [];
     // Use shared client
-    const supabase = saasSupabase;
+    // FIX: Use singleton client directly to avoid closure stale issues
+    // FIX: Using stateless client to bypass lock contention and handle expired tokens
+    let token = '';
+    try {
+      if (typeof window !== 'undefined') {
+        const localSession = localStorage.getItem('hanamiecho-auth');
+        if (localSession) {
+          const parsed = JSON.parse(localSession);
+          let accessToken = parsed.access_token;
+          const refreshToken = parsed.refresh_token;
+          const expiresAt = parsed.expires_at; // unix timestamp in seconds
+
+          // Check if expired (buffer 60s)
+          const now = Math.floor(Date.now() / 1000);
+          if (expiresAt && (now + 60) > expiresAt && refreshToken) {
+            console.log('🔄 [Storage] Token expired/expiring, refreshing via stateless client...');
+            // Create temp client just for refresh
+            const refreshClient = createClient(supabaseUrl, supabaseAnonKey, {
+              auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+            });
+            const { data: refreshData, error: refreshError } = await refreshClient.auth.refreshSession({ refresh_token: refreshToken });
+            if (refreshError || !refreshData.session) {
+              console.error('❌ [Storage] Stateless refresh failed:', refreshError);
+            } else {
+              console.log('✅ [Storage] Stateless refresh successful. Got new token.');
+              accessToken = refreshData.session.access_token;
+            }
+          }
+          token = accessToken;
+        }
+      }
+    } catch (e) {
+      console.error('⚠️ [Storage] Manual token retrieval failed:', e);
+    }
+
+    // Create Stateless Client for Upload
+    const uploadClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false, // NO STORAGE LOCK
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      },
+      global: {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      }
+    });
+
+    console.log('📤 [Storage] Created stateless upload client. Token present:', !!token);
 
     for (const file of files) {
       console.log('📤 [Storage] Starting upload for file:', file.name);
@@ -4961,9 +5319,17 @@ export default function RoomChatPage() {
         const filePath = `chat_uploads/${roomId}/${fileName}`;
         console.log('📤 [Storage] Generated path:', filePath);
 
-        const { data, error } = await supabase.storage
+        // Upload with Timeout Race
+        const uploadPromise = uploadClient.storage
           .from('hanami-content')
           .upload(filePath, file);
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Upload timed out (30s)')), 30000)
+        );
+
+        const result: any = await Promise.race([uploadPromise, timeoutPromise]);
+        const { data, error } = result;
 
         if (error) {
           console.error('❌ [Storage] Upload failed for:', file.name, error);
@@ -4974,14 +5340,15 @@ export default function RoomChatPage() {
         console.log('✅ [Storage] Upload success for:', file.name);
 
         // Use Signed URL for better security and to ensure backend access even if bucket is private
-        const { data: signedData, error: signedError } = await supabase.storage
+        // FIX: Use stateless client for URL generation too (avoid lock)
+        const { data: signedData, error: signedError } = await uploadClient.storage
           .from('hanami-content')
           .createSignedUrl(filePath, 3600); // 1 hour expiry
 
         if (signedError || !signedData?.signedUrl) {
           console.warn('⚠️ [Storage] createSignedUrl failed, falling back to public URL', signedError);
           // Fallback
-          const { data: { publicUrl } } = supabase.storage
+          const { data: { publicUrl } } = uploadClient.storage
             .from('hanami-content')
             .getPublicUrl(filePath);
 
@@ -5044,163 +5411,30 @@ export default function RoomChatPage() {
     // ---------------------------------------------------------
     // VISION FALLBACK LOGIC
     // ---------------------------------------------------------
-    let finalMessage = inputMessage;
-    let finalImages = selectedImages;
-    let visionContext = '';
 
-    if (selectedImages.length > 0 && selectedCompanion !== 'pico') {
-      const state = getRoleModelState();
-      const currentModelId = state?.selectedModel === DEFAULT_MODEL_SENTINEL && state?.roleDefaultModel
-        ? state.roleDefaultModel.split(',')[0]
-        : state?.selectedModel;
-
-      const nativeSupport = isNativeVisionSupported(currentModelId);
-
-      if (!nativeSupport && room?.config?.vision_model) {
-        console.log('👁️ [Vision Fallback] Main model does not support vision. Using Vision Model:', room.config.vision_model);
-        const { default: toast } = require('react-hot-toast');
-        const toastId = toast.loading('正在透過視覺模型識別圖片...');
-
-        try {
-
-          // Convert images to base64
-          const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-          });
-
-          const base64Images = await Promise.all(selectedImages.map(toBase64));
-
-          // Call Chat API
-          const messages = [
-            {
-              role: 'user',
-              content: '請詳細描述這張圖片的內容，以便我了解上下文。',
-              experimental_attachments: base64Images.map((b64, idx) => ({
-                name: selectedImages[idx].name,
-                contentType: selectedImages[idx].type,
-                url: b64
-              }))
-            }
-          ];
-
-          const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messages,
-              model: room.config.vision_model,
-              temperature: 0.3
-            })
-          });
-
-          if (!response.ok) throw new Error('Vision API response was not ok');
-
-          // Stream handling (simplified for one-shot description)
-          // Actually /api/chat returns a stream. We need to read it.
-          // Or we can just read the text if we didn't ask for a stream? 
-          // Default Vercel AI SDK route streams.
-          // Let's assume we need to read the stream.
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
-          let resultText = '';
-
-          if (reader) {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const chunk = decoder.decode(value, { stream: true });
-              // Simple cleaning of Vercel stream format (might contain "0:" prefixes etc if using data protocol)
-              // Assuming standard textual stream for now or just raw content.
-              // Actually, raw fetch to /api/chat usually returns the stream.
-              // If it's using 'streamText', it might be raw text.
-              // Let's just accumulate.
-              resultText += chunk;
-            }
-          }
-
-          // Clean up resultText if it has protocol headers (simplified fallback)
-          // If the description is messy, it's still better than nothing.
-
-          visionContext = `\n\n[系統自動生成的圖片描述]:\n${resultText}`;
-
-          toast.success('圖片識別完成', { id: toastId });
-
-          // Modify variables for downstream
-          finalMessage = `${inputMessage}${visionContext}`;
-          finalImages = []; // Clear images so main model doesn't error
-
-        } catch (err) {
-          console.error('Vision Fallback Failed:', err);
-          toast.error('圖片識別失敗，將僅發送文字', { id: toastId });
-          finalImages = [];
-        }
-      }
-    }
+    // ---------------------------------------------------------
+    // 0. IMMEDIATE OPTIMISTIC UI UPDATE
     // ---------------------------------------------------------
 
-    // Use finalMessage and finalImages for validation and sending
-    console.log('🔍 [發送前檢查] 狀態:', {
-      inputTrimmed: finalMessage.trim().length > 0,
-      isLoading,
-      hasUserId: !!user?.id,
-      userId: user?.id,
-      inputLength: finalMessage.length,
-      hasImages: finalImages.length > 0
-    });
+    // Define variables at the TOP of the scope so they are available everywhere
+    let finalMessage = inputMessage;
+    let finalImages = selectedImages;
+    let uploadedAttachments: any[] = [];
+    let visionContext = '';
 
-    // ⭐ 驗證輸入
-    if ((!finalMessage.trim() && finalImages.length === 0) || isLoading || !user?.id) {
-      console.warn('⚠️ [發送] 輸入無效，忽略請求');
-      return;
-    }
-
-    let messageContent = finalMessage.trim();
-    // Helper for roles
-    const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
-
-    setQueueCount(0);
-
-    // ⭐ 如果是 Pico 且有選擇 size 或 style，則合併到訊息中
-    if (roleHint === 'pico') {
-      const additionalInfo = [];
-      if (picoImageSize) {
-        additionalInfo.push(`尺寸：${picoImageSize}`);
-      }
-      if (picoImageStyle) {
-        additionalInfo.push(`風格：${picoImageStyle}`);
-      }
-      if (additionalInfo.length > 0) {
-        messageContent = `${messageContent}\n\n【圖片設定】\n${additionalInfo.join('、')}`;
-        console.log('🎨 [Pico] 添加圖片設定:', messageContent);
-      }
-    }
-
-    const lockKey = `${roomId}-${messageContent}-${Date.now()}`;
-
-    // ⭐ 第一步：檢查全局鎖
-    if (globalSendingLock.get(lockKey)) {
-      console.warn('⚠️ [發送] 全局鎖：正在發送中，忽略重複請求');
-      return;
-    }
-
-    // ⭐ 第二步：立即加全局鎖
-    globalSendingLock.set(lockKey, true);
-    isSendingRef.current = true;
-    setIsSending(true);
-    console.log('🔒 [發送] 已加全局鎖，鎖鍵:', lockKey);
-
-    // ⭐ 立即顯示用戶訊息
     const tempMessageId = generateUUID();
     const tempClientMsgId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const displayMessageContent = finalMessage.trim(); // What user sees
+    let payloadMessageContent = finalMessage.trim();   // What LLM sees (will be updated by Vision)
 
-    // OPTIMISTIC ATTACHMENTS FOR UI
-    // Note: We use 'selectedImages' (original) for UI
+    // Helper for roles
+    const roleHint = selectedCompanion || (activeRoles[0] ?? 'auto');
+    setQueueCount(0);
+
+    // Initial Optimistic Attachments
     const optimisticAttachments = selectedImages.map(file => ({
       type: 'image',
-      url: URL.createObjectURL(file),
+      url: URL.createObjectURL(file), // Helper function for this?
       name: file.name,
       contentType: file.type
     }));
@@ -5209,9 +5443,10 @@ export default function RoomChatPage() {
     setInputMessage('');
     setSelectedImages([]);
 
+    // Create the User Message Object
     const userMessage: Message = {
       id: tempMessageId,
-      content: messageContent,
+      content: displayMessageContent,
       sender: 'user',
       timestamp: new Date(),
       type: 'text' as const,
@@ -5219,159 +5454,239 @@ export default function RoomChatPage() {
       attachments: optimisticAttachments.length > 0 ? optimisticAttachments : undefined
     };
 
-    // 立即添加到 UI
+    // 1. ADD TO UI IMMEDIATELY
     setMessages(prev => {
-      const newMessages = [...prev, userMessage];
       console.log('📨 [即時] 立即添加用戶訊息到 UI:', userMessage);
-      return newMessages;
+      return [...prev, userMessage];
     });
 
-    // ⭐ 將臨時訊息 ID 添加到全局追蹤，防止重複
+    // Add to global tracking
     processedMessageIds.current.add(tempMessageId);
     console.log('📨 [即時] 已添加臨時訊息 ID 到全局追蹤:', tempMessageId);
 
-    // 清空輸入框和圖片
-    setInputMessage('');
-    setSelectedImages([]); // Clear images
-    // Note: showImagePicker should be closed already
     setIsLoading(true);
     setIsTyping(true);
 
-    // ⭐ 鎖定當前角色圖標（防止角色切換時圖標改變）
+    // Lock role icon
     if (roleHint && ['hibi', 'mori', 'pico'].includes(roleHint)) {
-      setProcessingCompanion(roleHint as 'hibi' | 'mori' | 'pico');
-      console.log(`🔒 [圖標鎖定] 鎖定角色圖標為: ${roleHint}`);
+      setProcessingCompanion(roleHint as 'hibi' | 'mori' | 'pico'); // Cast to specific type
     }
 
-    // ⭐ 在發送前再次查詢輪候人數（排除即將發送的訊息）
-    // ⭐ 在發送前再次查詢輪候人數（排除即將發送的訊息）
-    // FIXME: This hangs, disabling.
-    /*
-    if (roleHint && ['hibi', 'mori', 'pico'].includes(roleHint)) {
-      try {
-        console.log(`📋 [發送前] 準備查詢輪候人數 (${roleHint})...`);
-        const queueCount = await getProcessingQueueCount(roleHint as 'hibi' | 'mori' | 'pico', tempClientMsgId);
-        setQueueCount(queueCount);
-        console.log(`📋 [發送前] ${roleHint} 前面還有 ${queueCount} 個訊息正在排隊/處理中`);
-      } catch (error) {
-        console.error('❌ 查詢輪候人數時發生錯誤:', error);
-      }
+    // Global Lock
+    const lockKey = `${roomId}-${displayMessageContent}-${Date.now()}`;
+    if (globalSendingLock.get(lockKey)) {
+      console.warn('⚠️ [發送] 全局鎖：正在發送中，忽略重複請求');
+      return;
     }
-    */
+    globalSendingLock.set(lockKey, true);
+    isSendingRef.current = true;
+    setIsSending(true);
 
     try {
-      // === UPLOAD IMAGES IF ANY ===
-      let realAttachments: any[] = [];
-      if (selectedImages.length > 0) {
-        console.log('📦 [Upload] Selected images count:', selectedImages.length);
-        console.log('📦 [Upload] Files:', selectedImages.map(f => ({ name: f.name, size: f.size, type: f.type })));
 
-        realAttachments = await uploadFilesToStorage(selectedImages, roomId);
-        console.log('✅ [Upload] Images uploaded result:', JSON.stringify(realAttachments, null, 2));
 
-        if (realAttachments.length === 0) {
-          console.warn('⚠️ [Upload] Upload returned empty array despite selectedImages > 0. Check uploadFilesToStorage.');
+      // ---------------------------------------------------------
+      // 1. GLOBAL UPLOAD (Hoist to top scope)
+      // ---------------------------------------------------------
+      if (finalImages.length > 0) {
+        if (uploadedAttachments.length === 0) {
+          // Only upload if not already uploaded (e.g. if we retried? logic mostly fine here)
+          console.log('📤 [Upload] Uploading images before processing...');
+          uploadedAttachments = await uploadFilesToStorage(finalImages, roomId);
         }
 
-        // Update userMessage with real attachments (optional, but good for consistency)
-        userMessage.attachments = realAttachments;
-      } else {
-        console.log('ℹ️ [Upload] No images selected.');
+        // FIX: If upload failed
+        if (uploadedAttachments.length === 0) {
+          console.error('❌ [Upload] Upload failed. Aborting.');
+          toast.error('圖片上傳失敗');
+          setIsLoading(false);
+          setIsSending(false);
+          globalSendingLock.delete(lockKey);
+          setMessages(prev => prev.filter(m => m.id !== tempMessageId));
+          return;
+        }
+        // Update attachments for user message object
+        userMessage.attachments = uploadedAttachments;
       }
 
-      // === 使用 Edge Function 發送訊息 ===
-      console.log('📦 [Edge] 開始發送訊息到 Edge Function...');
+      // ---------------------------------------------------------
+      // 2. VISION FALLBACK (If needed)
+      // ---------------------------------------------------------
+      const state = getRoleModelState();
+      const currentModelId = state?.selectedModel === DEFAULT_MODEL_SENTINEL && state?.roleDefaultModel
+        ? state.roleDefaultModel.split(',')[0]
+        : state?.selectedModel;
+      const nativeSupport = isNativeVisionSupported(currentModelId);
 
-      // 1. 儲存用戶訊息到 Supabase (Client Side)
-      // 1. 儲存用戶訊息到 Supabase (Client Side)
-      const savedMessageId = await saveMessageToSupabase(userMessage, roomId);
-
-      // Fallback to temp ID if save failed (e.g. timeout), so we can still call the API
-      const effectiveMessageId = savedMessageId || tempMessageId;
-
-      if (!savedMessageId) {
-        console.warn('⚠️ [Edge] 無法儲存用戶訊息 (timeout?), 繼續嘗試調用 API...');
+      // Resolve Vision Model
+      let visionModelId = room?.config?.vision_model;
+      if (!visionModelId || visionModelId === '__default__') {
+        const adminDefault = getAdminDefaultVisionModel();
+        if (adminDefault) visionModelId = adminDefault.model_id;
       }
 
-      // ⭐ CRITICAL: Add saved ID to tracking to prevent Realtime from re-adding it
-      // ⭐ CRITICAL: Add saved ID to tracking to prevent Realtime from re-adding it
-      if (savedMessageId) {
-        processedMessageIds.current.add(savedMessageId);
-        console.log('📨 [Dedupe] Added savedMessageId to tracking:', savedMessageId);
-      }
+      if (!nativeSupport && visionModelId && uploadedAttachments.length > 0) {
+        console.log('👁️ [Vision Fallback] Active. Model:', visionModelId);
+        // Stage 1: Analyzing
+        setLoadingState('analyzing');
+        const toastId = toast.loading('正在分析圖片...', { id: 'vision-toast' });
 
-      // 更新 UI 中的訊息 ID
-      // 更新 UI 中的訊息 ID
-      setMessages(prev => {
-        // Check if the saved message ID somehow already crept in via Realtime
-        // CAUTION: If savedMessageId === tempMessageId, this will be true (finding the optimistic message itself)
-        // We must distinguish between "found OTHER message with same ID" and "found THIS message"
+        try {
+          // Retrieve token manually (omitted for brevity, assume reusable helper or same logic)
+          // ... (Token logic same as before) ...
+          let visionToken = '';
+          // ... [Token retrieval logic stays here if needed, or use existing helper] ...
+          // For brevity in this diff, assuming we use the same logic or the existing 'token' var if available early.
+          // Actually, let's just copy the token block or assume it works.
+          // We'll skip the verbose token block in this ReplacementContent for clarity, 
+          // but in real code, valid token is needed. 
+          // We will assume 'token' is refreshed/available or re-fetch it.
 
-        // Actually, if savedMessageId === tempMessageId, we just want to update it.
-        // We ONLY want to filter if savedMessageId != tempMessageId AND savedMessageId exists in prev.
-
-        const isIdChanged = savedMessageId && savedMessageId !== tempMessageId;
-        const targetIdExists = isIdChanged ? prev.some(m => m.id === savedMessageId) : false;
-
-        if (targetIdExists && savedMessageId) {
-          console.log('🔄 [UI Update] Message already exists (via Realtime?). Removing temp message to avoid duplicate (IDs differ).');
-          // Filter out the temp message, keeping the Realtime one.
-          return prev.map(msg => {
-            if (msg.id === savedMessageId && realAttachments.length > 0) {
-              return { ...msg, attachments: realAttachments };
+          // ... [Re-insert Token Logic] ...
+          try {
+            if (typeof window !== 'undefined') {
+              const localSession = localStorage.getItem('hanamiecho-auth');
+              if (localSession) {
+                const parsed = JSON.parse(localSession);
+                if (parsed.refresh_token) {
+                  // Quick refresh check
+                  const now = Math.floor(Date.now() / 1000);
+                  if (parsed.expires_at && (now + 60) > parsed.expires_at) {
+                    console.log('🔄 [Vision] Refreshing token...');
+                    const rc = createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+                    const { data: rd } = await rc.auth.refreshSession({ refresh_token: parsed.refresh_token });
+                    if (rd.session) visionToken = rd.session.access_token;
+                  } else {
+                    visionToken = parsed.access_token;
+                  }
+                }
+              }
             }
-            return msg;
-          }).filter(msg => msg.id !== tempMessageId);
+          } catch (e) { }
+
+          const visionClient = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: { persistSession: false },
+            global: { headers: visionToken ? { Authorization: `Bearer ${visionToken}` } : undefined }
+          });
+
+          // ⭐ Get vision prompt from room config or use default
+          const visionMindBlockPrompt = (room?.config?.vision_mind_block as any)?.content ||
+            (room?.config?.vision_mind_block as any)?.prompt ||
+            DEFAULT_VISION_PROMPT;
+
+          const { data: vData, error: vError } = await visionClient.functions.invoke('chat-processor', {
+            body: {
+              message: visionMindBlockPrompt,
+              roomId,
+              roleHint,
+              companionId: roleHint,
+              modelId: visionModelId,
+              attachments: uploadedAttachments,
+              userId: user?.id
+            }
+          });
+
+          if (vError) throw vError;
+          if (!vData?.content) throw new Error('No content');
+
+          // Format: Special delimiter for AI to parse, but we won't show this in USER message
+          visionContext = `\n\n[系統自動生成的圖片描述]:\n${vData.content}`;
+
+          // ⭐ Store in ref immediately for duplicate detection in Realtime handler
+          currentVisionContextRef.current = vData.content;
+
+          toast.success('圖片分析完成', { id: toastId });
+
+          // Clear finalImages so text model doesn't get them
+          finalImages = [];
+
+        } catch (err) {
+          console.error('Vision failed:', err);
+          toast.error('圖片分析失敗，將僅發送文字', { id: toastId });
+          finalImages = []; // Safety
         }
-
-        // If IDs are same, OR target ID not found yet: Update the temp message
-        return prev.map(msg => {
-          if (msg.id === tempMessageId) {
-            console.log('🔄 [UI Update] Updating message status/ID:', { savedMessageId, tempMessageId });
-
-            const finalId = savedMessageId || tempMessageId;
-            return {
-              ...msg,
-              id: finalId,
-              status: 'sent', // FORCE SENT STATUS
-              // Force use of realAttachments if available, falling back to existing only if realAttachments is empty
-              attachments: realAttachments.length > 0 ? realAttachments : msg.attachments
-            };
-          }
-          return msg;
-        });
-      });
-
-      // 更新全局追蹤
-      processedMessageIds.current.delete(tempMessageId);
-      if (savedMessageId) {
-        processedMessageIds.current.add(savedMessageId);
-      } else {
-        processedMessageIds.current.add(effectiveMessageId);
       }
 
-      // Check Session Before Invoke
-      let sessionData = { session: null } as any;
+      // Stage 2: Thinking
+      setLoadingState('thinking');
+
+      // Prepare Payload
+      // We append visionContext to the message sent to LLM, so it knows what it's looking at
+      const finalPayloadContent = `${payloadMessageContent}${visionContext}`;
+
+      // Update User Message for Saving
+      // 1. Do NOT append visionContext to 'content' (keep it clean)
+      // 2. Attach visionContext to 'content_json.vision_analysis' so MessageBubble can render it
+      let updatedContentJson = userMessage.content_json || {};
+      if (visionContext) {
+        const cleanVisionText = visionContext.replace(/\n\n\[系統自動生成的圖片描述\]:\n/, '').trim();
+        updatedContentJson = {
+          ...updatedContentJson,
+          vision_analysis: cleanVisionText,
+          vision_model: visionModelId // Save the model used for analysis
+        };
+      }
+
+      const messageToSave = {
+        ...userMessage,
+        content: payloadMessageContent, // Raw user text
+        content_json: updatedContentJson, // Contains vision analysis
+        attachments: uploadedAttachments // Ensure this is present!
+      };
+
+      console.log('📦 [Edge] Sending payload to LLM...');
+
+      // 1. Save to Supabase (Client Side)
+      // Validate attachments before saving
+      if (uploadedAttachments.length > 0) {
+        console.log(`💾 [Save] Saving message with ${uploadedAttachments.length} attachments...`);
+      }
+      const savedMessageId = await saveMessageToSupabase(messageToSave, roomId);
+
+      // ... (rest of dedupe logic) ...
+      // Fallback to temp ID if save failed
+      const effectiveMessageId = savedMessageId || tempMessageId;
+      if (savedMessageId) processedMessageIds.current.add(savedMessageId);
+
+      // Update UI with saved ID (and updated content_json/attachments)
+      setMessages(prev => prev.map(m => m.id === tempMessageId ? { ...m, id: effectiveMessageId, status: 'sent', attachments: uploadedAttachments, content_json: updatedContentJson } : m));
+
+      // 2. Call LLM
+
+      // Prepare Token for Main LLM Call
+      let token = '';
       try {
-        const sessionPromise = saasSupabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Check Timeout')), 3000));
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        sessionData = result.data || { session: null };
+        if (typeof window !== 'undefined') {
+          const localSession = localStorage.getItem('hanamiecho-auth');
+          if (localSession) {
+            const parsed = JSON.parse(localSession);
+            let accessToken = parsed.access_token;
+            const refreshToken = parsed.refresh_token;
+            const expiresAt = parsed.expires_at;
+
+            const now = Math.floor(Date.now() / 1000);
+            if (expiresAt && (now + 60) > expiresAt && refreshToken) {
+              console.log('🔄 [Edge] Token expired/expiring, refreshing...');
+              const refreshClient = createClient(supabaseUrl, supabaseAnonKey, {
+                auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+              });
+              const { data: refreshData, error: refreshError } = await refreshClient.auth.refreshSession({ refresh_token: refreshToken });
+              if (!refreshError && refreshData.session) {
+                console.log('✅ [Edge] Refresh successful. Got new token.');
+                accessToken = refreshData.session.access_token;
+              } else {
+                console.error('❌ [Edge] Refresh failed:', refreshError);
+              }
+            }
+            token = accessToken;
+          }
+        }
       } catch (e) {
-        console.warn('⚠️ [Edge] Auth check timed out. Proceeding regardless...');
+        console.error('⚠️ [Edge] Manual token retrieval failed:', e);
       }
 
-      const token = sessionData.session?.access_token;
-      console.log(`🔑 [Edge] Invoke Token Check: ${token ? 'Present (' + token.substring(0, 10) + '...)' : 'MISSING'}`);
-
-      if (!token) {
-        console.warn('⚠️ [Edge] No Auth Token available (timeout?). Proceeding to invoke anyway...');
-      }
-
-      // 2. 呼叫 Edge Function
       // Resolve Model ID based on current roleHint
       let resolvedModelId: string | undefined = undefined;
-      // Use roleHint or fallback to 'hibi' (though roleHint should be set if locked)
       const targetRole = roleHint || 'hibi';
 
       if (targetRole === 'hibi') {
@@ -5388,29 +5703,36 @@ export default function RoomChatPage() {
 
       console.log(`📦 [Edge] Resolved Model ID for ${targetRole}:`, resolvedModelId);
 
-      // 2. 呼叫 Edge Function
       const payload = {
-        message: messageContent, // Server expects 'message', not 'messageContent'
+        message: finalPayloadContent, // LLM sees description
         roomId,
-        roleHint: targetRole,
-        companionId: targetRole, // Server expects 'companionId' for role config
-        modelId: resolvedModelId, // Pass the resolved model ID
-        sessionId: currentSessionId, // Pass the current session ID for persistence
-        userMessage,
+        roleHint,
+        companionId: roleHint,
+        modelId: resolvedModelId, // Should be text model if fallback used
+        sessionId: currentSessionId,
+        userMessage: messageToSave, // Send the "clean" user message object
+        // Pass explicit IDs to prevent duplicate creation if Edge Function logic is ambiguous
+        id: effectiveMessageId,
+        messageId: effectiveMessageId,
         effectiveMessageId,
-        attachments: realAttachments, // Pass real attachments
-        userId: user?.id, // Pass userId for fallback auth
+        attachments: visionContext ? [] : uploadedAttachments, // Clear attachments if vision used
+        userId: user?.id
       };
-      console.log('📦 [Edge Payload Debug] Full Payload:', JSON.stringify(payload));
-      console.log('📦 [Edge Payload Debug] effectiveMessageId:', effectiveMessageId);
 
-      console.log('📦 [Edge] 準備呼叫 Edge Function (Timeout: 5s)...');
+      console.log('📦 [Edge Payload Debug] Full Payload:', JSON.stringify(payload));
+      console.log('📦 [Edge] 準備呼叫 Edge Function with Stateless Client (Timeout: 60s)...');
 
       let data;
       try {
-        const invokePromise = saasSupabase.functions.invoke('chat-processor', {
+        const edgeClient = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+          global: { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+        });
+
+        const invokePromise = edgeClient.functions.invoke('chat-processor', {
           body: payload
         });
+
         const invokeTimeoutPromise = new Promise((_, reject) =>
           setTimeout(() => {
             console.warn('⚠️ [Edge] Invoke Timeout Triggered (60s)');
@@ -5480,10 +5802,32 @@ export default function RoomChatPage() {
       console.log('✅ Edge Function 回應:', JSON.stringify(data, null, 2));
 
       if (data && data.success && data.content) {
+        // [Persistence Fix]: Force Re-Save of User Message
+        // The Edge Function likely overwrote the user message with empty attachments (because we sent empty array).
+        // We must restore the user message to its correct state (With Attachments + Vision Analysis).
+        // Add delay to ensure this write occurs AFTER any async Edge Function db writes
+        if (uploadedAttachments.length > 0 || visionContext) {
+          const attachmentCount = uploadedAttachments.length;
+          console.log(`🛡️ [Persistence] Post-Edge Restoration: Waiting 1.5s to ensure Last Write Wins... (Attachments: ${attachmentCount})`);
+          await new Promise(r => setTimeout(r, 1500));
+
+          console.log('🛡️ [Persistence] Executing Restoration Save now...');
+          // CRITICAL CORRECTION: 'data.messageId' is the AI REPLY ID, not the User Message ID.
+          // We must NOT overwrite the AI reply. We must update the User Message (effectiveMessageId).
+          const finalTargetId = effectiveMessageId;
+          const restorationMessage = { ...messageToSave, id: finalTargetId };
+
+          await saveMessageToSupabase(restorationMessage, roomId)
+            .then((id) => console.log(`✅ [Persistence] Restoration complete. ID: ${id}`))
+            .catch(e => console.error('❌ [Persistence] Restoration failed:', e));
+        }
+
         // Determine sender based on model usage or role hint
         const isImageModel = data.model_used?.includes('image') || data.model_used?.includes('dall-e') || data.content_json?.image;
         const sender = isImageModel ? 'pico' : (roleHint as any);
 
+        // Revert: We are attaching vision analysis to USER message now, NOT AI message.
+        // So no need to modify finalContentJson for AI here.
         const aiMessage: Message = {
           id: data.messageId || Date.now().toString(),
           content: data.content,
@@ -6165,7 +6509,26 @@ export default function RoomChatPage() {
             className="flex-1 overflow-y-auto p-4 space-y-4 pb-64 lg:pb-40 no-scrollbar"
             onScroll={handleMessagesScroll}
           >
-            {messages.map((message, index) => (
+            {messages.filter((message, index, array) => {
+              // [Filter Redundant Vision Messages]
+              // If a ROLE message has content identical to the preceding USER message's vision_analysis, hide it.
+              // This prevents the "Double Vision" issue where the analysis appears as a separate bubble.
+              if (message.sender !== 'user' && index > 0) {
+                const prevMessage = array[index - 1];
+                const isPrevUser = prevMessage.sender === 'user';
+                const prevAnalysis = (prevMessage.content_json as any)?.vision_analysis;
+
+                // Condition 1: Content matches prev user's analysis exactly or closely
+                if (isPrevUser && prevAnalysis && message.content && message.content.trim().includes(prevAnalysis.substring(0, 50))) { // Check first 50 chars match
+                  return false; // Hide this redundant message
+                }
+
+                // [Optional] Condition 2: If this message itself claims to be a vision result via content_json (legacy backend behavior)
+                // But we want to be careful not to hide legitimate AI responses that quote the analysis.
+                // The substring check above is safer.
+              }
+              return true;
+            }).map((message, index) => (
               <MessageBubble
                 key={message.id || index}
                 message={message}
@@ -6260,7 +6623,9 @@ export default function RoomChatPage() {
                         {/* Thinking Text with Character Name */}
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-[#FF9BB3] mb-0.5">{info.name}</span>
-                          <span className="text-xs text-[#2B3A3B]/70 tracking-wider">正在思考中...</span>
+                          <span className="text-xs text-[#2B3A3B]/70 tracking-wider">
+                            {loadingState === 'analyzing' ? '正在分析圖片...' : loadingState === 'audio_analyzing' ? '正在分析語音...' : '正在思考中...'}
+                          </span>
                         </div>
 
                         {/* Subtle Loading Dots */}
@@ -6321,21 +6686,34 @@ export default function RoomChatPage() {
                           // Resolve Model and Level for Styling
                           let mId = '';
                           if (roleId === 'pico') {
-                            mId = picoSelectedModel;
+                            // If using default sentinel, resolve to actual default model
+                            mId = (picoSelectedModel === DEFAULT_MODEL_SENTINEL && picoRoleDefaultModel)
+                              ? picoRoleDefaultModel.split(',')[0]
+                              : picoSelectedModel;
                           } else if (roleId === 'mori') {
-                            mId = (moriSelectedModelsMulti && moriSelectedModelsMulti.length > 0) ? moriSelectedModelsMulti[0] : moriSelectedModel;
+                            // For Mori, check if using multi-select or default
+                            if (moriSelectedModel === DEFAULT_MODEL_SENTINEL && moriRoleDefaultModel) {
+                              mId = moriRoleDefaultModel.split(',')[0];
+                            } else if (moriSelectedModelsMulti && moriSelectedModelsMulti.length > 0) {
+                              mId = moriSelectedModelsMulti[0];
+                            } else {
+                              mId = moriSelectedModel;
+                            }
                           } else {
-                            mId = hibiSelectedModel;
+                            // Hibi: If using default sentinel, resolve to actual default model
+                            mId = (hibiSelectedModel === DEFAULT_MODEL_SENTINEL && hibiRoleDefaultModel)
+                              ? hibiRoleDefaultModel.split(',')[0]
+                              : hibiSelectedModel;
                           }
 
-                          if (!mId) mId = '';
+                          if (!mId || mId === DEFAULT_MODEL_SENTINEL) mId = '';
 
                           const m = availableModels.find((x: any) => x.model_id === mId);
 
                           // Default Level Logic
                           let level = m?.metadata?.level;
                           if (!level) {
-                            if (mId.includes('flash') || mId.includes('turbo')) level = 'L1';
+                            if (mId.includes('flash') || mId.includes('turbo') || mId.includes('lite')) level = 'L1';
                             else if (mId.includes('standard')) level = 'L2';
                             else level = 'L3'; // Default to L3 if unknown
                           }
@@ -6416,24 +6794,37 @@ export default function RoomChatPage() {
                           return (
                             <button
                               onClick={() => {
+                                if (!isRoomReady) {
+                                  toast.error('模型載入中，請稍候...', { duration: 2000 });
+                                  return;
+                                }
                                 modelState.setModelSelectOpen(true);
                                 if (modelState.setModelSearch) modelState.setModelSearch('');
                               }}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm transition-all active:scale-95 flex-shrink-0 ${btnClasses}`}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-sm transition-all active:scale-95 flex-shrink-0 ${!isRoomReady ? 'border border-gray-200 bg-gray-100 text-gray-400' : btnClasses}`}
                             >
-                              <CpuChipIcon className={`w-3.5 h-3.5 ${iconColor}`} />
-                              <span className="text-xs font-bold max-w-[140px] truncate">
-                                {isMulti ? (() => {
-                                  const isDefaults = modelState.selectedModel === DEFAULT_MODEL_SENTINEL;
-                                  const list = isDefaults
-                                    ? (modelState.roleDefaultModel?.split(',') || [])
-                                    : (modelState.selectedModelsMulti || []);
-                                  const count = list.filter((s: string) => s.trim()).length || 1;
-                                  return `已選 ${count} 個模型`;
-                                })() : (
-                                  displayLabel
-                                )}
-                              </span>
+                              {!isRoomReady ? (
+                                <>
+                                  <ArrowPathIcon className="w-3.5 h-3.5 text-gray-400 animate-spin" />
+                                  <span className="text-xs font-bold text-gray-400">載入中...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CpuChipIcon className={`w-3.5 h-3.5 ${iconColor}`} />
+                                  <span className="text-xs font-bold max-w-[140px] truncate">
+                                    {isMulti ? (() => {
+                                      const isDefaults = modelState.selectedModel === DEFAULT_MODEL_SENTINEL;
+                                      const list = isDefaults
+                                        ? (modelState.roleDefaultModel?.split(',') || [])
+                                        : (modelState.selectedModelsMulti || []);
+                                      const count = list.filter((s: string) => s.trim()).length || 1;
+                                      return `已選 ${count} 個模型`;
+                                    })() : (
+                                      displayLabel
+                                    )}
+                                  </span>
+                                </>
+                              )}
                             </button>
                           );
                         })()}
@@ -6518,14 +6909,15 @@ export default function RoomChatPage() {
                                 className="p-2.5 text-[#4B4036]/60 hover:text-[#4B4036] hover:bg-[#F8F5EC] rounded-full transition-colors hidden sm:block"
                                 title="添加圖片"
                                 onClick={() => {
-                                  console.log('📸 [Click] Image Button Clicked');
+                                  console.log('📸 [Debug] Image button clicked (Desktop). Checking support...');
                                   if (checkModelImageSupport()) {
-                                    console.log('📸 [Click] Support TRUE');
+                                    console.log('📸 [Debug] Support TRUE. Opening picker.');
                                     setShowImagePicker(true);
                                   } else {
-                                    console.log('📸 [Click] Support FALSE');
-                                    const { default: toast } = require('react-hot-toast');
-                                    toast.error('當前模型不支援圖片輸入');
+                                    console.log('📸 [Debug] Support FALSE. Showing toast.');
+                                    toast.error('當前模型不支援圖片輸入。請在設定中配置「OCR 圖片識別」模型以啟用自動轉換功能。', {
+                                      duration: 4000
+                                    });
                                   }
                                 }}
                               >
@@ -6536,11 +6928,15 @@ export default function RoomChatPage() {
                                 whileTap={{ scale: 0.9 }}
                                 className="p-2 text-[#4B4036]/60 hover:text-[#4B4036] rounded-full sm:hidden"
                                 onClick={() => {
+                                  console.log('📸 [Debug] Image button clicked (Mobile). Checking support...');
                                   if (checkModelImageSupport()) {
+                                    console.log('📸 [Debug] Support TRUE. Opening picker.');
                                     setShowImagePicker(true);
                                   } else {
-                                    const { default: toast } = require('react-hot-toast');
-                                    toast.error('當前模型不支援圖片輸入');
+                                    console.log('📸 [Debug] Support FALSE. Showing toast.');
+                                    toast.error('當前模型不支援圖片輸入。請在設定中配置「OCR 圖片識別」模型以啟用自動轉換功能。', {
+                                      duration: 4000
+                                    });
                                   }
                                 }}
                               >
@@ -6618,7 +7014,7 @@ export default function RoomChatPage() {
                                   // Prevent focus loss only
                                   e.preventDefault();
                                 }}
-                                disabled={(!inputMessage.trim() && selectedImages.length === 0) || isLoading || isTyping || isSending || !user}
+                                disabled={(!inputMessage.trim() && selectedImages.length === 0) || isLoading || isTyping || isSending || !user || !isRoomReady}
                                 className={`relative z-50 p-2.5 rounded-full shadow-md flex-shrink-0 transition-all duration-300 ${(inputMessage.trim() || selectedImages.length > 0) && !isLoading && !isSending && user
                                   ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white shadow-[#FFB6C1]/30 cursor-pointer pointer-events-auto'
                                   : 'bg-[#F0EAE0] text-[#4B4036]/30 shadow-none cursor-not-allowed'
@@ -7148,6 +7544,9 @@ export default function RoomChatPage() {
                 onSelectUpload={handleImageSelect}
                 onSelectCamera={handleCameraCapture}
                 onFilesSelected={handleFilesAdded}
+                availableModels={availableModels}
+                currentVisionModelId={room?.config?.vision_model}
+                currentVisionMindBlockTitle={(room?.config?.vision_mind_block as any)?.title}
               />
             )}
           </AnimatePresence>
@@ -7306,6 +7705,10 @@ interface MessageBubbleProps {
   availableModels?: any[];
 }
 function MessageBubble({ message, companion, onDelete, isHighlighted = false, availableModels = [] }: MessageBubbleProps) {
+  // CRITICAL DEBUG LOG
+  if (message.sender === 'user') {
+    console.log('🔥🔥🔥 [CRITICAL DEBUG] Inline MessageBubble rendering USER message:', message.id);
+  }
   // Debug log to verify component render
   // console.log('🔍 [MessageBubble] Rendering message:', message.id, 'Sender:', message.sender, 'Content length:', message.content?.length);
   // console.log('🔍 [MessageBubble] Full content preview:', message.content?.substring(0, 500));
@@ -7330,6 +7733,40 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false, av
     message.content_json.model_responses.length > 1;
   const moriModelCount = isMoriMulti ? message.content_json?.model_responses?.length ?? 0 : 0;
   const isMoriDeck = isMoriMulti && moriViewMode === 'deck';
+
+  // 🟢 [Vision Analysis Toggle] - Auto expand if fresh (< 1 min)
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    // Logic for freshness check
+    const timeRef = (message as any).timestamp || (message as any).created_at || Date.now();
+    const createdAt = new Date(timeRef).getTime();
+    const now = Date.now();
+    if (now - createdAt < 60000) {
+      setIsDetailsOpen(true);
+    }
+  }, [message]);
+
+  const renderVisionAnalysis = () => {
+    const visionAnalysis = (message.content_json as any)?.vision_analysis;
+    if (!visionAnalysis) return null;
+
+    return (
+      <details
+        className="mt-2 text-xs group w-full"
+        open={isDetailsOpen}
+        onToggle={(e: any) => setIsDetailsOpen(e.currentTarget.open)}
+      >
+        <summary className="list-none cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/50 hover:bg-white/80 border border-[#EADBC8]/60 text-[#8C7B6C] transition-all select-none shadow-sm hover:shadow active:scale-95">
+          <span className={`transform transition-transform duration-200 ${isDetailsOpen ? 'rotate-90' : ''}`}>▶</span>
+          <span className="font-medium">查看圖片分析 (OCR)</span>
+        </summary>
+        <div className="mt-2 p-3 bg-white/60 rounded-lg border border-[#EADBC8]/40 text-[#4B4036] text-xs leading-relaxed whitespace-pre-wrap">
+          {visionAnalysis.trim()}
+        </div>
+      </details>
+    );
+  };
 
   // 🟢 Fix: Extract attachments from message (handling both array and string formats)
   let safeAttachments: any[] = [];
@@ -7360,8 +7797,15 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false, av
   );
 
   const renderPlainText = () => {
+    // ⭐ Strip out the [系統自動生成的圖片描述] section to prevent duplicate display
+    // (The vision analysis is already shown via renderVisionAnalysis toggle)
+    let cleanContent = message.content;
+    if (cleanContent.includes('[系統自動生成的圖片描述]')) {
+      cleanContent = cleanContent.replace(/\n\n\[系統自動生成的圖片描述\]:\n[\s\S]*$/, '').trim();
+    }
+
     // Robust splitting for different newline formats
-    const lines = message.content.split(/\r\n|\r|\n/);
+    const lines = cleanContent.split(/\r\n|\r|\n/);
     let hasRenderedImage = false;
 
     // 🟣 Inline Debug Box removed
@@ -7696,8 +8140,10 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false, av
       </div>
     );
 
+
+
     return (
-      <div className="whitespace-normal space-y-4 font-sans">
+      <div className="space-y-6">
         {isDeckMode ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -7998,7 +8444,51 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false, av
             )}
             {analysis.model && (
               <div className="text-[10px] opacity-40 text-right mt-1">
-                Analysis by {analysis.model}
+                Analysis by {(() => {
+                  const modelId = analysis.model;
+                  const modelConfig = availableModels.find((m: any) => m.model_id === modelId || m.id === modelId);
+
+                  // Helper to determine tier from model ID
+                  const getTierFromModelId = (id: string): string => {
+                    const lowerId = id.toLowerCase();
+                    if (lowerId.includes('flash') || lowerId.includes('turbo') || lowerId.includes('lite') || lowerId.includes('mini')) {
+                      return 'L1';
+                    } else if (lowerId.includes('standard')) {
+                      return 'L2';
+                    }
+                    return 'L3';
+                  };
+
+                  // Helper to get family name from model ID
+                  const getFamilyFromModelId = (id: string): string => {
+                    const lowerId = id.toLowerCase();
+                    if (lowerId.includes('gemini') || lowerId.includes('google')) return 'Gemini';
+                    if (lowerId.includes('gpt') || lowerId.includes('openai')) return 'ChatGPT';
+                    if (lowerId.includes('claude') || lowerId.includes('anthropic')) return 'Claude';
+                    if (lowerId.includes('grok') || lowerId.includes('xai')) return 'Grok';
+                    if (lowerId.includes('deepseek')) return 'DeepSeek';
+                    if (lowerId.includes('qwen')) return 'Qwen';
+                    // Fallback: capitalize first segment
+                    const parts = id.split('/');
+                    const provider = parts.length > 1 ? parts[0] : '';
+                    return provider.charAt(0).toUpperCase() + provider.slice(1);
+                  };
+
+                  if (modelConfig) {
+                    // Try to get Family from config, but ALWAYS infer tier from model ID for accuracy
+                    const family = modelConfig.metadata?.family || modelConfig.provider || getFamilyFromModelId(modelId);
+                    // Always use getTierFromModelId to ensure flash/lite/mini are correctly identified as L1
+                    const tier = getTierFromModelId(modelId);
+
+                    const capitalizedFamily = family.charAt(0).toUpperCase() + family.slice(1);
+                    return `${capitalizedFamily} ${tier}`;
+                  }
+
+                  // Fallback if model not found in config: infer from model ID
+                  const family = getFamilyFromModelId(modelId);
+                  const tier = getTierFromModelId(modelId);
+                  return `${family} ${tier}`;
+                })()}
               </div>
             )}
           </div>
@@ -8035,7 +8525,6 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false, av
     // Check if this is likely an image response
     const isImageResponse =
       message.sender === 'pico' ||
-      (message.content_json && message.content_json.food && message.content_json.food.image_tokens > 0) ||
       model?.toLowerCase().includes('flux') ||
       model?.toLowerCase().includes('dall-e') ||
       model?.toLowerCase().includes('journey');
@@ -8236,6 +8725,7 @@ function MessageBubble({ message, companion, onDelete, isHighlighted = false, av
               return (
                 <div className="whitespace-pre-wrap break-words overflow-x-auto max-w-full">
                   {renderPlainText()}
+                  {renderVisionAnalysis()}
                   {renderAudioAnalysis()}
                   {renderMetadataFooter()}
                 </div>

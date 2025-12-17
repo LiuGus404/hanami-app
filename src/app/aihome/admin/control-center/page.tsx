@@ -2082,7 +2082,15 @@ export default function AdminControlCenterPage() {
                                       />
                                     )}
                                     <Cog6ToothIcon className="w-5 h-5 text-[#FFB6C1]" />
-                                    <h3 className="text-lg font-semibold text-[#4B4036]">{model.display_name || '未命名模型'}</h3>
+                                    <h3 className="text-lg font-semibold text-[#4B4036]">
+                                      {model.metadata?.family && model.metadata?.level
+                                        ? (() => {
+                                          const family = model.metadata.family;
+                                          const capitalizedFamily = family.charAt(0).toUpperCase() + family.slice(1);
+                                          return `${capitalizedFamily} ${model.metadata.level}`;
+                                        })()
+                                        : (model.display_name || '未命名模型')}
+                                    </h3>
                                     {model.metadata?.family && (
                                       <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#FFD59A]/20 text-[#8F7A65] border border-[#FFD59A]/50 uppercase tracking-wide">
                                         {model.metadata.family}
