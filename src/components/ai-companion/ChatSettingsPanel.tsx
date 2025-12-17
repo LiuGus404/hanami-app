@@ -346,65 +346,96 @@ export function ChatSettingsPanel({
                             <div className="text-[10px] text-gray-500">點擊更換語音模型</div>
                         </div>
 
-                        {/* Vision Assistant */}
-                        <div
-                            className="bg-white rounded-lg border border-gray-200 p-3 flex flex-col justify-between min-h-[80px] relative group hover:border-orange-300 transition-all cursor-pointer"
-                            onClick={() => {
-                                const event = new CustomEvent('open-model-selector', {
-                                    detail: { capability: 'image_input' }
-                                });
-                                window.dispatchEvent(event);
-                            }}
-                        >
-                            <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        {/* Vision Settings - Combined Card */}
+                        <div className="col-span-2 bg-gradient-to-br from-orange-50 to-purple-50 rounded-lg border border-gray-200 p-3">
+                            <div className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                                 <PhotoIcon className="w-4 h-4" />
-                                OCR 圖片識別 (Vision)
+                                圖片分析設定
                             </div>
-                            <div className="font-bold text-gray-800 text-xs mt-1">
-                                {(() => {
-                                    const mId = room?.config?.vision_model;
-                                    if (!mId || mId === '__default__') return 'System Default (L1)';
-                                    const m = availableModels?.find((x: any) => x.model_id === mId);
-                                    if (!m) return mId;
 
-                                    const getModelLevel = (model: any) => {
-                                        if (model.metadata?.level) return model.metadata.level;
-                                        const lowerId = model.model_id.toLowerCase();
-                                        if (lowerId.includes('flux')) return 'L2';
-                                        if (lowerId.includes('flash') && lowerId.includes('image')) return 'L2';
-                                        if (lowerId.includes('gpt-5') && lowerId.includes('image') && lowerId.includes('mini')) return 'L2';
+                            <div className="grid grid-cols-2 gap-2">
+                                {/* OCR Model */}
+                                <div
+                                    className="bg-white rounded-lg border border-gray-200 p-2.5 flex flex-col justify-between min-h-[70px] relative group hover:border-orange-300 transition-all cursor-pointer"
+                                    onClick={() => {
+                                        const event = new CustomEvent('open-model-selector', {
+                                            detail: { capability: 'image_input' }
+                                        });
+                                        window.dispatchEvent(event);
+                                    }}
+                                >
+                                    <div className="text-[10px] font-medium text-orange-500 uppercase tracking-wider">
+                                        OCR 模型
+                                    </div>
+                                    <div className="font-bold text-gray-800 text-xs mt-1">
+                                        {(() => {
+                                            let mId = room?.config?.vision_model;
+                                            if (!mId || mId === '__default__') {
+                                                const adminDef = availableModels?.find((x: any) => x.metadata?.is_system_default_image_input === true);
+                                                if (adminDef) mId = adminDef.model_id;
+                                                else return 'System Default';
+                                            }
+                                            const m = availableModels?.find((x: any) => x.model_id === mId);
+                                            if (!m) return mId;
 
-                                        if (lowerId.includes('pro') && !lowerId.includes('flux')) return 'L3';
-                                        if (lowerId.includes('flash') || lowerId.includes('mini') || lowerId.includes('lite') || lowerId.includes('haiku')) return 'L1';
-                                        if (lowerId.includes('standard')) return 'L2';
-                                        if (lowerId.includes('gpt-4')) return 'L2';
-                                        return 'L3';
-                                    };
+                                            // Get model level
+                                            const getLevel = (model: any) => {
+                                                if (model.metadata?.level) return model.metadata.level;
+                                                const id = model.model_id.toLowerCase();
+                                                if (id.includes('flash') || id.includes('mini') || id.includes('lite')) return 'L1';
+                                                if (id.includes('pro')) return 'L3';
+                                                return 'L2';
+                                            };
 
-                                    // Helper to extract clean Family Name
-                                    const getFamilyName = (model: any) => {
-                                        const n = (model.display_name || '').toLowerCase();
-                                        const i = model.model_id.toLowerCase();
+                                            // Get family name
+                                            const n = (m.display_name || '').toLowerCase();
+                                            const i = m.model_id.toLowerCase();
+                                            let family = 'Model';
+                                            if (n.includes('gemini') || i.includes('google')) family = 'Gemini';
+                                            else if (n.includes('gpt') || n.includes('openai')) family = 'ChatGPT';
+                                            else if (n.includes('claude')) family = 'Claude';
+                                            else if (n.includes('deepseek')) family = 'DeepSeek';
+                                            else if (n.includes('grok')) family = 'Grok';
 
-                                        if (n.includes('gemini') || i.includes('google')) return 'Gemini';
-                                        if (n.includes('gpt') || n.includes('openai') || i.includes('openai')) return 'ChatGPT';
-                                        if (n.includes('claude') || i.includes('anthropic')) return 'Claude';
-                                        if (n.includes('deepseek')) return 'DeepSeek';
-                                        if (n.includes('grok') || i.includes('x-ai')) return 'Grok';
-                                        if (n.includes('flux')) return 'Flux';
+                                            return `${family} (${getLevel(m)})`;
+                                        })()}
+                                    </div>
+                                    <div className="text-[9px] text-gray-400 mt-0.5">點擊更換</div>
+                                </div>
 
-                                        // Fallback: strip common provider prefixes
-                                        let label = model.display_name || model.model_id.split('/').pop() || 'Unknown';
-                                        label = label.replace(/^(Google|OpenAI|Anthropic|DeepSeek|xAI)\s+/i, '');
-                                        return label;
-                                    };
-
-                                    const family = getFamilyName(m);
-                                    const level = getModelLevel(m);
-                                    return `${family} ${level ? '(' + level + ')' : ''}`;
-                                })()}
+                                {/* Vision Mind Block */}
+                                <div
+                                    className="bg-white rounded-lg border border-gray-200 p-2.5 flex flex-col justify-between min-h-[70px] relative group hover:border-purple-300 transition-all cursor-pointer"
+                                    onClick={() => {
+                                        const event = new CustomEvent('open-vision-block-selector', {
+                                            detail: { type: 'vision' }
+                                        });
+                                        window.dispatchEvent(event);
+                                    }}
+                                >
+                                    {/* Reset button */}
+                                    {(room?.config?.vision_mind_block as any)?.title && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const event = new CustomEvent('reset-vision-block');
+                                                window.dispatchEvent(event);
+                                            }}
+                                            className="absolute top-1.5 right-1.5 p-0.5 rounded-full bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100 z-10"
+                                            title="重設為預設描述"
+                                        >
+                                            <XMarkIcon className="w-2.5 h-2.5" />
+                                        </button>
+                                    )}
+                                    <div className="text-[10px] font-medium text-purple-500 uppercase tracking-wider">
+                                        思維積木
+                                    </div>
+                                    <div className="font-bold text-gray-800 text-xs mt-1 line-clamp-1">
+                                        {(room?.config?.vision_mind_block as any)?.title || '預設描述'}
+                                    </div>
+                                    <div className="text-[9px] text-gray-400 mt-0.5">點擊更換</div>
+                                </div>
                             </div>
-                            <div className="text-[10px] text-gray-500">點擊更換識別模型</div>
                         </div>
                     </div>
                 </div>

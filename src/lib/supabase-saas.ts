@@ -7,27 +7,30 @@ const supabaseServiceKey = process.env.SUPABASE_SAAS_SERVICE_ROLE_KEY || 'eyJhbG
 export const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxhb3d5cXBsY3Rod3Fja3lpZ2l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMDE0MjYsImV4cCI6MjA3Mjg3NzQyNn0.LU37G9rZSBP5_BoAGQ_1QncFS2wemcI1w2J-wZzC-cI';
 
 // 單例模式，避免多個客戶端實例
-let saasAdminClient: ReturnType<typeof createClient<Database>> | null = null;
-let saasClient: ReturnType<typeof createClient<Database>> | null = null;
+const globalForSupabase = globalThis as unknown as {
+  saasAdminClient: ReturnType<typeof createClient<Database>> | null;
+  saasClient: ReturnType<typeof createClient<Database>> | null;
+}
 
 // 創建管理員客戶端（用於 API 路由）
 export function createSaasAdminClient() {
-  if (!saasAdminClient) {
-    saasAdminClient = createClient<Database>(supabaseUrl, supabaseServiceKey, {
+  if (!globalForSupabase.saasAdminClient) {
+    console.log('⚡ [Supabase] Creating NEW Admin Client instance');
+    globalForSupabase.saasAdminClient = createClient<Database>(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
   }
-  return saasAdminClient;
+  return globalForSupabase.saasAdminClient;
 }
 
 // 創建用戶客戶端（用於前端）
 export function createSaasClient() {
-  if (!saasClient) {
-
-    saasClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  if (!globalForSupabase.saasClient) {
+    console.log('⚡ [Supabase] Creating NEW User Client instance');
+    globalForSupabase.saasClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         storageKey: 'hanamiecho-auth', // 使用獨立的 storageKey
         autoRefreshToken: true,
@@ -37,7 +40,8 @@ export function createSaasClient() {
       }
     });
   } else {
-    // console.log('createSaasClient: Returning EXISTING instance');
+    // console.log('⚡ [Supabase] Returning EXISTING User Client instance');
   }
-  return saasClient;
+
+  return globalForSupabase.saasClient;
 }

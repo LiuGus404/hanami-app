@@ -1,22 +1,74 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PhotoIcon, CameraIcon, XMarkIcon, CloudArrowUpIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, CameraIcon, XMarkIcon, CloudArrowUpIcon, SparklesIcon, PuzzlePieceIcon } from '@heroicons/react/24/outline';
 
 interface ReferenceImagePickerProps {
     onClose: () => void;
     onSelectUpload: () => void;
     onSelectCamera: () => void;
     onFilesSelected?: (files: File[]) => void;
+    // New props for Vision and Mind Block selectors
+    availableModels?: any[];
+    currentVisionModelId?: string;
+    currentVisionMindBlockTitle?: string;  // ⭐ Changed: Vision-specific mind block
 }
 
 export const ReferenceImagePicker: React.FC<ReferenceImagePickerProps> = ({
     onClose,
     onSelectUpload,
     onSelectCamera,
-    onFilesSelected
+    onFilesSelected,
+    availableModels = [],
+    currentVisionModelId,
+    currentVisionMindBlockTitle  // ⭐ Changed: Vision-specific mind block
 }) => {
     console.log('🖼️ [Render] ReferenceImagePicker Rendered');
     const [isDragging, setIsDragging] = useState(false);
+
+    // Helper functions for model display (ported from ChatSettingsPanel)
+    const getModelLevel = (model: any) => {
+        if (model?.metadata?.level) return model.metadata.level;
+        const lowerId = (model?.model_id || '').toLowerCase();
+        if (lowerId.includes('flux')) return 'L2';
+        if (lowerId.includes('flash') && lowerId.includes('image')) return 'L2';
+        if (lowerId.includes('gpt-5') && lowerId.includes('image') && lowerId.includes('mini')) return 'L2';
+        if (lowerId.includes('pro') && !lowerId.includes('flux')) return 'L3';
+        if (lowerId.includes('flash') || lowerId.includes('mini') || lowerId.includes('lite') || lowerId.includes('haiku')) return 'L1';
+        if (lowerId.includes('standard')) return 'L2';
+        if (lowerId.includes('gpt-4')) return 'L2';
+        return 'L3';
+    };
+
+    const getFamilyName = (model: any) => {
+        const n = (model?.display_name || '').toLowerCase();
+        const i = (model?.model_id || '').toLowerCase();
+        if (n.includes('gemini') || i.includes('google')) return 'Gemini';
+        if (n.includes('gpt') || n.includes('openai') || i.includes('openai')) return 'ChatGPT';
+        if (n.includes('claude') || i.includes('anthropic')) return 'Claude';
+        if (n.includes('deepseek')) return 'DeepSeek';
+        if (n.includes('grok') || i.includes('x-ai')) return 'Grok';
+        if (n.includes('flux')) return 'Flux';
+        let label = model?.display_name || model?.model_id?.split('/').pop() || 'Unknown';
+        label = label.replace(/^(Google|OpenAI|Anthropic|DeepSeek|xAI)\s+/i, '');
+        return label;
+    };
+
+    const getVisionModelDisplay = () => {
+        let mId = currentVisionModelId;
+        if (!mId || mId === '__default__') {
+            const adminDef = availableModels?.find((x: any) => x.metadata?.is_system_default_image_input === true);
+            if (adminDef) {
+                mId = adminDef.model_id;
+            } else {
+                return 'System Default (L1)';
+            }
+        }
+        const m = availableModels?.find((x: any) => x.model_id === mId);
+        if (!m) return mId || 'Unknown';
+        const family = getFamilyName(m);
+        const level = getModelLevel(m);
+        return `${family} ${level ? '(' + level + ')' : ''}`;
+    };
 
     // Drag handlers
     const handleDragOver = (e: React.DragEvent) => {
@@ -42,6 +94,32 @@ export const ReferenceImagePicker: React.FC<ReferenceImagePickerProps> = ({
                 onFilesSelected(files);
             }
         }
+    };
+
+    const handleOpenVisionSelector = () => {
+        // Close the image picker first so the selector modal isn't covered
+        onClose();
+        const event = new CustomEvent('open-model-selector', {
+            detail: { capability: 'image_input' }
+        });
+        window.dispatchEvent(event);
+    };
+
+    const handleOpenBlockSelector = () => {
+        // ⭐ Dispatch vision-specific block selector event
+        onClose();
+        const event = new CustomEvent('open-vision-block-selector', {
+            detail: { type: 'vision' }
+        });
+        window.dispatchEvent(event);
+    };
+
+    // ⭐ Reset vision mind block to default
+    const handleResetVisionBlock = (e: React.MouseEvent) => {
+        e.stopPropagation();  // Prevent opening the selector
+        const event = new CustomEvent('reset-vision-block');
+        window.dispatchEvent(event);
+        onClose();
     };
 
     return (
@@ -133,7 +211,7 @@ export const ReferenceImagePicker: React.FC<ReferenceImagePickerProps> = ({
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={onSelectCamera}
-                        className="w-full relative overflow-hidden group rounded-xl bg-white border border-[#EADBC8] p-1 shadow-sm hover:shadow-md transition-all duration-300"
+                        className="w-full relative overflow-hidden group rounded-xl bg-white border border-[#EADBC8] p-1 shadow-sm hover:shadow-md transition-all duration-300 mb-4"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-[#FFD59A]/10 to-[#FFB6C1]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
@@ -146,6 +224,60 @@ export const ReferenceImagePicker: React.FC<ReferenceImagePickerProps> = ({
                             </span>
                         </div>
                     </motion.button>
+
+                    {/* Divider for Assistant Settings */}
+                    <div className="w-full flex items-center gap-3 mb-4 opacity-60">
+                        <div className="h-px bg-gradient-to-r from-transparent via-[#4B4036]/20 to-transparent flex-1" />
+                        <span className="text-xs font-medium text-[#4B4036]/60">圖片分析設定</span>
+                        <div className="h-px bg-gradient-to-r from-transparent via-[#4B4036]/20 to-transparent flex-1" />
+                    </div>
+
+                    {/* Vision Model & Mind Block Selectors */}
+                    <div className="w-full grid grid-cols-2 gap-3">
+                        {/* Vision Model Selector */}
+                        <motion.div
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handleOpenVisionSelector}
+                            className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col justify-between min-h-[80px] relative group hover:border-orange-300 transition-all cursor-pointer shadow-sm"
+                        >
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                <SparklesIcon className="w-3.5 h-3.5" />
+                                OCR 模型
+                            </div>
+                            <div className="font-bold text-gray-800 text-xs mt-1 line-clamp-2">
+                                {getVisionModelDisplay()}
+                            </div>
+                            <div className="text-[9px] text-gray-500 mt-1">點擊更換</div>
+                        </motion.div>
+
+                        {/* Mind Block Selector */}
+                        <motion.div
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={handleOpenBlockSelector}
+                            className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col justify-between min-h-[80px] relative group hover:border-purple-300 transition-all cursor-pointer shadow-sm"
+                        >
+                            {/* Reset button - only show when a block is selected */}
+                            {currentVisionMindBlockTitle && (
+                                <button
+                                    onClick={handleResetVisionBlock}
+                                    className="absolute top-2 right-2 p-1 rounded-full bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100 z-10"
+                                    title="重設為預設描述"
+                                >
+                                    <XMarkIcon className="w-3 h-3" />
+                                </button>
+                            )}
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                                <PuzzlePieceIcon className="w-3.5 h-3.5" />
+                                Vision 思維積木
+                            </div>
+                            <div className="font-bold text-gray-800 text-xs mt-1 line-clamp-2">
+                                {currentVisionMindBlockTitle || '預設描述'}
+                            </div>
+                            <div className="text-[9px] text-gray-500 mt-1">點擊更換</div>
+                        </motion.div>
+                    </div>
                 </div>
             </motion.div>
         </div>

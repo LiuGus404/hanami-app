@@ -280,7 +280,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
     return btoa(binary);
 }
 
-export async function analyzeAudioWithGemini(audioUrl: string): Promise<AudioAnalysis> {
+export async function analyzeAudioWithGemini(audioUrl: string, audioModelId?: string): Promise<AudioAnalysis> {
     const openaiKey = Deno.env.get('OPENAI_API_KEY');
     const openRouterKey = Deno.env.get('OPENROUTER_API_KEY');
 
@@ -295,8 +295,9 @@ export async function analyzeAudioWithGemini(audioUrl: string): Promise<AudioAna
         };
     }
 
-    // Correction: Using the specific model ID requested by the user.
-    const TARGET_MODEL = "google/gemini-2.5-flash-preview-09-2025";
+    // Use provided audioModelId or fall back to default
+    const DEFAULT_AUDIO_MODEL = "google/gemini-2.5-flash-preview-09-2025";
+    const TARGET_MODEL = audioModelId || DEFAULT_AUDIO_MODEL;
 
     try {
 
@@ -811,6 +812,23 @@ export async function processChat(
         console.log(`[Pricing] User ${userId} isFreePlan: ${isFreePlan} (Plan: ${userData?.subscription_plan_id})`);
     }
 
+    // 0.5 Fetch Room Settings (for audio_model selection)
+    let roomSettings: any = {};
+    if (roomId) {
+        const { data: roomData, error: roomError } = await supabase
+            .from('ai_rooms')
+            .select('settings')
+            .eq('id', roomId)
+            .maybeSingle();
+
+        if (roomData?.settings) {
+            roomSettings = roomData.settings;
+            console.log(`[RoomSettings] Loaded settings for room ${roomId}:`, JSON.stringify(roomSettings));
+        } else if (roomError) {
+            console.warn(`[RoomSettings] Failed to load room settings: ${roomError.message}`);
+        }
+    }
+
     // 1. Fetch Role Configuration
     let roleConfig: RoleConfig | null = null;
     if (companionId) {
@@ -1088,8 +1106,9 @@ export async function processChat(
                 });
             } else if (att.type === 'audio') {
                 // 2-Phase Analysis
-                console.log(`Starting 2-phase analysis for audio: ${att.url}`);
-                const analysis = await analyzeAudioWithGemini(att.url);
+                const selectedAudioModel = roomSettings?.audio_model || null;
+                console.log(`Starting 2-phase analysis for audio: ${att.url} with model: ${selectedAudioModel || 'default'}`);
+                const analysis = await analyzeAudioWithGemini(att.url, selectedAudioModel);
 
                 const transcriptionText = analysis.transcription || "[Audio: Transcription failed]";
                 const descriptionText = analysis.description || "[Audio: Description unavailable]";
@@ -1356,33 +1375,41 @@ export async function processChat(
     let textInputCost = 0;
     let textOutputCost = 0;
 
-    // --- Image Cost Calculation ---
-    // --- Image Cost Calculation (Strict L-Tier) ---
-    if (generatedImageUrl) {
-        const imageConfig = modelConfigs.find(m => m.model_id === imageModelId) || modelConfigs[0];
-        const tier = determineModelTier(imageConfig);
-        console.log(`[Pricing-Image] Model: ${imageModelId}, Tier: ${tier}, Plan: ${isFreePlan ? 'Free' : 'Starter+'}`);
+    // --- Image Cost Calculation (Strict L-Tier for Vision Analysis) ---
+    // If the message contains images, we consume food for the Vision capability.
+    const hasImages = attachments?.some(a => a.type === 'image');
+    let visionCost = 0;
 
-        if (tier === 'L1') {
-            imageCost = isFreePlan ? 3 : 0;
-        } else if (tier === 'L2') {
-            imageCost = 4;
+    if (hasImages) {
+        // Resolve Vision Model
+        const visionModelId = roomSettings?.vision_model || "google/gemini-2.0-flash-lite-preview-02-05"; // Default fallback
+
+        // Try to find its config in our fetched list, or fallback to a heuristic
+        const visionConfig = modelConfigs.find(m => m.model_id === visionModelId) || modelConfigs.find(m => m.model_id.includes('gemini')) || modelConfigs[0];
+        const visionTier = determineModelTier(visionConfig);
+
+        console.log(`[Pricing-Vision] Model: ${visionModelId}, Tier: ${visionTier}, Plan: ${isFreePlan ? 'Free' : 'Starter+'}`);
+
+        if (visionTier === 'L1') {
+            visionCost = isFreePlan ? 3 : 0;
+        } else if (visionTier === 'L2') {
+            visionCost = 4;
         } else {
             // L3
-            imageCost = 20;
+            visionCost = 20;
         }
     }
 
-    // --- Text Cost Calculation (L-Tier Fixed Pricing) ---
+    // --- Accumulated Text Cost (Role Response) ---
     for (const { config, res, error, isImagePlaceholder } of (responses as any[])) {
-        // Skip error, null response, OR if it's the image placeholder (already charged in imageCost)
+        // Skip error, null response, OR if it's the image placeholder (already charged in imageCost if separate)
         if (error || !res || isImagePlaceholder) continue;
 
         const tier = determineModelTier(config);
-        console.log(`[Pricing] Model: ${config.model_id}, Tier: ${tier}, Plan: ${isFreePlan ? 'Free' : 'Starter+'}`);
+        console.log(`[Pricing-Role] Model: ${config.model_id}, Tier: ${tier}, Plan: ${isFreePlan ? 'Free' : 'Starter+'}`);
 
         let modelInputCost = 0;
-        let modelOutputCost = 0;
+        let modelOutputCost = 0; // We currently bundle input/output into a single per-turn cost for simplicity in this logic
 
         if (tier === 'L1') {
             modelInputCost = isFreePlan ? 3 : 0;
@@ -1399,19 +1426,20 @@ export async function processChat(
     }
 
     // --- Final Tally Overrides ---
-    // If primary model is an image generator (Flux etc), we treat the Tier Cost (L2=4) as the total cost.
-    // We should ignore any separate imageCost (e.g. 10 or 50) calculated earlier for 'isPico'.
+    // Rule: If primary model is an image generator (Flux etc), we treat the Tier Cost (L2=4) as the total cost.
     const primaryIsImage = responses.some(r => {
         const lower = r.config.model_id.toLowerCase();
         return lower.includes('flux') || lower.includes('midjourney') || lower.includes('dall-e');
     });
 
     if (primaryIsImage && textInputCost > 0) {
-        console.log(`[Pricing] Primary model is image generator (Tier cost applied). Ignoring separate imageCost (${imageCost}).`);
-        imageCost = 0;
+        console.log(`[Pricing] Primary model is image generator (Tier cost applied). Ignoring separate image/vision costs.`);
+        imageCost = 0; // Reset generation cost
+        visionCost = 0; // Reset vision cost (unlikely to be both)
     }
 
-    totalFoodCost = textInputCost + textOutputCost + imageCost + audioAnalysisCost;
+    // Total Cost = Vision Cost (if images) + Role Cost (Text) + Generation Cost (if Pico) + Audio Cost
+    totalFoodCost = textInputCost + textOutputCost + imageCost + visionCost + audioAnalysisCost;
 
     // 10. Save Response
     const { data: assistantMsg, error: saveError } = await supabase
@@ -1430,6 +1458,7 @@ export async function processChat(
                     output_chars: outputChars,
                     total_food_cost: totalFoodCost,
                     image_tokens: imageCost,
+                    vision_cost: visionCost, // Add specific vision cost
                     audio_analysis_cost: audioAnalysisCost,
                     CHARS_PER_FOOD
                 },
@@ -1439,6 +1468,7 @@ export async function processChat(
                     roleId: roleConfig?.id,
                     userId: userId,
                     mindBlocksCount: mindBlocks?.length || 0,
+                    visionModelUsed: hasImages ? (roomSettings?.vision_model || "default") : null,
                     mindBlocksTitles: mindBlocks?.map((mb: any) => mb?.title || mb?.name || 'Untitled') || []
                 },
                 model_responses: responses.map(({ config, res, error }, index) => {
@@ -1542,6 +1572,9 @@ const corsHeaders = {
 };
 
 serve(async (req: Request) => {
+    console.log(`🚀 [ENTRY] Edge Function invoked at ${new Date().toISOString()}`);
+    console.log(`🚀 [ENTRY] Method: ${req.method}`);
+
     // 1. Parse & Validate
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -1549,16 +1582,35 @@ serve(async (req: Request) => {
 
     let request: ChatRequest;
     try {
-        request = await req.json();
-    } catch (e) {
+        const rawBody = await req.text();
+        console.log(`📦 [ENTRY] Raw body length: ${rawBody.length} bytes`);
+        console.log(`📦 [ENTRY] Body preview: ${rawBody.substring(0, 500)}...`);
+        request = JSON.parse(rawBody);
+        console.log(`✅ [ENTRY] JSON parsed successfully`);
+    } catch (e: any) {
+        console.error(`❌ [ENTRY] JSON parse error: ${e.message}`);
         return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { headers: corsHeaders, status: 400 });
     }
 
     const { message, roomId, companionId, modelId, attachments, userId, messageId, userMessage } = request as any;
 
+    console.log(`📋 [ENTRY] Request details:`, {
+        hasMessage: !!message,
+        messageLength: message?.length || 0,
+        hasAttachments: !!attachments,
+        attachmentsCount: attachments?.length || 0,
+        roomId,
+        companionId,
+        userId,
+        messageId
+    });
+
     if (!message && (!attachments || attachments.length === 0)) {
+        console.error(`❌ [ENTRY] Validation failed: No message and no attachments`);
         return new Response(JSON.stringify({ error: 'Message or attachments required' }), { headers: corsHeaders, status: 400 });
     }
+
+    console.log(`✅ [ENTRY] Validation passed, proceeding...`);
 
     // Initialize Supabase Clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;

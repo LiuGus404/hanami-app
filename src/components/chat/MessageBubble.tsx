@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChatMessage } from './ThreadChat';
 
 interface MessageBubbleProps {
@@ -157,14 +157,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 : 'bg-white text-[#4B4036] border border-[#EADBC8]'
             } ${isError ? 'border-red-300 bg-red-50' : ''}`}>
 
-            {/* 訊息內容 */}
-            {message.content && (
-              <div className="whitespace-pre-wrap break-words">
-                {message.content}
-              </div>
-            )}
+            {/* 訊息內容 (Text Content) */}
+            {message.content && (() => {
+              // Safety Net: If Edge Function persisted the vision description in content, hide it here.
+              const separator = '[系統自動生成的圖片描述]:';
+              const parts = message.content.split(separator);
+              const mainContent = parts[0];
+              // We ignore the split part here because we rely on content_json.vision_analysis for rendering.
+              // Use mainContent which is the clean user text.
 
-            {/* Attachments */}
+              return (
+                <div className="whitespace-pre-wrap break-words">
+                  {mainContent.trim()}
+                </div>
+              );
+            })()}
+
+            {/* Attachments (Images) - Render BEFORE Vision Analysis */}
             {finalAttachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2 relative">
                 {finalAttachments.map((att: any, idx: number) => (
@@ -178,6 +187,44 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 ))}
               </div>
             )}
+
+            {/* Collapsible Vision Analysis (From content_json) */}
+            {(() => {
+              const visionAnalysis = (message.content_json as any)?.vision_analysis;
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+              // Auto-expand logic: Only open if message is "fresh" (created within last 60 seconds)
+              // This satisfies "Expand only first time" (Just now), "Collapse otherwise" (History)
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              useEffect(() => {
+                const createdAt = new Date(message.created_at || Date.now()).getTime();
+                const now = Date.now();
+                // If message is younger than 60 seconds, auto-expand
+                if (now - createdAt < 60000) {
+                  setIsDetailsOpen(true);
+                }
+              }, [message.created_at]);
+
+              if (visionAnalysis) {
+                return (
+                  <details
+                    className="mt-2 text-xs group"
+                    open={isDetailsOpen}
+                    onToggle={(e: any) => setIsDetailsOpen(e.currentTarget.open)}
+                  >
+                    <summary className="list-none cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/50 hover:bg-white/80 border border-[#EADBC8]/60 text-[#8C7B6C] transition-all select-none shadow-sm hover:shadow active:scale-95">
+                      <span className={`transform transition-transform duration-200 ${isDetailsOpen ? 'rotate-90' : ''}`}>▶</span>
+                      <span className="font-medium">查看圖片分析 (OCR)</span>
+                    </summary>
+                    <div className="mt-2 p-3 bg-white/40 rounded-lg border border-[#EADBC8]/40 text-[#4B4036] text-xs leading-relaxed whitespace-pre-wrap">
+                      {visionAnalysis.trim()}
+                    </div>
+                  </details>
+                );
+              }
+              return null;
+            })()}
 
             {/* 錯誤訊息 */}
             {isError && message.error_message && (
@@ -193,8 +240,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               </div>
             )}
 
-            {/* 思維積木與模型資訊 */}
-            {isAssistant && message.content_json && (
+            {/* 思維積木與模型資訊 (Assistant OR User with Vision) */}
+            {(isAssistant || (isUser && (message.content_json as any)?.vision_model)) && message.content_json && (
               <div className="mt-2 pt-2 border-t border-[#EADBC8]/50 text-xs text-[#8C7B6C] flex flex-wrap gap-3">
                 {/* Debug log */}
 
@@ -204,9 +251,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     🧠 {message.content_json.mind_name || message.content_json.model_responses?.[0]?.mind_name}
                   </span>
                 )}
-                {(message.content_json.model_responses?.[0]?.model || message.model_used) && (
+                {/* Assistant Model */}
+                {(isAssistant && (message.content_json.model_responses?.[0]?.model || message.model_used)) && (
                   <span className="flex items-center gap-1" title="使用模型">
                     🤖 {message.content_json.model_responses?.[0]?.model || message.model_used}
+                  </span>
+                )}
+                {/* User Vision Model */}
+                {isUser && (message.content_json as any)?.vision_model && (
+                  <span className="flex items-center gap-1" title="視覺模型">
+                    👁️ {(message.content_json as any).vision_model}
                   </span>
                 )}
               </div>
@@ -229,4 +283,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
     </div>
   );
+}
+
+// Helper for time formatting
+function formatTime(dateStr?: string) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
