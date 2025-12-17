@@ -1814,12 +1814,13 @@ export default function ClassActivitiesPage(
     try {
       setLoadingMediaStatus(true);
 
-      // 獲取所選日期香港時區的開始和結束時間
+      // 獲取所選日期字串（香港時區）
       const selectedDateHK = new Date(selectedDate.toLocaleString("en-US", { timeZone: "Asia/Hong_Kong" }));
-      const dateStart = new Date(selectedDateHK);
-      dateStart.setHours(0, 0, 0, 0);
-      const dateEnd = new Date(selectedDateHK);
-      dateEnd.setHours(23, 59, 59, 999);
+      const year = selectedDateHK.getFullYear();
+      const month = String(selectedDateHK.getMonth() + 1).padStart(2, '0');
+      const day = String(selectedDateHK.getDate()).padStart(2, '0');
+      const selectedDateStr = `${year}-${month}-${day}`;
+      const selectedDateStrNoHyphen = `${year}${month}${day}`; // YYYYMMDD 格式（用於文件名匹配）
 
       // 獲取所有學生ID
       const allStudentIds = Array.from(new Set([
@@ -1827,40 +1828,58 @@ export default function ClassActivitiesPage(
         ...trialLessons.map(lesson => lesson.id) // 試聽學生的ID
       ]));
 
+      // 獲取當天所有課堂的 lesson_id
+      const todayLessonIds = lessons
+        .filter(lesson => lesson.lesson_date === selectedDateStr)
+        .map(lesson => lesson.id);
+
       if (allStudentIds.length > 0) {
-        // 查詢所選日期是否有媒體上傳記錄
-        let mediaQuery = supabase
+        const statusMap: Record<string, boolean> = {};
+        allStudentIds.forEach(id => {
+          statusMap[id] = false;
+        });
+
+        // 方法1: 通過 lesson_id 關聯查詢當天課堂的媒體
+        if (todayLessonIds.length > 0) {
+          let lessonMediaQuery = supabase
+            .from('hanami_student_media')
+            .select('student_id')
+            .in('student_id', allStudentIds)
+            .in('lesson_id', todayLessonIds);
+
+          if (validOrgId) {
+            lessonMediaQuery = lessonMediaQuery.eq('org_id', validOrgId);
+          }
+
+          const { data: lessonMedia, error: lessonError } = await lessonMediaQuery;
+
+          if (!lessonError && lessonMedia) {
+            (lessonMedia as any[]).forEach((media: any) => {
+              statusMap[media.student_id] = true;
+            });
+          }
+        }
+
+        // 方法2: 通過文件名中的日期來匹配（file_name 格式: studentId_YYYYMMDD_HHMMSS.ext）
+        let fileNameMediaQuery = supabase
           .from('hanami_student_media')
-          .select('student_id')
+          .select('student_id, file_name')
           .in('student_id', allStudentIds)
-          .gte('created_at', dateStart.toISOString())
-          .lte('created_at', dateEnd.toISOString());
+          .ilike('file_name', `%${selectedDateStrNoHyphen}%`);
 
         if (validOrgId) {
-          mediaQuery = mediaQuery.eq('org_id', validOrgId);
+          fileNameMediaQuery = fileNameMediaQuery.eq('org_id', validOrgId);
         }
 
-        const { data: dateMedia, error } = await mediaQuery;
+        const { data: fileNameMedia, error: fileNameError } = await fileNameMediaQuery;
 
-        if (!error && dateMedia) {
-          const statusMap: Record<string, boolean> = {};
-          allStudentIds.forEach(id => {
-            statusMap[id] = false;
-          });
-
-          (dateMedia as any[]).forEach((media: any) => {
+        if (!fileNameError && fileNameMedia) {
+          (fileNameMedia as any[]).forEach((media: any) => {
             statusMap[media.student_id] = true;
           });
-
-          setStudentMediaStatus(statusMap);
-        } else {
-          // 如果沒有找到任何媒體，將所有學生標記為未上傳
-          const statusMap: Record<string, boolean> = {};
-          allStudentIds.forEach(id => {
-            statusMap[id] = false;
-          });
-          setStudentMediaStatus(statusMap);
         }
+
+        setStudentMediaStatus(statusMap);
       }
     } catch (error) {
       console.error('檢查學生媒體狀態失敗:', error);

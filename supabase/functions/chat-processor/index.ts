@@ -1144,13 +1144,26 @@ export async function processChat(
                     contentParts[0].text = analysisContext;
                 }
 
-                // Track Usage/Cost for Analysis phase
-                if (analysis.usage) {
-                    const tokens = analysis.usage.total_tokens || 0;
-                    audioAnalysisCost = Math.ceil(tokens / 100);
-                } else {
-                    audioAnalysisCost = 50; // Fixed fallback
+                // Track Usage/Cost for Analysis phase - Use L-tier pricing consistent with role models
+                // Determine tier from audio model ID
+                const audioModelId = analysis.model || selectedAudioModel || 'default';
+                const audioModelLower = audioModelId.toLowerCase();
+                let audioTier = 'L3'; // Default
+                if (audioModelLower.includes('flash') || audioModelLower.includes('turbo') || audioModelLower.includes('lite') || audioModelLower.includes('mini')) {
+                    audioTier = 'L1';
+                } else if (audioModelLower.includes('standard')) {
+                    audioTier = 'L2';
                 }
+
+                // Apply same pricing as role models
+                if (audioTier === 'L1') {
+                    audioAnalysisCost = isFreePlan ? 3 : 0;
+                } else if (audioTier === 'L2') {
+                    audioAnalysisCost = 4;
+                } else {
+                    audioAnalysisCost = 20;
+                }
+                console.log(`[Pricing-Audio] Model: ${audioModelId}, Tier: ${audioTier}, Cost: ${audioAnalysisCost}`);
                 audioAnalysisResult = analysis;
             }
         }
