@@ -2982,7 +2982,7 @@ export default function AICompanionsPage() {
                     <h1 className="text-4xl font-bold text-[#4B4036]">換腦工房 MindSwitch</h1>
                   </div>
                   <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
-                    你的第二大腦組裝廠 - 認識我們的 AI 角色夥伴，每個成員都有獨特的專長和個性
+                    組裝 AI 思維，打造你的第二大腦 - 認識我們的 AI 角色夥伴，每個成員都有獨特的專長和個性
                   </p>
                   <div className="mt-4 inline-flex items-center px-4 py-2 bg-[#FFD59A]/20 border border-[#FFD59A] rounded-full text-sm text-[#4B4036]">
                     <CpuChipIcon className="w-4 h-4 mr-2" />

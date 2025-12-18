@@ -181,13 +181,13 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         icon: CalendarDaysIcon,
         label: '課程活動',
         href: '/aihome/course-activities',
-        description: '查看所有報讀的機構和課程活動'
+        description: '查看更多機構和課程活動'
       },
       {
         icon: UsersIcon,
         label: '家長連結',
         href: '/aihome/parent/bound-students',
-        description: '查看孩子的學習'
+        description: '查看孩子的學習和成長'
       },
       {
         icon: BriefcaseIcon,
@@ -199,7 +199,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         icon: SparklesIcon,
         label: '換腦工房',
         href: '/aihome/ai-companions',
-        description: '你的第二大腦組裝廠'
+        description: '組裝 AI 思維，打造你的第二大腦'
       },
     ];
 
@@ -270,7 +270,8 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             initial={{ x: -300 }}
             animate={{ x: 0 }}
             exit={{ x: -300 }}
-            className="fixed top-16 bottom-0 left-0 w-80 bg-white shadow-xl z-50 lg:fixed lg:top-16 lg:shadow-lg lg:z-50 lg:flex-shrink-0 flex flex-col h-full overflow-y-auto"
+            className="fixed top-16 left-0 w-80 bg-white shadow-xl z-50 lg:fixed lg:top-16 lg:shadow-lg lg:z-50 lg:flex-shrink-0 flex flex-col overflow-hidden"
+            style={{ height: 'calc(100vh - 4rem)' }}
           >
             {/* 標題區域 */}
             <div className="p-6 border-b border-[#EADBC8] flex-shrink-0">
@@ -300,7 +301,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
             </div>
 
             {/* 選單項目 */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+            <nav className="flex-1 min-h-0 overflow-y-auto p-4 pb-8 space-y-2">
               {sidebarMenuItems.map((item, index) => {
                 const isActive = currentPath === item.href;
 

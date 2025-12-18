@@ -2,9 +2,9 @@
 
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
-  UserIcon, 
-  UsersIcon, 
+import {
+  UserIcon,
+  UsersIcon,
   LinkIcon,
   HeartIcon,
   BookOpenIcon,
@@ -23,7 +23,7 @@ export default function ParentNavigation({ className = '' }: ParentNavigationPro
       icon: UsersIcon,
       label: '家長連結',
       href: '/aihome/parent/bound-students',
-      description: '查看孩子的學習',
+      description: '查看孩子的學習和成長',
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
       iconColor: 'text-green-600'
