@@ -4693,7 +4693,10 @@ export default function RoomChatPage() {
               }
             }
           }
-        } catch (e) { }
+        } catch (e) {
+          // Silently handle token refresh errors
+          console.debug('Token refresh error:', e);
+        }
 
         // 2. Create Stateless Client
         // We use the anon key and inject the token. 
@@ -5562,7 +5565,10 @@ export default function RoomChatPage() {
                 }
               }
             }
-          } catch (e) { }
+          } catch (e) {
+            // Silently handle vision token refresh errors
+            console.debug('Vision token refresh error:', e);
+          }
 
           const visionClient = createClient(supabaseUrl, supabaseAnonKey, {
             auth: { persistSession: false },

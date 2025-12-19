@@ -13,6 +13,7 @@ import {
   SparklesIcon,
   AcademicCapIcon,
   BriefcaseIcon,
+  BeakerIcon,
 } from '@heroicons/react/24/outline';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
 import { useTeacherAccess } from '@/hooks/saas/useTeacherAccess';
@@ -200,6 +201,12 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
         label: '換腦工房',
         href: '/aihome/ai-companions',
         description: '組裝 AI 思維，打造你的第二大腦'
+      },
+      {
+        icon: BeakerIcon,
+        label: 'AI 實驗室',
+        href: '/aihome/playground',
+        description: '探索 3D 互動與創意 AI 小工具'
       },
     ];
 

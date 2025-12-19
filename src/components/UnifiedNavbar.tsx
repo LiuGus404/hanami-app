@@ -81,16 +81,17 @@ export default function UnifiedNavbar({
                 >
                   <Cog6ToothIcon className="w-6 h-6 text-[#4B4036]" />
                 </motion.button>
-                {menuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={closeMenu} />
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute right-0 mt-2 w-44 bg-white border border-[#EADBC8] rounded-xl shadow-lg z-50"
-                    >
+                <AnimatePresence>
+                  {menuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={closeMenu} />
+                      <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute right-0 mt-2 w-44 bg-white border border-[#EADBC8] rounded-xl shadow-lg z-50"
+                      >
                       {user ? (
                         <div className="px-4 py-3 text-[#4B4036] text-sm">
                           <div className="flex items-center gap-3 mb-2">
@@ -150,7 +151,8 @@ export default function UnifiedNavbar({
                       )}
                     </motion.div>
                   </>
-                )}
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </div>

@@ -219,7 +219,12 @@ export default function TaskDashboard({ userPhone, orgId, userEmail, onTaskEdit,
         const errorText = await response.text();
         console.log('Update failed body:', errorText);
         let errorData: any = {};
-        try { errorData = JSON.parse(errorText); } catch (e) { }
+        try { 
+          errorData = JSON.parse(errorText); 
+        } catch (e) {
+          // Silently handle JSON parse errors
+          console.debug('JSON parse error:', e);
+        }
         throw new Error(`Failed to update status: ${errorData?.details || errorData?.error || response.statusText} `);
       }
 
