@@ -191,6 +191,7 @@ const CarouselCard = ({
         } else {
             shakeX.set(0);
             shakeR.set(0);
+            return undefined;
         }
     }, [isActive, isGrabbing, shakeX, shakeR]);
 
@@ -302,11 +303,11 @@ const CarouselCard = ({
             <div style={{ marginLeft: -10, marginTop: -10 }} className="relative md:ml-0 md:mt-0">
                 {/* Real Projected Floor Shadow */}
                 {/* Positioned at the bottom, rotated to lie flat on the floor */}
-                <div
+                <motion.div
                     className="absolute -bottom-[60px] left-1/2 w-[90%] h-[40px] bg-black/20 blur-[20px] rounded-[100%] pointer-events-none transition-all duration-500 group-hover:bg-black/30 group-hover:blur-[25px] group-hover:w-[100%]"
                     style={{
                         transform: 'translateX(-50%) rotateX(90deg)',
-                        opacity: useTransform(opacity, o => o as number * 0.5) // Shadow fades with card
+                        opacity: useTransform(opacity, o => (o as number) * 0.5) // Shadow fades with card
                     }}
                 />
 
