@@ -106,7 +106,7 @@ function InteractiveTree({ gesture, handX, handY = 0.5, isTracking, photos, onSc
         }
     }, [resetKey, camera]);
 
-    // Mouse event handlers
+    // Mouse and touch event handlers
     useEffect(() => {
         const canvas = gl.domElement;
 
@@ -129,6 +129,26 @@ function InteractiveTree({ gesture, handX, handY = 0.5, isTracking, photos, onSc
             isDragging.current = false;
         };
 
+        // Touch event handlers for mobile
+        const handleTouchStart = (e: TouchEvent) => {
+            if (e.touches.length === 1) {
+                isDragging.current = true;
+                lastMouseX.current = e.touches[0].clientX;
+            }
+        };
+
+        const handleTouchMove = (e: TouchEvent) => {
+            if (isDragging.current && focusedPhotoIndex === null && e.touches.length === 1) {
+                const deltaX = e.touches[0].clientX - lastMouseX.current;
+                targetRotationRef.current += deltaX * 0.01;
+                lastMouseX.current = e.touches[0].clientX;
+            }
+        };
+
+        const handleTouchEnd = () => {
+            isDragging.current = false;
+        };
+
         const handleWheel = (e: WheelEvent) => {
             if (focusedPhotoIndex !== null) return; // Disable zoom when focused
             e.preventDefault();
@@ -142,6 +162,9 @@ function InteractiveTree({ gesture, handX, handY = 0.5, isTracking, photos, onSc
         canvas.addEventListener('mousemove', handleMouseMove);
         canvas.addEventListener('mouseup', handleMouseUp);
         canvas.addEventListener('mouseleave', handleMouseUp);
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
+        canvas.addEventListener('touchend', handleTouchEnd);
         canvas.addEventListener('wheel', handleWheel, { passive: false });
 
         return () => {
@@ -149,6 +172,9 @@ function InteractiveTree({ gesture, handX, handY = 0.5, isTracking, photos, onSc
             canvas.removeEventListener('mousemove', handleMouseMove);
             canvas.removeEventListener('mouseup', handleMouseUp);
             canvas.removeEventListener('mouseleave', handleMouseUp);
+            canvas.removeEventListener('touchstart', handleTouchStart);
+            canvas.removeEventListener('touchmove', handleTouchMove);
+            canvas.removeEventListener('touchend', handleTouchEnd);
             canvas.removeEventListener('wheel', handleWheel);
         };
     }, [camera, gl, focusedPhotoIndex]);

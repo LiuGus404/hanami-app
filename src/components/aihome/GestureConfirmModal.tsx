@@ -108,6 +108,36 @@ export default function GestureConfirmModal({
                                 </div>
                             </div>
 
+                            {/* Camera Permission Guide - Collapsible */}
+                            <details className="text-xs text-[#6B6B6B] bg-white/30 rounded-xl p-3">
+                                <summary className="cursor-pointer font-medium text-[#4A4A4A] flex items-center gap-2">
+                                    <span>📱</span> 如何開啟相機權限？
+                                </summary>
+                                <div className="mt-3 space-y-3 pl-1">
+                                    {/* iOS Instructions */}
+                                    <div>
+                                        <p className="font-medium text-[#4A4A4A]">🍎 iPhone / iPad：</p>
+                                        <ol className="list-decimal list-inside space-y-1 mt-1 text-[#6B6B6B]">
+                                            <li>打開「設定」應用程式</li>
+                                            <li>向下滑動找到「Safari」</li>
+                                            <li>點選「相機」</li>
+                                            <li>選擇「允許」或「詢問」</li>
+                                        </ol>
+                                    </div>
+                                    {/* Android Instructions */}
+                                    <div>
+                                        <p className="font-medium text-[#4A4A4A]">🤖 Android：</p>
+                                        <ol className="list-decimal list-inside space-y-1 mt-1 text-[#6B6B6B]">
+                                            <li>打開「設定」</li>
+                                            <li>點選「應用程式」→「Chrome」</li>
+                                            <li>點選「權限」→「相機」</li>
+                                            <li>選擇「允許」</li>
+                                        </ol>
+                                    </div>
+                                    <p className="text-[#8A8A8A] italic">提示：授權後請重新整理頁面</p>
+                                </div>
+                            </details>
+
                             {/* Privacy Note */}
                             <p className="text-center text-[#8A8A8A] text-xs">
                                 影像僅在本地處理，不會上傳

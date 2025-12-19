@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ArrowLeftIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, HomeIcon, EllipsisVerticalIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { MusicalNoteIcon, StarIcon, BellIcon, HeartIcon, HandRaisedIcon } from '@heroicons/react/24/solid';
 import InteractionToggle from '@/components/aihome/InteractionToggle';
 import GestureConfirmModal from '@/components/aihome/GestureConfirmModal';
@@ -130,6 +130,8 @@ export default function PitchBellPage() {
     const { gesture, handX, handY, isTracking, startTracking, stopTracking } = useHandGesture();
     const { isPlaying: isMusicPlaying, togglePlay } = useMusicPlayer();
     const [isGestureLoading, setIsGestureLoading] = useState(false);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const [showSongMenu, setShowSongMenu] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [currentSongId, setCurrentSongId] = useState('scale');
     const [isHintDismissed, setIsHintDismissed] = useState(false);
@@ -208,8 +210,95 @@ export default function PitchBellPage() {
 
     return (
         <div className="min-h-screen bg-[#FAFAF9] flex flex-col relative overflow-hidden">
-            {/* Header */}
-            <div className="absolute top-0 left-0 pt-10 px-8 z-10 text-center md:text-left pointer-events-none">
+            {/* Mobile: Compact Header Row (Title + 3-dot Menu) */}
+            <div className="flex sm:hidden items-center justify-between absolute top-4 left-4 right-4 z-50 pointer-events-none">
+                <div className="flex items-center gap-2 pointer-events-auto">
+                    <Link href="/aihome/playground" className="hover:scale-110 transition-transform">
+                        <div className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm border border-[#EADBC8] shadow-sm flex items-center justify-center hover:bg-white text-[#4B4036]">
+                            <ArrowLeftIcon className="w-4 h-4" />
+                        </div>
+                    </Link>
+                    <div className="flex flex-col">
+                        <h1 className="text-lg font-bold text-[#4B4036] font-serif tracking-wide">
+                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4B4036] via-[#6B5142] to-[#8C7A6B]">
+                                空氣彩虹鐘
+                            </span>
+                        </h1>
+                        <p className="text-[#8A8A8A] text-[10px] font-light tracking-wide opacity-80 -mt-0.5">
+                            花見AI與孩子的魔法樂章
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 pointer-events-auto">
+                    {/* Mobile Song Selector */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSongMenu(!showSongMenu)}
+                            className="flex items-center gap-1 px-3 py-2 rounded-full bg-white/30 backdrop-blur-md border border-white/40 shadow-sm transition-all hover:bg-white/40 text-[#4B4036] font-medium text-xs"
+                        >
+                            <span className="truncate max-w-[60px]">{currentSong.title.split(' ')[0]}</span>
+                            <svg className={`w-3 h-3 opacity-70 transition-transform ${showSongMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {/* Dropdown Menu */}
+                        {showSongMenu && (
+                            <div className="absolute top-full right-0 mt-2 w-40 py-1 rounded-xl bg-white/90 backdrop-blur-xl border border-white/40 shadow-lg flex flex-col gap-0.5 p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                {SONGS.map(s => (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => {
+                                            setCurrentSongId(s.id);
+                                            setShowSongMenu(false);
+                                        }}
+                                        className={`text-left px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-2 ${currentSongId === s.id
+                                            ? 'bg-white/70 text-[#4B4036] font-bold shadow-sm'
+                                            : 'hover:bg-white/40 text-[#4B4036]/80'
+                                            }`}
+                                    >
+                                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                                        <span className="truncate">{s.title.split('(')[0].trim()}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <InteractionToggle
+                        isEnabled={isTracking}
+                        onToggle={handleInteractionToggle}
+                        isLoading={isGestureLoading}
+                    />
+                    <button
+                        onClick={() => setShowMobileMenu(!showMobileMenu)}
+                        className="w-10 h-10 rounded-full bg-white/30 hover:bg-white/50 backdrop-blur-md shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer border border-white/40"
+                    >
+                        {showMobileMenu ? (
+                            <XMarkIcon className="w-5 h-5 text-[#4B4036]" />
+                        ) : (
+                            <EllipsisVerticalIcon className="w-5 h-5 text-[#4B4036]" />
+                        )}
+                    </button>
+                </div>
+            </div>
+
+            {/* Mobile: Expandable Control Buttons */}
+            {showMobileMenu && (
+                <div className="flex sm:hidden flex-wrap justify-center gap-2 z-40 pointer-events-auto absolute top-16 left-4 right-4 bg-white/50 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/40 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <UnifiedRightContent
+                        user={user}
+                        onLogout={logout}
+                    />
+                    <FoodBalanceButton />
+                    <Link href="/aihome">
+                        <div className="w-10 h-10 rounded-full bg-[#A7C7E7] hover:bg-[#8FB8E0] shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/20">
+                            <HomeIcon className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-300" />
+                        </div>
+                    </Link>
+                </div>
+            )}
+
+            {/* Desktop: Header */}
+            <div className="hidden sm:block absolute top-0 left-0 pt-10 px-8 z-10 text-left pointer-events-none">
                 <div className="inline-flex items-center gap-4">
                     <Link href="/aihome/playground" className="pointer-events-auto hover:scale-110 transition-transform">
                         <div className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm border border-[#EADBC8] shadow-sm flex items-center justify-center hover:bg-white text-[#4B4036]">
@@ -218,23 +307,23 @@ export default function PitchBellPage() {
                     </Link>
                     <div>
                         <h1 className="text-2xl md:text-3xl font-bold text-[#4B4036] font-serif tracking-widest">
-                            AI 空氣音鐘
+                            空氣彩虹鐘
                         </h1>
                         <p className="text-[#8A8A8A] text-sm md:text-base font-light tracking-wide opacity-80">
-                            Virtual Pitch Bell
+                            花見AI與孩子的魔法樂章
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Navigation Bar (Right) */}
-            <div className="absolute top-8 right-6 z-50 flex items-center gap-3 pointer-events-auto">
+            {/* Desktop: Navigation Bar (Top Right) */}
+            <div className="hidden sm:flex absolute top-8 right-6 z-50 items-center gap-3 pointer-events-auto">
                 {/* Song Selection (Frosted Glass Dropdown) */}
                 <div className="relative group mr-2">
                     <button
-                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/30 backdrop-blur-md border border-white/40 shadow-sm transition-all hover:bg-white/40 text-[#4B4036] font-medium min-w-[160px] justify-between"
+                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/30 backdrop-blur-md border border-white/40 shadow-sm transition-all hover:bg-white/40 text-[#4B4036] font-medium min-w-[120px] md:min-w-[160px] justify-between"
                     >
-                        <span className="truncate max-w-[120px]">{currentSong.title}</span>
+                        <span className="truncate max-w-[80px] md:max-w-[120px]">{currentSong.title}</span>
                         <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
@@ -264,7 +353,6 @@ export default function PitchBellPage() {
                         onToggle={handleInteractionToggle}
                         isLoading={isGestureLoading}
                     />
-                    {/* Shishi Hint (Anchored to Toggle) */}
                     <PlaygroundHint
                         isVisible={!isTracking && !showConfirmModal && !isHintDismissed && !isPreparing && countdown === null}
                         className="absolute top-12 -right-4 z-50 w-[240px] pointer-events-none"

@@ -3,7 +3,7 @@ import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiInput } from '@/components/ui/HanamiInput';
 import { HanamiSelect } from '@/components/ui/HanamiSelect';
 import { toast } from 'react-hot-toast';
-import { format, addHours, isBefore, isAfter, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { addDays, isBefore, isAfter, parseISO } from 'date-fns';
 import { Loader2, Upload, X } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { Lesson } from '@/types';
@@ -37,16 +37,22 @@ export default function LeaveApplicationModal({
         const now = new Date();
         const filtered = lessons.filter((lesson) => {
             if (!lesson.lesson_date) return false;
+            
+            // 排除已請假的課堂
+            if (lesson.lesson_status === '請假') {
+                return false;
+            }
+            
             const lessonDate = parseISO(lesson.lesson_date); // Assuming lesson.lesson_date is YYYY-MM-DD or ISO string
 
             if (leaveType === 'personal') {
                 // Personal leave: > 72 hours notice
-                const minNoticeDate = addHours(now, 72);
+                const minNoticeDate = addDays(now, 3);
                 return isAfter(lessonDate, minNoticeDate);
             } else {
-                // Sick leave: +/- 24 hours window
-                const minDate = addHours(now, -24);
-                const maxDate = addHours(now, 24);
+                // Sick leave: +/- 7 days window
+                const minDate = addDays(now, -7);
+                const maxDate = addDays(now, 7);
                 return isAfter(lessonDate, minDate) && isBefore(lessonDate, maxDate);
             }
         });
@@ -203,8 +209,8 @@ export default function LeaveApplicationModal({
                         </div>
                         <p className="text-xs text-gray-500">
                             {leaveType === 'personal'
-                                ? '需於 72 小時前申請，每月限一次。'
-                                : '需於課堂前後 24 小時內申請，並上傳醫生證明。'}
+                                ? '需於 72 小時前申請，待審批。'
+                                : '需於課堂前後 7 天內申請，並上傳醫生證明，待審批。'}
                         </p>
                     </div>
 

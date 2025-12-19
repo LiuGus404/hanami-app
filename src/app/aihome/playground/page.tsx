@@ -103,14 +103,14 @@ interface Experiment {
 }
 
 // --- Configuration ---
-const RADIUS = 350;
+// RADIUS is now handled dynamically in the component
 
 // --- Mock Data ---
 const experiments: Experiment[] = [
     {
         id: 'christmas-gallery',
-        title: "AI魔法畫廊",
-        description: "沉浸式粒子聖誕樹體驗，支援手勢與許願互動。",
+        title: "AI星光回憶錄",
+        description: "用回憶組合，專屬於您沉浸式的微光聖誕樹。",
         status: "Live",
         href: "/aihome/playground/christmas-tree",
         thumbnailGradient: "from-pink-400 to-rose-500",
@@ -127,7 +127,7 @@ const experiments: Experiment[] = [
     {
         id: 'ai-storybook',
         title: "AI繪本",
-        description: "AI 生成互動故事繪本，讓想像力變成畫面。",
+        description: "AI互動式故事繪本，讓想像力變成畫面。",
         status: "Coming Soon",
         thumbnailGradient: "from-blue-400 to-purple-500",
         icon: PhotoIcon,
@@ -135,7 +135,7 @@ const experiments: Experiment[] = [
     {
         id: 'ai-pitch-bell',
         title: "AI空氣音鐘",
-        description: "揮手演奏的虛擬樂器，將高度轉化為美妙音階。",
+        description: "揮手演奏的虛擬樂器，用AI轉化為美妙音階。",
         status: "Live",
         href: "/aihome/playground/pitch-bell",
         thumbnailGradient: "from-cyan-400 to-blue-500",
@@ -153,14 +153,29 @@ const experiments: Experiment[] = [
 
 const ANGLE_STEP = 360 / experiments.length;
 
-// --- 3D Card Component ---
+// Hook to get responsive radius
+const useResponsiveRadius = () => {
+    const [radius, setRadius] = React.useState(350);
+    React.useEffect(() => {
+        const updateRadius = () => {
+            // Smaller radius on mobile for tighter carousel
+            setRadius(window.innerWidth < 640 ? 180 : 350);
+        };
+        updateRadius();
+        window.addEventListener('resize', updateRadius);
+        return () => window.removeEventListener('resize', updateRadius);
+    }, []);
+    return radius;
+};
+
 const CarouselCard = ({
     item,
     index,
     rotation,
     isActive,
     pullY,
-    isGrabbing
+    isGrabbing,
+    radius
 }: {
     item: Experiment;
     index: number;
@@ -168,6 +183,7 @@ const CarouselCard = ({
     isActive: boolean;
     pullY?: any;
     isGrabbing?: boolean;
+    radius: number;
 }) => {
     const baseAngle = index * ANGLE_STEP;
 
@@ -201,7 +217,7 @@ const CarouselCard = ({
         const currentSX = isActive ? sx : 0;
         const currentSR = isActive ? sr : 0;
 
-        return `rotateY(${angle as number + (currentSR as number)}deg) translateZ(${RADIUS}px) translateY(${currentY as number}px) translateX(${currentSX as number}px)`;
+        return `rotateY(${angle as number + (currentSR as number)}deg) translateZ(${radius}px) translateY(${currentY as number}px) translateX(${currentSX as number}px)`;
     });
 
     const opacity = useTransform([effectiveAngle, pullY], ([angle, y]) => {
@@ -210,8 +226,10 @@ const CarouselCard = ({
         // Fade out if dropped significantly
         if (isActive && (y as number) > 200) return 1 - (((y as number) - 200) / 300);
 
-        if (abs > 110) return 0;
-        if (abs > 80) return 1 - ((abs - 80) / 30);
+        // Show more cards on mobile (wider visibility range)
+        if (abs > 150) return 0;
+        if (abs > 120) return 0.3; // Adjacent cards dimmer but visible
+        if (abs > 80) return 0.6;
         return 1;
     });
 
@@ -228,10 +246,10 @@ const CarouselCard = ({
     const Icon = item.icon;
 
     const CardContent = (
-        <div className="group relative w-[280px] h-[400px] md:w-[320px] md:h-[460px] rounded-[40px] bg-white/40 backdrop-blur-xl overflow-hidden flex flex-col select-none backface-hidden ring-1 ring-white/60 transition-all duration-500 border border-white/40 shadow-2xl">
+        <div className="group relative w-[200px] h-[280px] sm:w-[280px] sm:h-[400px] md:w-[320px] md:h-[460px] rounded-[20px] sm:rounded-[40px] bg-white/40 backdrop-blur-xl overflow-hidden flex flex-col select-none backface-hidden ring-1 ring-white/60 transition-all duration-500 border border-white/40 shadow-2xl">
 
             {/* Icy Texture Overlay */}
-            <div className="absolute inset-0 z-0 opacity-50 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay opacity-20" />
+            <div className="absolute inset-0 z-0 opacity-50 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay opacity-20 rounded-[20px] sm:rounded-[40px]" />
 
             {/* Grabbing Tension Overlay (Reddish tint when pulling hard) */}
             {isActive && isGrabbing && (
@@ -239,33 +257,33 @@ const CarouselCard = ({
             )}
 
             {/* Glossy Reflection Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/80 via-white/20 to-transparent z-0 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-br from-white/80 via-white/20 to-transparent z-0 pointer-events-none rounded-[20px] sm:rounded-[40px]" />
 
             {/* Top Shine */}
-            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-white/60 to-transparent pointer-events-none z-10" />
+            <div className="absolute top-0 left-0 right-0 h-24 sm:h-32 bg-gradient-to-b from-white/60 to-transparent pointer-events-none z-10 rounded-t-[20px] sm:rounded-t-[40px]" />
 
             {/* Thumbnail / Icon Area */}
             <div className="relative h-[60%] w-full flex items-center justify-center z-20">
                 {/* Floating Glow behind icon */}
-                <div className={`absolute w-32 h-32 rounded-full blur-[60px] opacity-60 bg-gradient-to-tr ${item.thumbnailGradient}`} />
+                <div className={`absolute w-20 h-20 sm:w-32 sm:h-32 rounded-full blur-[40px] sm:blur-[60px] opacity-60 bg-gradient-to-tr ${item.thumbnailGradient}`} />
 
                 {/* 3D Floating Icon */}
                 <div className="relative transform transition-all duration-700 group-hover:-translate-y-4 group-hover:scale-110 group-hover:rotate-6">
-                    <Icon className="w-28 h-28 text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] opacity-90" />
+                    <Icon className="w-16 h-16 sm:w-28 sm:h-28 text-white drop-shadow-[0_10px_20px_rgba(0,0,0,0.15)] opacity-90" />
                     {/* Reflection on icon */}
                     <div className="absolute inset-0 bg-gradient-to-tr from-transparent to-white/30 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 </div>
 
                 {/* Status Badge - Minimalist Pill */}
-                <div className={`absolute top-6 right-6 px-4 py-1.5 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase backdrop-blur-md shadow-sm border ${isLive ? 'bg-white/50 text-emerald-800 border-white/60' : 'bg-black/5 text-gray-500 border-white/20'}`}>
+                <div className={`absolute top-3 right-3 sm:top-6 sm:right-6 px-2 sm:px-4 py-1 sm:py-1.5 rounded-full text-[8px] sm:text-[10px] font-bold tracking-[0.15em] sm:tracking-[0.2em] uppercase backdrop-blur-md shadow-sm border ${isLive ? 'bg-white/50 text-emerald-800 border-white/60' : 'bg-black/5 text-gray-500 border-white/20'}`}>
                     {item.status}
                 </div>
             </div>
 
             {/* Info Section - Frosted Bottom */}
-            <div className="relative flex-1 p-8 flex flex-col items-center text-center z-20">
-                <h3 className="text-3xl font-bold text-gray-800/90 mb-3 tracking-tight drop-shadow-sm">{item.title}</h3>
-                <p className="text-sm text-gray-600 font-medium leading-relaxed line-clamp-2 max-w-[85%]">
+            <div className="relative flex-1 p-4 sm:p-8 flex flex-col items-center text-center z-20">
+                <h3 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-800/90 mb-1 sm:mb-3 tracking-tight drop-shadow-sm font-serif">{item.title}</h3>
+                <p className="text-xs sm:text-sm text-gray-600 font-light leading-relaxed line-clamp-2 max-w-[90%] sm:max-w-[85%] italic">
                     {item.description}
                 </p>
 
@@ -295,12 +313,12 @@ const CarouselCard = ({
                 position: 'absolute',
                 left: '50%',
                 top: '50%',
-                marginLeft: -150,
-                marginTop: -220,
+                marginLeft: '-100px',
+                marginTop: '-230px',
             }}
-            className="origin-center"
+            className="origin-center sm:!ml-[-150px] sm:!mt-[-220px]"
         >
-            <div style={{ marginLeft: -10, marginTop: -10 }} className="relative md:ml-0 md:mt-0">
+            <div className="relative">
                 {/* Real Projected Floor Shadow */}
                 {/* Positioned at the bottom, rotated to lie flat on the floor */}
                 <motion.div
@@ -329,6 +347,7 @@ export default function PlaygroundHome() {
     // Use MotionValue for reactive animation
     const rotation = useMotionValue(0);
     const [currentIndex, setCurrentIndex] = React.useState(0);
+    const radius = useResponsiveRadius();
 
     const handleInteractionToggle = useCallback(() => {
         if (isTracking) {
@@ -554,38 +573,55 @@ export default function PlaygroundHome() {
                 </div>
             )}
             {/* Header */}
-            <div className="pt-10 px-8 relative z-10 pointer-events-none text-center md:text-left">
-                <h1 className="text-4xl md:text-5xl font-bold text-[#4B4036] inline-flex items-center gap-4 font-serif tracking-widest">
-                    <SparklesIcon className="w-8 h-8 md:w-10 md:h-10 text-[#D4A373] animate-pulse" />
+            <div className="pt-12 sm:pt-10 px-4 sm:px-8 relative z-10 pointer-events-none text-center md:text-left">
+                <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-[#4B4036] inline-flex items-center gap-2 sm:gap-4 font-serif tracking-widest">
+                    <SparklesIcon className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 text-[#D4A373] animate-pulse" />
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4B4036] via-[#6B5142] to-[#8C7A6B] drop-shadow-sm">
                         花見 AI 實驗室
                     </span>
                 </h1>
-                <p className="text-[#8A8A8A] text-lg md:text-xl mt-3 font-light tracking-wide opacity-80 pl-1">
+                <p className="text-[#8A8A8A] text-sm sm:text-lg md:text-xl mt-2 sm:mt-3 font-light tracking-wide opacity-80 pl-1">
                     探索 3D 互動與創意 AI 小工具
                 </p>
             </div>
 
-            {/* Navigation Bar (Interaction, Food, Settings, Home) */}
-            <div className="absolute top-8 right-6 z-50 flex items-center space-x-3 pointer-events-auto">
-                {/* Interaction Toggle */}
+            {/* Mobile: Food Balance (Top Right) */}
+            <div className="block sm:hidden absolute top-4 right-4 z-50 pointer-events-auto">
+                <FoodBalanceButton />
+            </div>
+
+            {/* Mobile: Control Buttons (Below Header, Above Cards) */}
+            <div className="flex sm:hidden justify-center gap-3 mt-1 mb-0 z-20 pointer-events-auto">
                 <InteractionToggle
                     isEnabled={isTracking}
                     onToggle={handleInteractionToggle}
                     isLoading={isLoading}
                 />
-
-                {/* Food Balance */}
-                <FoodBalanceButton />
-
-                {/* Unified Right Content (Music + Settings Overlay) */}
                 <UnifiedRightContent
                     user={user}
                     onLogout={logout}
                     onNavigate={(path) => router.push(`/aihome/${path.replace('view:', '?view=')}`)}
                 />
+                <Link href="/aihome">
+                    <div className="w-10 h-10 rounded-full bg-[#A7C7E7] hover:bg-[#8FB8E0] shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/20">
+                        <HomeIcon className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-300" />
+                    </div>
+                </Link>
+            </div>
 
-                {/* Home Button */}
+            {/* Desktop: Navigation Bar (Top Right) */}
+            <div className="hidden sm:flex absolute top-8 right-6 z-50 items-center space-x-3 pointer-events-auto">
+                <InteractionToggle
+                    isEnabled={isTracking}
+                    onToggle={handleInteractionToggle}
+                    isLoading={isLoading}
+                />
+                <FoodBalanceButton />
+                <UnifiedRightContent
+                    user={user}
+                    onLogout={logout}
+                    onNavigate={(path) => router.push(`/aihome/${path.replace('view:', '?view=')}`)}
+                />
                 <Link href="/aihome">
                     <div className="w-10 h-10 rounded-full bg-[#A7C7E7] hover:bg-[#8FB8E0] shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/20">
                         <HomeIcon className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-300" />
@@ -595,7 +631,7 @@ export default function PlaygroundHome() {
 
             {/* 3D Scene Wrapper - with touch/drag support */}
             <div
-                className="flex-1 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
+                className="flex-1 relative flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing pb-10 sm:pb-0"
                 style={{ perspective: '1200px', touchAction: 'none' }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -607,7 +643,7 @@ export default function PlaygroundHome() {
                     className="relative w-full h-full flex items-center justify-center"
                     style={{
                         transformStyle: 'preserve-3d',
-                        transform: `translateZ(-${RADIUS}px)`
+                        transform: `translateZ(-${radius}px)`
                     }}
                 >
                     {experiments.map((exp, index) => (
@@ -625,9 +661,15 @@ export default function PlaygroundHome() {
                                 isActive={index === currentIndex}
                                 pullY={pullYMotion}
                                 isGrabbing={(gesture === 'CLOSED' || isMouseGrabbing) && index === currentIndex}
+                                radius={radius}
                             />
                         </div>
                     ))}
+                </div>
+
+                {/* Navigation Hint (Visible on mobile, inside carousel) */}
+                <div className="block sm:hidden absolute bottom-60 left-0 right-0 text-center z-50">
+                    <span className="text-[#D4A373]/80 text-xs font-medium tracking-widest bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full">← 滑動切換 →</span>
                 </div>
 
                 {/* Navigation Arrows */}
@@ -647,8 +689,8 @@ export default function PlaygroundHome() {
                 </button>
             </div>
 
-            {/* Indicators */}
-            <div className="pb-12 flex flex-col items-center space-y-4">
+            {/* Indicators (Hidden on mobile to avoid overlap with bottom nav) */}
+            <div className="hidden sm:flex pb-12 flex-col items-center space-y-4">
                 <div className="flex space-x-2">
                     {experiments.map((_, idx) => (
                         <div

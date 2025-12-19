@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { ArrowLeftIcon, HomeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, HomeIcon, ArrowPathIcon, EllipsisVerticalIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import FoodBalanceButton from '@/components/aihome/FoodBalanceButton';
 import UnifiedRightContent from '@/components/UnifiedRightContent';
 import { useSaasAuth } from '@/hooks/saas/useSaasAuthSimple';
@@ -46,6 +46,7 @@ export default function ChristmasTreePage() {
     const [showGalleryModal, setShowGalleryModal] = useState(false);
     const [hasRecording, setHasRecording] = useState(false);
     const [resetKey, setResetKey] = useState(0);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleResetCamera = useCallback(() => {
@@ -99,8 +100,86 @@ export default function ChristmasTreePage() {
 
     return (
         <div className="w-full h-screen relative overflow-hidden bg-[#FAFAF9]">
-            {/* Header - Matching Playground Style */}
-            <div className="absolute top-0 left-0 pt-10 px-8 z-10 text-center md:text-left pointer-events-none">
+            {/* Mobile: Compact Header Row (Title + Food Balance + Menu Button) */}
+            <div className="flex sm:hidden items-center justify-between absolute top-4 left-4 right-4 z-50 pointer-events-none">
+                <div className="flex items-center gap-2 pointer-events-auto">
+                    <Link href="/aihome/playground" className="hover:scale-110 transition-transform">
+                        <div className="w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm border border-[#EADBC8] shadow-sm flex items-center justify-center hover:bg-white text-[#4B4036]">
+                            <ArrowLeftIcon className="w-4 h-4" />
+                        </div>
+                    </Link>
+                    <div className="flex flex-col">
+                        <h1 className="text-lg font-bold text-[#4B4036] font-serif tracking-wide">
+                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4B4036] via-[#6B5142] to-[#8C7A6B]">
+                                星光回憶錄
+                            </span>
+                        </h1>
+                        <p className="text-[#8A8A8A] text-[10px] font-light tracking-wide opacity-80 -mt-0.5">
+                            花見AI與你建立的微光聖誕樹
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 pointer-events-auto">
+                    <InteractionToggle
+                        isEnabled={isTracking}
+                        onToggle={handleInteractionToggle}
+                        isLoading={isGestureLoading}
+                    />
+                    <PhotoUploadButton
+                        onClick={handlePhotoUploadClick}
+                        isLoading={isPhotoLoading}
+                        photoCount={photos.length}
+                    />
+                    <button
+                        onClick={() => setShowMobileMenu(!showMobileMenu)}
+                        className="w-10 h-10 rounded-full bg-white/30 hover:bg-white/50 backdrop-blur-md shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer border border-white/40"
+                    >
+                        {showMobileMenu ? (
+                            <XMarkIcon className="w-5 h-5 text-[#4B4036]" />
+                        ) : (
+                            <EllipsisVerticalIcon className="w-5 h-5 text-[#4B4036]" />
+                        )}
+                    </button>
+                </div>
+            </div>
+
+            {/* Mobile: Expandable Control Buttons */}
+            {showMobileMenu && (
+                <div className="flex sm:hidden flex-wrap justify-center gap-2 z-40 pointer-events-auto absolute top-16 left-4 right-4 bg-white/50 backdrop-blur-md rounded-2xl p-3 shadow-lg border border-white/40 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <button
+                        onClick={handleResetCamera}
+                        className="w-10 h-10 rounded-full bg-white/30 hover:bg-white/50 backdrop-blur-md shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/40"
+                        title="重置鏡頭"
+                    >
+                        <ArrowPathIcon className="w-5 h-5 text-[#4B4036] group-hover:rotate-180 transition-transform duration-500" />
+                    </button>
+                    <RecordButton
+                        isRecording={isRecording}
+                        recordingTime={recordingTime}
+                        onStartRecording={startRecording}
+                        onStopRecording={async () => {
+                            const blob = await stopRecording();
+                            if (blob) setHasRecording(true);
+                        }}
+                        hasRecording={hasRecording}
+                        onDownload={downloadRecording}
+                    />
+                    <UnifiedRightContent
+                        user={user}
+                        onLogout={logout}
+                        onNavigate={(path) => router.push(`/aihome/${path.replace('view:', '?view=')}`)}
+                    />
+                    <FoodBalanceButton />
+                    <Link href="/aihome">
+                        <div className="w-10 h-10 rounded-full bg-[#A7C7E7] hover:bg-[#8FB8E0] shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/20">
+                            <HomeIcon className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-300" />
+                        </div>
+                    </Link>
+                </div>
+            )}
+
+            {/* Desktop: Header */}
+            <div className="hidden sm:block absolute top-0 left-0 pt-10 px-8 z-10 text-left pointer-events-none">
                 <div className="inline-flex items-center gap-4">
                     <Link href="/aihome/playground" className="pointer-events-auto hover:scale-110 transition-transform">
                         <div className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm border border-[#EADBC8] shadow-sm flex items-center justify-center hover:bg-white text-[#4B4036]">
@@ -110,26 +189,23 @@ export default function ChristmasTreePage() {
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-[#4B4036] inline-flex items-center gap-4 font-serif tracking-widest">
                             <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4B4036] via-[#6B5142] to-[#8C7A6B] drop-shadow-sm">
-                                聖誕許願樹
+                                星光回憶錄
                             </span>
                         </h1>
                         <p className="text-[#8A8A8A] text-lg md:text-xl mt-1 font-light tracking-wide opacity-80">
-                            沉浸式 3D 粒子互動體驗
+                            花見AI與你建立的微光聖誕樹
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Navigation Bar - InteractionToggle | FoodBalance | Settings | Home */}
-            <div className="absolute top-8 right-6 z-50 flex items-center space-x-3 pointer-events-auto">
-                {/* Interaction Toggle */}
+            {/* Desktop: Navigation Bar (Top Right) */}
+            <div className="hidden sm:flex absolute top-8 right-6 z-50 items-center space-x-3 pointer-events-auto">
                 <InteractionToggle
                     isEnabled={isTracking}
                     onToggle={handleInteractionToggle}
                     isLoading={isGestureLoading}
                 />
-
-                {/* Reset Camera Button */}
                 <button
                     onClick={handleResetCamera}
                     className="w-10 h-10 rounded-full bg-white/30 hover:bg-white/50 backdrop-blur-md shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/40"
@@ -137,8 +213,6 @@ export default function ChristmasTreePage() {
                 >
                     <ArrowPathIcon className="w-5 h-5 text-[#4B4036] group-hover:rotate-180 transition-transform duration-500" />
                 </button>
-
-                {/* Record Button */}
                 <RecordButton
                     isRecording={isRecording}
                     recordingTime={recordingTime}
@@ -150,25 +224,17 @@ export default function ChristmasTreePage() {
                     hasRecording={hasRecording}
                     onDownload={downloadRecording}
                 />
-
-                {/* Photo Upload */}
                 <PhotoUploadButton
                     onClick={handlePhotoUploadClick}
                     isLoading={isPhotoLoading}
                     photoCount={photos.length}
                 />
-
-                {/* Food Balance */}
                 <FoodBalanceButton />
-
-                {/* Unified Right Content (Music + Settings Overlay) */}
                 <UnifiedRightContent
                     user={user}
                     onLogout={logout}
                     onNavigate={(path) => router.push(`/aihome/${path.replace('view:', '?view=')}`)}
                 />
-
-                {/* Home Button */}
                 <Link href="/aihome">
                     <div className="w-10 h-10 rounded-full bg-[#A7C7E7] hover:bg-[#8FB8E0] shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/20">
                         <HomeIcon className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-300" />
