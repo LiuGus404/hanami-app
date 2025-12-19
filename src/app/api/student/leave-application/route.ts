@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { addHours, isAfter, isBefore, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { addDays, addHours, isAfter, isBefore, parseISO } from 'date-fns';
 
 export async function POST(request: NextRequest) {
     try {
@@ -19,6 +19,39 @@ export async function POST(request: NextRequest) {
         const lessonDateObj = parseISO(lessonDate);
         const now = new Date();
 
+        // 0. Check if lesson already has leave request or is already on leave
+        const { data: existingLesson, error: lessonError } = await (supabase as any)
+            .from('hanami_student_lesson')
+            .select('lesson_status')
+            .eq('id', lessonId)
+            .single();
+
+        if (lessonError) throw lessonError;
+
+        // 檢查課堂是否已經請假
+        if (existingLesson?.lesson_status === '請假') {
+            return NextResponse.json({ success: false, error: '此課堂已經請假，無法重複申請' }, { status: 400 });
+        }
+
+        // 檢查是否已有待審批或已批准的請假申請
+        const { data: existingRequest, error: requestError } = await (supabase as any)
+            .from('hanami_leave_requests')
+            .select('id, status')
+            .eq('lesson_id', lessonId)
+            .in('status', ['pending', 'approved'])
+            .maybeSingle();
+
+        if (requestError) throw requestError;
+
+        if (existingRequest) {
+            return NextResponse.json({ 
+                success: false, 
+                error: existingRequest.status === 'pending' 
+                    ? '此課堂已有待審批的請假申請' 
+                    : '此課堂的請假申請已獲批准' 
+            }, { status: 400 });
+        }
+
         // 1. Validate Leave Rules
         if (leaveType === 'personal') {
             // Check 72h notice
@@ -26,32 +59,13 @@ export async function POST(request: NextRequest) {
             if (isBefore(lessonDateObj, minNoticeDate)) {
                 return NextResponse.json({ success: false, error: '事假需在 72 小時前申請' }, { status: 400 });
             }
-
-            // Check monthly limit (1 per month)
-            const start = startOfMonth(lessonDateObj).toISOString();
-            const end = endOfMonth(lessonDateObj).toISOString();
-
-            const { count, error: countError } = await (supabase as any)
-                .from('hanami_leave_requests')
-                .select('*', { count: 'exact', head: true })
-                .eq('student_id', studentId)
-                .eq('leave_type', 'personal')
-                .gte('lesson_date', start)
-                .lte('lesson_date', end)
-                .neq('status', 'rejected'); // Count pending and approved
-
-            if (countError) throw countError;
-
-            if (count && count >= 1) {
-                return NextResponse.json({ success: false, error: '每月只能申請一次事假' }, { status: 400 });
-            }
         } else if (leaveType === 'sick') {
-            // Check +/- 24h window
-            const minDate = addHours(now, -24);
-            const maxDate = addHours(now, 24);
+            // 病假：課堂前後 7 天內可申請
+            const minDate = addDays(now, -7);
+            const maxDate = addDays(now, 7);
 
             if (isBefore(lessonDateObj, minDate) || isAfter(lessonDateObj, maxDate)) {
-                return NextResponse.json({ success: false, error: '病假需在課堂前後 24 小時內申請' }, { status: 400 });
+                return NextResponse.json({ success: false, error: '病假需在課堂前後 7 天內申請' }, { status: 400 });
             }
 
             if (!proofUrl) {
@@ -62,6 +76,7 @@ export async function POST(request: NextRequest) {
         // 2. Process Leave Application
 
         // Create leave request record
+        // Both personal and sick leave now require approval
         const { error: insertError } = await (supabase as any)
             .from('hanami_leave_requests')
             .insert({
@@ -70,10 +85,10 @@ export async function POST(request: NextRequest) {
                 lesson_id: lessonId, // Save lesson_id for restoration
                 lesson_date: lessonDate,
                 leave_type: leaveType,
-                status: leaveType === 'personal' ? 'approved' : 'pending',
+                status: 'pending', // Both types require approval
                 proof_url: proofUrl,
-                reviewed_at: leaveType === 'personal' ? new Date().toISOString() : null,
-                reviewed_by: leaveType === 'personal' ? 'system' : null,
+                reviewed_at: null,
+                reviewed_by: null,
             });
 
         if (insertError) throw insertError;
@@ -90,44 +105,23 @@ export async function POST(request: NextRequest) {
         }
 
         // Update student counts
-        if (leaveType === 'personal') {
-            // Increment approved_lesson_nonscheduled (Pending Arrangement)
-            const { data: student, error: fetchError } = await (supabase as any)
-                .from('Hanami_Students')
-                .select('approved_lesson_nonscheduled')
-                .eq('id', studentId)
-                .single();
+        // Both personal and sick leave now increment pending_confirmation_count
+        const { data: student, error: fetchError } = await (supabase as any)
+            .from('Hanami_Students')
+            .select('pending_confirmation_count')
+            .eq('id', studentId)
+            .single();
 
-            if (fetchError) throw fetchError;
+        if (fetchError) throw fetchError;
 
-            const currentCount = (student as any)?.approved_lesson_nonscheduled || 0;
+        const currentCount = (student as any)?.pending_confirmation_count || 0;
 
-            const { error: updateError } = await (supabase as any)
-                .from('Hanami_Students')
-                .update({ approved_lesson_nonscheduled: currentCount + 1 })
-                .eq('id', studentId);
+        const { error: updateError } = await (supabase as any)
+            .from('Hanami_Students')
+            .update({ pending_confirmation_count: currentCount + 1 })
+            .eq('id', studentId);
 
-            if (updateError) throw updateError;
-
-        } else {
-            // Sick leave: Increment pending_confirmation_count
-            const { data: student, error: fetchError } = await (supabase as any)
-                .from('Hanami_Students')
-                .select('pending_confirmation_count')
-                .eq('id', studentId)
-                .single();
-
-            if (fetchError) throw fetchError;
-
-            const currentCount = (student as any)?.pending_confirmation_count || 0;
-
-            const { error: updateError } = await (supabase as any)
-                .from('Hanami_Students')
-                .update({ pending_confirmation_count: currentCount + 1 })
-                .eq('id', studentId);
-
-            if (updateError) throw updateError;
-        }
+        if (updateError) throw updateError;
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

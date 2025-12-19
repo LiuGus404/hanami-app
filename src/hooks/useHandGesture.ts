@@ -81,83 +81,101 @@ export function useHandGesture(): UseHandGestureResult {
     const startTracking = useCallback(async () => {
         if (isTracking) return;
 
+        // Timeout wrapper for mobile reliability
+        const timeoutMs = 30000; // 30 seconds timeout
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Gesture tracking timed out. Please check camera permissions.')), timeoutMs);
+        });
+
         try {
-            // Load MediaPipe scripts from CDN
-            await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
-            await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
+            await Promise.race([
+                (async () => {
+                    // Load MediaPipe scripts from CDN
+                    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js');
+                    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js');
 
-            // Wait for globals to be available
-            await new Promise(resolve => setTimeout(resolve, 100));
+                    // Wait for globals to be available
+                    await new Promise(resolve => setTimeout(resolve, 100));
 
-            if (!window.Hands || !window.Camera) {
-                throw new Error('MediaPipe not loaded');
-            }
-
-            // Create hidden video element
-            const video = document.createElement('video');
-            video.style.display = 'none';
-            video.setAttribute('playsinline', '');
-            document.body.appendChild(video);
-            videoRef.current = video;
-
-            // Get camera stream
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 320, height: 240, facingMode: 'user' }
-            });
-            streamRef.current = stream;
-            video.srcObject = stream;
-            await video.play();
-
-            // Initialize MediaPipe Hands
-            const hands = new window.Hands({
-                locateFile: (file: string) =>
-                    `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-            });
-
-            hands.setOptions({
-                maxNumHands: 1,
-                modelComplexity: 1,
-                minDetectionConfidence: 0.7,
-                minTrackingConfidence: 0.5
-            });
-
-            hands.onResults((results: MediaPipeResults) => {
-                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                    const landmarks = results.multiHandLandmarks[0];
-                    setGesture(detectGesture(landmarks));
-
-                    // Track palm center X position (wrist landmark 0)
-                    // Note: Camera is mirrored, so we invert X (1 - x)
-                    const palmX = 1 - landmarks[0].x;
-                    const palmY = landmarks[0].y;
-
-                    setHandX(palmX);
-                    setHandY(palmY);
-                } else {
-                    setGesture('UNKNOWN');
-                }
-            });
-
-            handsRef.current = hands;
-
-            // Use Camera utils for frame capture
-            const camera = new window.Camera(video, {
-                onFrame: async () => {
-                    if (videoRef.current && handsRef.current) {
-                        await handsRef.current.send({ image: videoRef.current });
+                    if (!window.Hands || !window.Camera) {
+                        throw new Error('MediaPipe not loaded');
                     }
-                },
-                width: 320,
-                height: 240
-            });
-            await camera.start();
-            cameraRef.current = camera;
 
-            setIsTracking(true);
+                    // Create hidden video element
+                    const video = document.createElement('video');
+                    video.style.display = 'none';
+                    video.setAttribute('playsinline', '');
+                    document.body.appendChild(video);
+                    videoRef.current = video;
+
+                    // Check if mediaDevices is available (requires HTTPS)
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('相機功能需要 HTTPS 連線。請確保您的網址是 https:// 開頭。');
+                    }
+
+                    // Get camera stream
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: 320, height: 240, facingMode: 'user' }
+                    });
+                    streamRef.current = stream;
+                    video.srcObject = stream;
+                    await video.play();
+
+                    // Initialize MediaPipe Hands
+                    const hands = new window.Hands({
+                        locateFile: (file: string) =>
+                            `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+                    });
+
+                    hands.setOptions({
+                        maxNumHands: 1,
+                        modelComplexity: 1,
+                        minDetectionConfidence: 0.7,
+                        minTrackingConfidence: 0.5
+                    });
+
+                    hands.onResults((results: MediaPipeResults) => {
+                        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                            const landmarks = results.multiHandLandmarks[0];
+                            setGesture(detectGesture(landmarks));
+
+                            // Track palm center X position (wrist landmark 0)
+                            // Note: Camera is mirrored, so we invert X (1 - x)
+                            const palmX = 1 - landmarks[0].x;
+                            const palmY = landmarks[0].y;
+
+                            setHandX(palmX);
+                            setHandY(palmY);
+                        } else {
+                            setGesture('UNKNOWN');
+                        }
+                    });
+
+                    handsRef.current = hands;
+
+                    // Use Camera utils for frame capture
+                    const camera = new window.Camera(video, {
+                        onFrame: async () => {
+                            if (videoRef.current && handsRef.current) {
+                                await handsRef.current.send({ image: videoRef.current });
+                            }
+                        },
+                        width: 320,
+                        height: 240
+                    });
+                    await camera.start();
+                    cameraRef.current = camera;
+
+                    setIsTracking(true);
+                })(),
+                timeoutPromise
+            ]);
 
         } catch (error) {
             console.error('Failed to start hand tracking:', error);
             setIsTracking(false);
+            // Re-throw so callers know it failed
+            throw error;
         }
     }, [isTracking]);
 
