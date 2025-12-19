@@ -330,6 +330,17 @@ CREATE TABLE public.hanami_projects (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT hanami_projects_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.hanami_task_activities (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  task_id uuid NOT NULL,
+  user_phone text,
+  action text NOT NULL,
+  description text,
+  metadata jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hanami_task_activities_pkey PRIMARY KEY (id),
+  CONSTRAINT hanami_task_activities_task_id_fkey FOREIGN KEY (task_id) REFERENCES public.hanami_task_list(id)
+);
 CREATE TABLE public.hanami_task_attachments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   task_id uuid NOT NULL,
@@ -360,7 +371,7 @@ CREATE TABLE public.hanami_task_list (
   description text,
   status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text, 'blocked'::text])),
   priority text NOT NULL CHECK (priority = ANY (ARRAY['urgent_important'::text, 'important_not_urgent'::text, 'urgent_not_important'::text, 'not_urgent_not_important'::text])),
-  category ARRAY CHECK (category <@ ARRAY['progress'::text, 'video'::text, 'photo'::text, 'learning'::text, 'enroll'::text, 'course_query'::text, 'leave'::text, 'payment'::text, 'technical'::text, 'time'::text, 'life'::text, 'complaint'::text, 'other'::text]),
+  category ARRAY CHECK (category <@ ARRAY['progress'::text, 'progress_tracking'::text, 'video'::text, 'video_production'::text, 'photo'::text, 'photo_processing'::text, 'learning'::text, 'learning_related'::text, 'enroll'::text, 'registration_processing'::text, 'course_query'::text, 'course_inquiry'::text, 'leave'::text, 'leave_processing'::text, 'payment'::text, 'payment_processing'::text, 'technical'::text, 'technical_support'::text, 'time'::text, 'schedule_arrangement'::text, 'life'::text, 'life_related'::text, 'complaint'::text, 'complaint_handling'::text, 'other'::text]),
   phone text,
   due_date timestamp with time zone,
   time_block_start timestamp with time zone,
@@ -384,6 +395,27 @@ CREATE TABLE public.hanami_task_list (
   checklist jsonb DEFAULT '[]'::jsonb,
   visible_to_roles ARRAY,
   CONSTRAINT hanami_task_list_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.hanami_task_redemptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id text NOT NULL,
+  reward_id uuid,
+  points_spent integer NOT NULL,
+  redeemed_by text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hanami_task_redemptions_pkey PRIMARY KEY (id),
+  CONSTRAINT hanami_task_redemptions_reward_id_fkey FOREIGN KEY (reward_id) REFERENCES public.hanami_task_rewards(id)
+);
+CREATE TABLE public.hanami_task_rewards (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  points_cost integer NOT NULL DEFAULT 0,
+  icon text,
+  org_id uuid,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT hanami_task_rewards_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.hanami_task_templates (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),

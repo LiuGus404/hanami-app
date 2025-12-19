@@ -3,7 +3,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 
 // 定義音樂曲目
-const LOFI_TRACKS = Array.from({ length: 10 }, (_, i) => `/music/lofi-${i + 1}.mp3`);
+const LOFI_TRACKS = [
+    '/music/chritmassong2.mp3', // Default Christmas song, can add more tracks here
+    ...Array.from({ length: 10 }, (_, i) => `/music/lofi-${i + 1}.mp3`)
+];
 
 interface MusicPlayerContextType {
     isPlaying: boolean;
@@ -25,15 +28,19 @@ const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(und
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-    const [volume, setVolume] = useState(0.5); // 預設音量 50%
+    const [volume, setVolume] = useState(1 / 3); // 預設音量 33% (1/3)
     const [isLooping, setIsLooping] = useState(true); // 預設單曲循環
     const [isShuffling, setIsShuffling] = useState(false);
     const [playlist, setPlaylist] = useState<string[]>(LOFI_TRACKS); // 實際播放列表 (可能被 shuffle)
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const isInitializedRef = useRef(false);
 
-    // 初始化 Audio 和設備偵測
+    // 初始化 Audio 和設備偵測 - 只執行一次
     useEffect(() => {
+        if (isInitializedRef.current) return;
+        isInitializedRef.current = true;
+
         if (!audioRef.current) {
             audioRef.current = new Audio(playlist[currentTrackIndex]);
             audioRef.current.volume = volume;
@@ -44,9 +51,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         const isDesktop = window.innerWidth >= 1024;
         if (isDesktop) {
             setIsPlaying(true);
-        } else {
-            setIsPlaying(false);
         }
+        // 不再設置 setIsPlaying(false)，保持當前狀態
 
         return () => {
             // 只有在組件真正卸載時才清理

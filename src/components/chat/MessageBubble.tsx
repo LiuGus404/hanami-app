@@ -191,12 +191,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {/* Collapsible Vision Analysis (From content_json) */}
             {(() => {
               const visionAnalysis = (message.content_json as any)?.vision_analysis;
-              // eslint-disable-next-line react-hooks/rules-of-hooks
               const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
               // Auto-expand logic: Only open if message is "fresh" (created within last 60 seconds)
               // This satisfies "Expand only first time" (Just now), "Collapse otherwise" (History)
-              // eslint-disable-next-line react-hooks/rules-of-hooks
               useEffect(() => {
                 const createdAt = new Date(message.created_at || Date.now()).getTime();
                 const now = Date.now();

@@ -18,7 +18,7 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 60,
   },
-  
+
   // 重定向配置
   async redirects() {
     return [
@@ -39,7 +39,7 @@ const nextConfig = {
       },
     ];
   },
-  
+
   // Webpack 配置
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // 處理 SVG 文件
@@ -47,10 +47,10 @@ const nextConfig = {
       test: /\.svg$/,
       use: ['@svgr/webpack'],
     });
-    
+
     return config;
   },
-  
+
   // 環境變數
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
@@ -63,16 +63,16 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxhb3d5cXBsY3Rod3Fja3lpZ2l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMDE0MjYsImV4cCI6MjA3Mjg3NzQyNn0.LU37G9rZSBP5_BoAGQ_1QncFS2wemcI1w2J-wZzC-cI',
     SUPABASE_SAAS_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxhb3d5cXBsY3Rod3Fja3lpZ2l5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NzMwMTQyNiwiZXhwIjoyMDcyODc3NDI2fQ.B2z_5vPpMJi8FAwlrsYd-KLLfKD-gt0Qv_9qvpMmQkk'
   },
-  
+
   // 壓縮配置
   compress: true,
-  
+
   // 電源效率
   poweredByHeader: false,
-  
+
   // 嚴格模式
   reactStrictMode: true,
-  
+
   // Content Security Policy 配置 - 修復 Airwallex 資源載入問題
   async headers() {
     return [
@@ -83,12 +83,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.airwallex.com https://static.airwallex.com https://js.stripe.com https://*.airwallex.com https://challenges.cloudflare.com https://maps.googleapis.com https://www.google.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.airwallex.com https://static.airwallex.com https://js.stripe.com https://*.airwallex.com https://challenges.cloudflare.com https://maps.googleapis.com https://www.google.com https://cdn.jsdelivr.net",
               "style-src 'self' 'unsafe-inline' https://checkout.airwallex.com https://static.airwallex.com https://*.airwallex.com https://maps.googleapis.com https://www.google.com",
               "img-src 'self' data: https: blob: https://*.airwallex.com",
               "media-src 'self' data: https: blob: https://*.airwallex.com",
               "font-src 'self' data: https: https://*.airwallex.com",
-              "connect-src 'self' https://api.airwallex.com https://checkout.airwallex.com https://static.airwallex.com https://o11y.airwallex.com https://*.airwallex.com https://laowyqplcthwqckyigiy.supabase.co https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com https://maps.googleapis.com https://www.google.com",
+              "connect-src 'self' https://api.airwallex.com https://checkout.airwallex.com https://static.airwallex.com https://o11y.airwallex.com https://*.airwallex.com https://laowyqplcthwqckyigiy.supabase.co https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com https://maps.googleapis.com https://www.google.com https://cdn.jsdelivr.net",
               "frame-src 'self' https://checkout.airwallex.com https://js.stripe.com https://*.airwallex.com https://challenges.cloudflare.com https://www.google.com https://maps.google.com",
               "object-src 'none'",
               "base-uri 'self'",
@@ -100,17 +100,17 @@ const nextConfig = {
       }
     ]
   },
-  
+
   // 類型檢查
   typescript: {
     ignoreBuildErrors: false,
   },
-  
+
   // ESLint 配置
   eslint: {
     ignoreDuringBuilds: true, // 暫時忽略 ESLint 錯誤以完成 build
   },
-  
+
   // 調試配置
   onDemandEntries: {
     maxInactiveAge: 25 * 1000,
