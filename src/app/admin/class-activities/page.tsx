@@ -613,7 +613,6 @@ export default function ClassActivitiesPage(
       let teacherQuery = supabase
         .from('hanami_employee')
         .select('id, teacher_fullname, teacher_nickname, teacher_role, teacher_status')
-        .eq('teacher_status', 'active')
         .order('teacher_fullname');
 
       if (validOrgId) {
