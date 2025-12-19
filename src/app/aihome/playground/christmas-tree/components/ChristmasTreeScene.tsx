@@ -10,7 +10,7 @@ import SnowParticles from './SnowParticles';
 import SceneEffects from './SceneEffects';
 import GestureTutorial from './GestureTutorial';
 import PhotoOrnaments from './PhotoOrnaments';
-import { GestureState } from '../hooks/useHandGesture';
+import { GestureState } from '@/hooks/useHandGesture';
 import { PhotoDecoration } from '../hooks/usePhotoDecorations';
 
 interface ChristmasTreeSceneProps {
