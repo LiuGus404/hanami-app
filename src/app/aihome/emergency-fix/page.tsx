@@ -9,9 +9,9 @@ import { toast } from 'react-hot-toast';
 
 export default function EmergencyFixPage() {
   const { user } = useSaasAuth();
-  const { 
-    teacherAccess, 
-    hasTeacherAccess, 
+  const {
+    teacherAccess,
+    hasTeacherAccess,
     loading,
     checkTeacherAccess,
     clearTeacherAccess,
@@ -44,22 +44,22 @@ export default function EmergencyFixPage() {
       addLog('步驟 1: 清除所有現有數據');
       clearTeacherAccess();
       sessionStorage.removeItem('hanami_teacher_access');
-      
+
       // 步驟 2: 直接調用 API
       addLog('步驟 2: 直接調用強制檢查 API');
       const response = await fetch(`/api/force-check-teacher-access?email=${encodeURIComponent(user.email)}`);
-      
+
       if (!response.ok) {
         throw new Error(`API 調用失敗: ${response.status}`);
       }
-      
+
       const data = await response.json();
       addLog(`API 響應: ${JSON.stringify(data, null, 2)}`);
-      
+
       if (!data.success) {
         throw new Error(`API 返回失敗: ${data.message}`);
       }
-      
+
       // 步驟 3: 手動設置會話存儲
       addLog('步驟 3: 手動設置會話存儲');
       const sessionData = {
@@ -68,20 +68,20 @@ export default function EmergencyFixPage() {
       };
       sessionStorage.setItem('hanami_teacher_access', JSON.stringify(sessionData));
       addLog('會話存儲已設置');
-      
+
       // 步驟 4: 強制刷新 Hook 狀態
       addLog('步驟 4: 強制刷新 Hook 狀態');
       setTimeout(() => {
         forceRefreshState();
         addLog('Hook 狀態已刷新');
-        
+
         // 步驟 5: 驗證修復結果
         setTimeout(() => {
           addLog('步驟 5: 驗證修復結果');
           if (data.hasTeacherAccess) {
             addLog('✓ 修復成功！用戶有教師權限');
             toast.success('緊急修復成功！');
-            
+
             // 自動跳轉到教師專區
             setTimeout(() => {
               addLog('自動跳轉到教師專區');
@@ -93,7 +93,7 @@ export default function EmergencyFixPage() {
           }
         }, 1000);
       }, 500);
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '未知錯誤';
       addLog(`修復失敗: ${errorMessage}`);
@@ -111,7 +111,7 @@ export default function EmergencyFixPage() {
     }
 
     addLog('手動設置教師權限數據');
-    
+
     const manualData = {
       success: true,
       email: user.email,
@@ -133,13 +133,13 @@ export default function EmergencyFixPage() {
     try {
       sessionStorage.setItem('hanami_teacher_access', JSON.stringify(manualData));
       addLog('手動數據已設置到會話存儲');
-      
+
       setTimeout(() => {
         forceRefreshState();
         addLog('Hook 狀態已刷新');
         toast.success('手動設置成功！');
       }, 500);
-      
+
     } catch (error) {
       addLog(`手動設置失敗: ${error instanceof Error ? error.message : '未知錯誤'}`);
       toast.error('手動設置失敗');
@@ -169,16 +169,15 @@ export default function EmergencyFixPage() {
           <h1 className="text-3xl font-bold text-hanami-text mb-6 text-center">
             🚨 緊急權限修復工具
           </h1>
-          
+
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-hanami-text mb-4">當前狀態</h2>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <p><strong>用戶:</strong> {user?.email || '未登入'}</p>
               <p><strong>載入中:</strong> {loading ? '是' : '否'}</p>
-              <p><strong>教師權限:</strong> 
-                <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
-                  hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
+              <p><strong>教師權限:</strong>
+                <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
                   {hasTeacherAccess ? '✓ 有權限' : '✗ 無權限'}
                 </span>
               </p>
@@ -192,7 +191,7 @@ export default function EmergencyFixPage() {
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-hanami-text mb-4">緊急修復操作</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <HanamiButton 
+              <HanamiButton
                 onClick={emergencyFix}
                 disabled={!user || isFixing}
                 variant="cute"
@@ -200,8 +199,8 @@ export default function EmergencyFixPage() {
               >
                 {isFixing ? '修復中...' : '🚨 緊急修復權限'}
               </HanamiButton>
-              
-              <HanamiButton 
+
+              <HanamiButton
                 onClick={manualSetAccess}
                 disabled={!user}
                 variant="primary"
@@ -209,16 +208,16 @@ export default function EmergencyFixPage() {
               >
                 🔧 手動設置權限
               </HanamiButton>
-              
-              <HanamiButton 
+
+              <HanamiButton
                 onClick={clearAll}
                 variant="danger"
                 className="w-full"
               >
                 🗑️ 清除所有數據
               </HanamiButton>
-              
-              <HanamiButton 
+
+              <HanamiButton
                 onClick={() => router.push('/aihome/check-state')}
                 variant="secondary"
                 className="w-full"
@@ -242,16 +241,16 @@ export default function EmergencyFixPage() {
           </div>
 
           <div className="flex space-x-4">
-            <HanamiButton 
+            <HanamiButton
               onClick={() => router.push('/aihome/teacher-zone')}
               disabled={!hasTeacherAccess}
               variant="cute"
             >
               測試教師專區訪問
             </HanamiButton>
-            
-            <HanamiButton 
-              onClick={() => router.push('/aihome')}
+
+            <HanamiButton
+              onClick={() => router.push('/')}
               variant="secondary"
             >
               返回首頁

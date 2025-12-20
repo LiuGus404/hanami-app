@@ -98,7 +98,7 @@ export default function EmailSentPage() {
             </HanamiButton>
 
             <button
-              onClick={() => router.push('/aihome')}
+              onClick={() => router.push('/')}
               className="w-full flex items-center justify-center text-[#4B4036] hover:text-[#2B3A3B] transition-colors"
             >
               <ArrowLeftIcon className="w-4 h-4 mr-2" />

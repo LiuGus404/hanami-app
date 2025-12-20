@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
-  ArrowLeft, 
-  BookOpen, 
-  Calendar, 
-  Clock, 
-  User, 
+import {
+  ArrowLeft,
+  BookOpen,
+  Calendar,
+  Clock,
+  User,
   Star,
   TrendingUp,
   Award,
@@ -46,7 +46,7 @@ export default function StudentCoursesPage() {
     const loadStudentCourses = async () => {
       try {
         setLoading(true);
-        
+
         // 模擬資料
         const mockStudents: Student[] = [
           {
@@ -76,7 +76,7 @@ export default function StudentCoursesPage() {
             ]
           }
         ];
-        
+
         setStudents(mockStudents);
       } catch (error) {
         console.error('載入課程資料失敗:', error);
@@ -133,7 +133,7 @@ export default function StudentCoursesPage() {
         {/* 頂部導航 */}
         <div className="mb-8">
           <motion.button
-            onClick={() => router.push('/aihome')}
+            onClick={() => router.push('/')}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors mb-4"
@@ -141,7 +141,7 @@ export default function StudentCoursesPage() {
             <ArrowLeft className="w-4 h-4" />
             <span>返回首頁</span>
           </motion.button>
-          
+
           <div className="flex items-center space-x-3">
             <BookOpen className="w-8 h-8 text-[#4B4036]" />
             <h1 className="text-3xl font-bold text-[#4B4036]">學生課程</h1>

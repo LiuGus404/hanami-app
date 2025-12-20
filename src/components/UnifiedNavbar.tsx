@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bars3Icon, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import FoodBalanceButton from '@/components/aihome/FoodBalanceButton';
 
 export interface UnifiedNavbarProps {
@@ -53,15 +54,17 @@ export default function UnifiedNavbar({
             >
               <Bars3Icon className="w-6 h-6 text-[#4B4036]" />
             </motion.button>
-            <div className="w-10 h-10 relative flex-shrink-0">
-              <Image
-                src="/@hanami.png"
-                alt="Hanami logo"
-                width={40}
-                height={40}
-                className="w-full h-full object-contain"
-              />
-            </div>
+            <Link href="/" className="block">
+              <div className="w-10 h-10 relative flex-shrink-0 cursor-pointer">
+                <Image
+                  src="/@hanami.png"
+                  alt="Hanami logo"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </Link>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -92,65 +95,65 @@ export default function UnifiedNavbar({
                         transition={{ duration: 0.2 }}
                         className="absolute right-0 mt-2 w-44 bg-white border border-[#EADBC8] rounded-xl shadow-lg z-50"
                       >
-                      {user ? (
-                        <div className="px-4 py-3 text-[#4B4036] text-sm">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium">{displayInitial}</span>
+                        {user ? (
+                          <div className="px-4 py-3 text-[#4B4036] text-sm">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                                <span className="text-sm font-medium">{displayInitial}</span>
+                              </div>
+                              <div className="leading-tight">
+                                <p className="font-semibold text-sm">
+                                  {displayName || '使用者'}
+                                </p>
+                                {user.email && (
+                                  <p className="text-xs text-[#8A7C70]">{user.email}</p>
+                                )}
+                              </div>
                             </div>
-                            <div className="leading-tight">
-                              <p className="font-semibold text-sm">
-                                {displayName || '使用者'}
-                              </p>
-                              {user.email && (
-                                <p className="text-xs text-[#8A7C70]">{user.email}</p>
-                              )}
-                            </div>
+                            <button
+                              onClick={() => {
+                                router.push('/aihome/profile');
+                                closeMenu();
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs border border-[#EADBC8] mb-2"
+                            >
+                              設定
+                            </button>
+                            <button
+                              onClick={() => {
+                                onLogout();
+                                closeMenu();
+                              }}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#FFF9F2] hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs"
+                            >
+                              <ArrowRightOnRectangleIcon className="w-4 h-4" />
+                              登出
+                            </button>
                           </div>
-                          <button
-                            onClick={() => {
-                              router.push('/aihome/profile');
-                              closeMenu();
-                            }}
-                            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs border border-[#EADBC8] mb-2"
-                          >
-                            設定
-                          </button>
-                          <button
-                            onClick={() => {
-                              onLogout();
-                              closeMenu();
-                            }}
-                            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#FFF9F2] hover:bg-[#FFF4DF] transition-colors text-[#4B4036] font-medium text-xs"
-                          >
-                            <ArrowRightOnRectangleIcon className="w-4 h-4" />
-                            登出
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col text-[#4B4036] text-sm">
-                          <button
-                            onClick={() => {
-                              onLogin();
-                              closeMenu();
-                            }}
-                            className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
-                          >
-                            登入
-                          </button>
-                          <button
-                            onClick={() => {
-                              onRegister();
-                              closeMenu();
-                            }}
-                            className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
-                          >
-                            註冊
-                          </button>
-                        </div>
-                      )}
-                    </motion.div>
-                  </>
+                        ) : (
+                          <div className="flex flex-col text-[#4B4036] text-sm">
+                            <button
+                              onClick={() => {
+                                onLogin();
+                                closeMenu();
+                              }}
+                              className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
+                            >
+                              登入
+                            </button>
+                            <button
+                              onClick={() => {
+                                onRegister();
+                                closeMenu();
+                              }}
+                              className="px-3 py-2 hover:bg-[#FFF9F2] text-left"
+                            >
+                              註冊
+                            </button>
+                          </div>
+                        )}
+                      </motion.div>
+                    </>
                   )}
                 </AnimatePresence>
               </div>

@@ -9,9 +9,9 @@ import { toast } from 'react-hot-toast';
 
 export default function QuickFixTeacherAccessPage() {
   const { user } = useSaasAuth();
-  const { 
-    teacherAccess, 
-    hasTeacherAccess, 
+  const {
+    teacherAccess,
+    hasTeacherAccess,
     checkTeacherAccess,
     clearTeacherAccess
   } = useTeacherAccess();
@@ -57,16 +57,16 @@ export default function QuickFixTeacherAccessPage() {
 
     try {
       console.log('開始快速修復，用戶:', user.email);
-      
+
       // 清除現有的會話存儲
       sessionStorage.removeItem('hanami_teacher_access');
       clearTeacherAccess();
 
       // 使用強制檢查模式重新檢查權限
       await checkTeacherAccess(user.email, true);
-      
+
       toast.success('權限檢查完成！');
-      
+
       // 等待一下讓 toast 顯示
       setTimeout(() => {
         router.push('/aihome/teacher-zone');
@@ -103,15 +103,14 @@ export default function QuickFixTeacherAccessPage() {
           <h1 className="text-3xl font-bold text-hanami-text mb-6 text-center">
             🚀 快速修復教師權限
           </h1>
-          
+
           <div className="mb-6">
             <h2 className="text-xl font-semibold text-hanami-text mb-4">當前狀態</h2>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <p><strong>用戶:</strong> {user?.email || '未登入'}</p>
-              <p><strong>教師權限:</strong> 
-                <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${
-                  hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
+              <p><strong>教師權限:</strong>
+                <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
                   {hasTeacherAccess ? '✓ 有權限' : '✗ 無權限'}
                 </span>
               </p>
@@ -158,7 +157,7 @@ export default function QuickFixTeacherAccessPage() {
           <div className="space-y-4">
             {user?.email && knownTeachers[user.email as keyof typeof knownTeachers] ? (
               <>
-                <HanamiButton 
+                <HanamiButton
                   onClick={quickFix}
                   disabled={isFixing || hasTeacherAccess}
                   className="w-full"
@@ -166,8 +165,8 @@ export default function QuickFixTeacherAccessPage() {
                 >
                   {isFixing ? '修復中...' : hasTeacherAccess ? '✓ 權限已修復' : '🔧 快速修復權限'}
                 </HanamiButton>
-                
-                <HanamiButton 
+
+                <HanamiButton
                   onClick={testAccess}
                   disabled={!hasTeacherAccess}
                   className="w-full"
@@ -179,8 +178,8 @@ export default function QuickFixTeacherAccessPage() {
             ) : (
               <div className="text-center">
                 <p className="text-gray-500 mb-4">請先登入具有教師權限的帳號</p>
-                <HanamiButton 
-                  onClick={() => router.push('/aihome')}
+                <HanamiButton
+                  onClick={() => router.push('/')}
                   className="w-full"
                   variant="secondary"
                 >
@@ -188,17 +187,17 @@ export default function QuickFixTeacherAccessPage() {
                 </HanamiButton>
               </div>
             )}
-            
+
             <div className="flex space-x-4">
-              <HanamiButton 
+              <HanamiButton
                 onClick={clearAll}
                 variant="danger"
                 className="flex-1"
               >
                 清除所有數據
               </HanamiButton>
-              
-              <HanamiButton 
+
+              <HanamiButton
                 onClick={() => router.push('/aihome/diagnose-session')}
                 variant="secondary"
                 className="flex-1"

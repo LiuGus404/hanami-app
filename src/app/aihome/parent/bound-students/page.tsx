@@ -45,7 +45,7 @@ export default function BoundStudentsPage() {
   const [boundStudents, setBoundStudents] = useState<BoundStudent[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
 
-  // 載入已綁定的孩子
+  // 載入已綁定的學習者
   useEffect(() => {
     const loadBoundStudents = async () => {
       try {
@@ -301,7 +301,7 @@ export default function BoundStudentsPage() {
   return (
     <ParentShell
       currentPath="/aihome/parent/bound-students"
-      pageTitle="已綁定的孩子"
+      pageTitle="已綁定的學習者"
       pageSubtitle="查看目前已經連結的學習者"
       action={action}
       user={user}

@@ -56,6 +56,7 @@ export default function OrganizationMiniCard({
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   const isUuid = /^[0-9a-fA-F-]{36}$/.test(orgId);
 
@@ -77,22 +78,22 @@ export default function OrganizationMiniCard({
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     if (!isUuid) return;
     if (!user) {
       router.push('/aihome/auth/login');
       return;
     }
     if (loading) return;
-    
+
     setLoading(true);
     const previousLiked = liked;
     const previousCount = likeCount;
-    
+
     // optimistic update
     setLiked((v) => !v);
     setLikeCount((n) => (liked ? Math.max(0, n - 1) : n + 1));
-    
+
     try {
       const userId = user?.id;
       const result = await toggleOrgLike(orgId, userId);
@@ -113,8 +114,8 @@ export default function OrganizationMiniCard({
       .slice(0, 60) + ((description || '').length > 60 ? '…' : '');
 
   const displayImage = coverImageUrl || '/@hanami.png';
-  
-  const displayCategories = categories && categories.length > 0 
+
+  const displayCategories = categories && categories.length > 0
     ? categories.map(cat => CATEGORY_LABEL_MAP[cat] || cat).filter(Boolean)
     : [];
 
@@ -139,11 +140,11 @@ export default function OrganizationMiniCard({
       <div className="p-4">
         <div className="text-[#4B4036] font-semibold line-clamp-1">{name}</div>
         {shortDesc && <div className="text-sm text-[#2B3A3B] mt-1 line-clamp-2">{shortDesc}</div>}
-        
+
         {/* 機構類別 */}
         {displayCategories.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {displayCategories.slice(0, 2).map((category, index) => (
+            {(categoriesExpanded ? displayCategories : displayCategories.slice(0, 3)).map((category, index) => (
               <span
                 key={index}
                 className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]"
@@ -151,10 +152,31 @@ export default function OrganizationMiniCard({
                 {category}
               </span>
             ))}
-            {displayCategories.length > 2 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]">
-                +{displayCategories.length - 2}
-              </span>
+            {displayCategories.length > 3 && !categoriesExpanded && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setCategoriesExpanded(true);
+                }}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] border border-[#EADBC8] hover:shadow-sm transition-all"
+              >
+                +{displayCategories.length - 3} 展開
+              </button>
+            )}
+            {categoriesExpanded && displayCategories.length > 3 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setCategoriesExpanded(false);
+                }}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-[#EADBC8] to-[#D4C4B0] text-[#4B4036] border border-[#EADBC8] hover:shadow-sm transition-all"
+              >
+                收起
+              </button>
             )}
           </div>
         )}
@@ -166,9 +188,8 @@ export default function OrganizationMiniCard({
             whileTap={{ scale: 0.95 }}
             onClick={handleToggle}
             disabled={!isUuid || loading}
-            className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-full border ${
-              liked ? 'bg-[#FFB6C1]/20 border-[#FFB6C1]' : 'bg-white border-[#EADBC8]'
-            }`}
+            className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-full border ${liked ? 'bg-[#FFB6C1]/20 border-[#FFB6C1]' : 'bg-white border-[#EADBC8]'
+              }`}
             aria-label="like"
           >
             <HeartIcon className={`w-4 h-4 ${liked ? 'text-[#FF6B8A]' : 'text-[#4B4036]'}`} />

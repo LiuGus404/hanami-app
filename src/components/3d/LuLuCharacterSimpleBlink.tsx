@@ -10,8 +10,8 @@ interface LuLuCharacterSimpleBlinkProps {
   enableInteractions?: boolean;
 }
 
-export default function LuLuCharacterSimpleBlink({ 
-  size = 'xxl', 
+export default function LuLuCharacterSimpleBlink({
+  size = 'xxl',
   className = '',
   enableInteractions = true
 }: LuLuCharacterSimpleBlinkProps) {
@@ -49,11 +49,11 @@ export default function LuLuCharacterSimpleBlink({
         {/* 開眼圖片 */}
         <motion.div
           className="absolute inset-0"
-          animate={{ 
+          animate={{
             opacity: isBlinking ? 0 : 1,
             scale: isBlinking ? 0.98 : 1
           }}
-          transition={{ 
+          transition={{
             duration: 0.1,
             ease: "easeInOut"
           }}
@@ -64,20 +64,21 @@ export default function LuLuCharacterSimpleBlink({
             fill
             className="object-contain"
             priority
+            sizes="300px"
             style={{
               backgroundColor: 'transparent'
             }}
           />
         </motion.div>
-        
+
         {/* 閉眼圖片 */}
         <motion.div
           className="absolute inset-0"
-          animate={{ 
+          animate={{
             opacity: isBlinking ? 1 : 0,
             scale: isBlinking ? 1 : 0.98
           }}
-          transition={{ 
+          transition={{
             duration: 0.1,
             ease: "easeInOut"
           }}
@@ -88,6 +89,7 @@ export default function LuLuCharacterSimpleBlink({
             fill
             className="object-contain"
             priority
+            sizes="300px"
             style={{
               backgroundColor: 'transparent'
             }}

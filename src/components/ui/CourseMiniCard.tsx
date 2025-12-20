@@ -50,6 +50,8 @@ interface CourseMiniCardProps {
   } | null;
   minAge?: number | null;
   maxAge?: number | null;
+  minAgeUnit?: 'years' | 'months' | null;
+  maxAgeUnit?: 'years' | 'months' | null;
   onClick?: () => void;
 }
 
@@ -66,6 +68,8 @@ export default function CourseMiniCard({
   discountConfigs,
   minAge,
   maxAge,
+  minAgeUnit,
+  maxAgeUnit,
   onClick,
 }: CourseMiniCardProps) {
   const { user } = useSaasAuth();
@@ -74,6 +78,7 @@ export default function CourseMiniCard({
   const [likeCount, setLikeCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
 
   const isUuid = /^[0-9a-fA-F-]{36}$/.test(id);
 
@@ -113,33 +118,33 @@ export default function CourseMiniCard({
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     console.log('❤️ 點擊 Like 按鈕', { id, isUuid, user: !!user, loading });
-    
+
     if (!isUuid) {
       console.warn('⚠️ 課程 ID 不是有效的 UUID:', id);
       return;
     }
-    
+
     if (!user) {
       console.log('🔒 用戶未登入，導向登入頁');
       router.push('/aihome/auth/login');
       return;
     }
-    
+
     if (loading) {
       console.log('⏳ 正在處理中，忽略重複點擊');
       return;
     }
-    
+
     setLoading(true);
     const previousLiked = liked;
     const previousCount = likeCount;
-    
+
     // optimistic update
     setLiked((v) => !v);
     setLikeCount((n) => (liked ? Math.max(0, n - 1) : n + 1));
-    
+
     try {
       const userId = user?.id;
       console.log('🔄 調用 toggleCourseLike，courseId:', id, 'userId:', userId);
@@ -155,11 +160,11 @@ export default function CourseMiniCard({
         courseId: id,
         userId: user?.id
       });
-      
+
       // rollback on error
       setLiked(previousLiked);
       setLikeCount(previousCount);
-      
+
       // 顯示錯誤訊息（如果需要）
       if (errorMessage === 'NOT_AUTHENTICATED') {
         console.warn('⚠️ 用戶未認證');
@@ -201,20 +206,27 @@ export default function CourseMiniCard({
   const firstActivePackage = packages.find((p) => p?.is_active !== false) || packages[0];
   const packagePrice = typeof firstActivePackage?.price === 'number' ? firstActivePackage!.price : undefined;
 
-  const displayCategories = categories && categories.length > 0 
+  const displayCategories = categories && categories.length > 0
     ? categories
-        .map((cat) => CATEGORY_LABEL_MAP[cat] || cat)
-        .filter(Boolean)
-        .slice(0, 2)
+      .map((cat) => CATEGORY_LABEL_MAP[cat] || cat)
+      .filter(Boolean)
     : [];
 
-  const ageText = typeof minAge === 'number' && typeof maxAge === 'number'
-    ? `${minAge}-${maxAge} 歲`
-    : typeof minAge === 'number'
-    ? `${minAge} 歲以上`
-    : typeof maxAge === 'number'
-    ? `${maxAge} 歲以下`
-    : null;
+  const ageText = (() => {
+    const minUnit = minAgeUnit === 'months' ? '月' : '歲';
+    const maxUnit = maxAgeUnit === 'months' ? '月' : '歲';
+
+    if (typeof minAge === 'number' && typeof maxAge === 'number') {
+      return `${minAge}${minUnit}-${maxAge}${maxUnit}`;
+    }
+    if (typeof minAge === 'number') {
+      return `${minAge}${minUnit}以上`;
+    }
+    if (typeof maxAge === 'number') {
+      return `${maxAge}${maxUnit}以下`;
+    }
+    return null;
+  })();
 
   return (
     <motion.div
@@ -234,7 +246,7 @@ export default function CourseMiniCard({
             priority={currentImageIndex === 0}
           />
         </div>
-        
+
         {/* 左右箭頭按鈕（僅在多張圖片時顯示） */}
         {hasMultipleImages && (
           <>
@@ -247,7 +259,7 @@ export default function CourseMiniCard({
             >
               <ChevronLeftIcon className="w-6 h-6 text-[#4B4036]" />
             </button>
-            
+
             {/* 右箭頭 */}
             <button
               type="button"
@@ -257,7 +269,7 @@ export default function CourseMiniCard({
             >
               <ChevronRightIcon className="w-6 h-6 text-[#4B4036]" />
             </button>
-            
+
             {/* 圖片指示器 */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1.5 px-2 py-1 rounded-full bg-black/20 backdrop-blur-sm">
               {imageList.map((_, index) => (
@@ -269,11 +281,10 @@ export default function CourseMiniCard({
                     e.preventDefault();
                     setCurrentImageIndex(index);
                   }}
-                  className={`rounded-full transition-all ${
-                    index === currentImageIndex
-                      ? 'bg-[#FFD59A] w-6 h-1.5'
-                      : 'bg-white/70 hover:bg-white/90 w-1.5 h-1.5'
-                  }`}
+                  className={`rounded-full transition-all ${index === currentImageIndex
+                    ? 'bg-[#FFD59A] w-6 h-1.5'
+                    : 'bg-white/70 hover:bg-white/90 w-1.5 h-1.5'
+                    }`}
                   aria-label={`跳轉到圖片 ${index + 1}`}
                 />
               ))}
@@ -299,18 +310,18 @@ export default function CourseMiniCard({
             <span className="text-xs text-[#8A7C70] line-clamp-1">{orgName}</span>
           </div>
         )}
-        
+
         <div className="text-[#4B4036] font-semibold line-clamp-1">{name}</div>
-        
+
         {/* 歲數顯示 */}
         {ageText && (
           <div className="mt-1 text-xs text-[#8A7C70]">適合 {ageText}</div>
         )}
-        
-        {/* 類別徽章（只在大螢幕顯示） */}
+
+        {/* 類別徽章 */}
         {displayCategories.length > 0 && (
-          <div className="mt-1 hidden flex-wrap gap-1 lg:flex">
-            {displayCategories.map((cat, idx) => (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {(categoriesExpanded ? displayCategories : displayCategories.slice(0, 3)).map((cat, idx) => (
               <span
                 key={idx}
                 className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]"
@@ -318,15 +329,36 @@ export default function CourseMiniCard({
                 {cat}
               </span>
             ))}
-            {categories && categories.length > 2 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-[#FFF9F2] to-[#FFFDF8] text-[#4B4036] border border-[#EADBC8]">
-                +{categories.length - 2}
-              </span>
+            {displayCategories.length > 3 && !categoriesExpanded && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setCategoriesExpanded(true);
+                }}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] border border-[#EADBC8] hover:shadow-sm transition-all"
+              >
+                +{displayCategories.length - 3} 展開
+              </button>
+            )}
+            {categoriesExpanded && displayCategories.length > 3 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setCategoriesExpanded(false);
+                }}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-[#EADBC8] to-[#D4C4B0] text-[#4B4036] border border-[#EADBC8] hover:shadow-sm transition-all"
+              >
+                收起
+              </button>
             )}
           </div>
         )}
         {shortDesc && <div className="text-sm text-[#2B3A3B] mt-1 line-clamp-2">{shortDesc}</div>}
-        
+
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* 試堂與套票價格（優先顯示兩者），若皆無則回退顯示單價 */}
@@ -346,9 +378,8 @@ export default function CourseMiniCard({
             whileTap={{ scale: 0.95 }}
             onClick={handleToggle}
             disabled={!isUuid || loading}
-            className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-full border ${
-              liked ? 'bg-[#FFB6C1]/20 border-[#FFB6C1]' : 'bg-white border-[#EADBC8]'
-            }`}
+            className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-full border ${liked ? 'bg-[#FFB6C1]/20 border-[#FFB6C1]' : 'bg-white border-[#EADBC8]'
+              }`}
             aria-label="like"
           >
             <HeartIcon className={`w-4 h-4 ${liked ? 'text-[#FF6B8A]' : 'text-[#4B4036]'}`} />

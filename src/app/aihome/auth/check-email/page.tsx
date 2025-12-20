@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import { HanamiButton } from '@/components/ui/HanamiButton';
-import { 
+import {
   EnvelopeIcon,
   ClockIcon,
   CheckCircleIcon,
@@ -85,7 +85,7 @@ export default function CheckEmailPage() {
                 <ArrowPathIcon className="h-5 w-5 mr-2" />
                 {resending ? '重新發送中...' : '重新發送確認郵件'}
               </HanamiButton>
-              
+
               <HanamiButton
                 onClick={() => router.push('/aihome/auth/login')}
                 size="lg"
@@ -99,16 +99,16 @@ export default function CheckEmailPage() {
             <div className="text-center space-y-4">
               <p className="text-sm text-[#2B3A3B]">
                 遇到問題？{' '}
-                <button 
+                <button
                   onClick={() => router.push('/aihome/email-setup-guide')}
                   className="text-[#FFD59A] hover:text-[#EBC9A4] font-semibold"
                 >
                   查看幫助指南
                 </button>
               </p>
-              
+
               <button
-                onClick={() => router.push('/aihome')}
+                onClick={() => router.push('/')}
                 className="flex items-center justify-center space-x-2 px-4 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200 mx-auto"
               >
                 <HomeIcon className="w-4 h-4" />

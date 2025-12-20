@@ -368,7 +368,7 @@ function LoginForm() {
             </p>
 
             <motion.button
-              onClick={() => router.push('/aihome')}
+              onClick={() => router.push('/')}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="flex items-center justify-center space-x-2 px-4 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200 mx-auto"

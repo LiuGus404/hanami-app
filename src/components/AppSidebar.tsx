@@ -175,7 +175,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       {
         icon: HomeIcon,
         label: '首頁',
-        href: '/aihome',
+        href: '/',
         description: '返回主頁'
       },
       {
@@ -186,13 +186,13 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
       },
       {
         icon: UsersIcon,
-        label: '家長連結',
+        label: '用戶連結',
         href: '/aihome/parent/bound-students',
-        description: '查看孩子的學習和成長'
+        description: '查看學習和成長'
       },
       {
         icon: BriefcaseIcon,
-        label: '老師連結',
+        label: '管理者連結',
         href: '/aihome/teacher-link',
         description: '建立與管理您的課程機構',
       },
@@ -238,7 +238,7 @@ export default function AppSidebar({ isOpen, onClose, currentPath }: AppSidebarP
 
   const handleNavigation = (href: string) => {
     if (href === '/aihome/parent/bound-students' && !user) {
-      toast('請先登入才能查看家長連結');
+      toast('請先登入才能查看用戶連結');
       router.push('/aihome/auth/login');
       return;
     }

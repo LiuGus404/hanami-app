@@ -170,7 +170,7 @@ export default function ChristmasTreePage() {
                         onNavigate={(path) => router.push(`/aihome/${path.replace('view:', '?view=')}`)}
                     />
                     <FoodBalanceButton />
-                    <Link href="/aihome">
+                    <Link href="/">
                         <div className="w-10 h-10 rounded-full bg-[#A7C7E7] hover:bg-[#8FB8E0] shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/20">
                             <HomeIcon className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-300" />
                         </div>
@@ -235,7 +235,7 @@ export default function ChristmasTreePage() {
                     onLogout={logout}
                     onNavigate={(path) => router.push(`/aihome/${path.replace('view:', '?view=')}`)}
                 />
-                <Link href="/aihome">
+                <Link href="/">
                     <div className="w-10 h-10 rounded-full bg-[#A7C7E7] hover:bg-[#8FB8E0] shadow-md flex items-center justify-center transition-all duration-300 hover:scale-105 cursor-pointer group border border-white/20">
                         <HomeIcon className="w-5 h-5 text-white group-hover:rotate-12 transition-transform duration-300" />
                     </div>

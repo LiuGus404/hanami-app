@@ -625,7 +625,7 @@ export default function TeacherZoneClassActivitiesPage() {
   // 權限檢查
   useEffect(() => {
     if (user && !hasTeacherAccess) {
-      router.push('/aihome');
+      router.push('/');
     }
   }, [user, hasTeacherAccess, router]);
 
@@ -659,7 +659,7 @@ export default function TeacherZoneClassActivitiesPage() {
             <div className="text-center">
               <h1 className="text-2xl font-bold text-hanami-text mb-4">權限不足</h1>
               <p className="text-hanami-text-secondary mb-6">您不具備花見老師專區的訪問權限</p>
-              <HanamiButton onClick={() => router.push('/aihome')}>
+              <HanamiButton onClick={() => router.push('/')}>
                 返回首頁
               </HanamiButton>
             </div>

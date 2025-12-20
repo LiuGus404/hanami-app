@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { HanamiCard } from '@/components/ui/HanamiCard';
 import { HanamiButton } from '@/components/ui/HanamiButton';
-import { 
+import {
   CheckCircleIcon,
   EnvelopeIcon,
   SparklesIcon
@@ -99,9 +99,9 @@ export default function VerificationSuccessPage() {
               >
                 立即進入儀表板
               </HanamiButton>
-              
+
               <HanamiButton
-                onClick={() => router.push('/aihome')}
+                onClick={() => router.push('/')}
                 size="lg"
                 variant="secondary"
                 className="w-full"

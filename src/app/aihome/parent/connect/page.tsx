@@ -220,7 +220,7 @@ export default function ParentConnectPage() {
     <>
       <ParentShell
         currentPath="/aihome/parent/connect"
-        pageTitle="連接您的孩子"
+        pageTitle="連接學習記錄"
         pageSubtitle="只需學生 ID，即可完成綁定"
         action={{
           label: '新增綁定',
@@ -239,7 +239,7 @@ export default function ParentConnectPage() {
             transition={{ duration: 0.8 }}
             className="text-center"
           >
-            <h2 className="text-3xl font-bold text-[#4B4036] mb-2">立即連接孩子</h2>
+            <h2 className="text-3xl font-bold text-[#4B4036] mb-2">立即連接</h2>
             <p className="text-sm text-[#2B3A3B]">
               <span className="font-semibold text-[#4B4036]">只需學生 ID</span> 即可完成綁定，機構資訊將由系統自動判斷。
             </p>

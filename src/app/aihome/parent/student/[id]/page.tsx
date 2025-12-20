@@ -90,7 +90,7 @@ export default function ParentStudentDetailPage() {
 
   // 側邊欄選單項目
   const sidebarMenuItems = [
-    { icon: Home, label: '首頁', href: '/aihome', description: '返回主頁' },
+    { icon: Home, label: '首頁', href: '/', description: '返回主頁' },
     { icon: Calendar, label: '課程活動', href: '/aihome/course-activities', description: '查看更多機構和課程活動' },
     { icon: UserIcon, label: '設定', href: '/aihome/profile', description: '管理您的個人信息和系統設定' }
   ];
@@ -331,7 +331,7 @@ export default function ParentStudentDetailPage() {
                 返回連接頁面
               </motion.button>
               <motion.button
-                onClick={() => router.push('/aihome')}
+                onClick={() => router.push('/')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-full inline-flex items-center justify-center px-6 py-3 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-semibold hover:bg-[#FFD59A]/10 transition-all duration-200"

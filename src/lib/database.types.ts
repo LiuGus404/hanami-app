@@ -963,6 +963,7 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           id: string
+          is_public: boolean | null
           org_name: string
           org_slug: string
           settings: Json | null
@@ -974,6 +975,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          is_public?: boolean | null
           org_name: string
           org_slug: string
           settings?: Json | null
@@ -985,6 +987,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          is_public?: boolean | null
           org_name?: string
           org_slug?: string
           settings?: Json | null

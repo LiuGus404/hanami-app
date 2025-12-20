@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
+import {
   ArrowLeftIcon,
   PlusIcon,
   BookOpenIcon,
@@ -70,7 +70,7 @@ export default function CourseManagementPage() {
   // 如果沒有教師權限，重定向到主頁
   useEffect(() => {
     if (user && !hasTeacherAccess) {
-      router.push('/aihome');
+      router.push('/');
     }
   }, [user, hasTeacherAccess, router]);
 
@@ -91,7 +91,7 @@ export default function CourseManagementPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[#4B4036] mb-4">權限不足</h1>
           <p className="text-[#2B3A3B] mb-6">您不具備花見老師專區的訪問權限</p>
-          <HanamiButton onClick={() => router.push('/aihome')}>
+          <HanamiButton onClick={() => router.push('/')}>
             返回首頁
           </HanamiButton>
         </div>
@@ -139,12 +139,12 @@ export default function CourseManagementPage() {
               <span>返回教師專區</span>
             </button>
           </div>
-          
+
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 relative">
-              <img 
-                src="/@hanami.png" 
-                alt="HanamiEcho Logo" 
+              <img
+                src="/@hanami.png"
+                alt="HanamiEcho Logo"
                 className="w-full h-full object-contain"
               />
             </div>
@@ -262,9 +262,9 @@ export default function CourseManagementPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <p className="text-[#2B3A3B] mb-4 text-sm">{course.description}</p>
-                  
+
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center space-x-2 text-sm text-[#4B4036]">
                       <UserGroupIcon className="w-4 h-4" />
@@ -279,7 +279,7 @@ export default function CourseManagementPage() {
                       <span>{course.schedule}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex space-x-2">
                     <HanamiButton
                       size="sm"

@@ -25,12 +25,12 @@ interface ClassActivityStyleCardProps {
   className?: string;
 }
 
-export default function ClassActivityStyleCard({ 
-  student, 
-  progressData, 
-  className = '' 
+export default function ClassActivityStyleCard({
+  student,
+  progressData,
+  className = ''
 }: ClassActivityStyleCardProps) {
-  
+
   // 年齡徽章顏色
   const getAgeColor = (age?: number) => {
     if (!age) return 'bg-gray-100 text-gray-600';
@@ -57,7 +57,7 @@ export default function ClassActivityStyleCard({
       transition={{ duration: 0.3 }}
     >
       {/* 頂部時間和日期區域 - 類似課堂活動卡片 */}
-      <div className="bg-gradient-to-r from-[#E8D5C4] to-[#E0C9B8] p-4">
+      <div className="bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <motion.div
@@ -66,13 +66,13 @@ export default function ClassActivityStyleCard({
             >
               <div className="text-xs text-gray-500">今日學習</div>
               <div className="text-lg font-bold text-gray-800">
-                {new Date().toLocaleDateString('zh-TW', { 
-                  month: 'numeric', 
-                  day: 'numeric' 
+                {new Date().toLocaleDateString('zh-TW', {
+                  month: 'numeric',
+                  day: 'numeric'
                 })}
               </div>
             </motion.div>
-            
+
             <div>
               <div className="text-sm text-gray-600">學生</div>
               <div className="text-xl font-bold text-gray-800">
@@ -186,12 +186,11 @@ export default function ClassActivityStyleCard({
                       whileHover={{ x: 5 }}
                     >
                       <div className="flex items-center space-x-3">
-                        <div className={`w-2 h-2 rounded-full ${
-                          activity.type === 'creative' ? 'bg-purple-400' :
+                        <div className={`w-2 h-2 rounded-full ${activity.type === 'creative' ? 'bg-purple-400' :
                           activity.type === 'practice' ? 'bg-blue-400' :
-                          activity.type === 'assessment' ? 'bg-green-400' :
-                          'bg-gray-400'
-                        }`} />
+                            activity.type === 'assessment' ? 'bg-green-400' :
+                              'bg-gray-400'
+                          }`} />
                         <span className="text-sm text-gray-700">{activity.name}</span>
                       </div>
                       <span className="text-xs text-gray-500">

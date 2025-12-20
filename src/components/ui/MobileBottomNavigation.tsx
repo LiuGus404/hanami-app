@@ -235,7 +235,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       {
         id: 'mobile-nav-dashboard',
         icon: HomeIcon,
-        href: getHomeNavigation(),
+        href: '/',
         label: '首頁'
       },
       {
@@ -248,7 +248,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
         id: 'mobile-nav-parent-connect',
         icon: UserGroupIcon,
         href: '/aihome/parent/bound-students',
-        label: '家長連結'
+        label: '用戶連結'
       },
       {
         id: 'mobile-nav-settings',
@@ -258,13 +258,13 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
       }
     ];
 
-    // 如果有機構身份，添加花見老師專區按鈕（跳轉到老師連結）
+    // 如果有機構身份，添加管理者專區按鈕（跳轉到管理者連結）
     if (hasOrgIdentity) {
       const teacherNavItem = {
         id: 'mobile-nav-teacher-link',
         icon: AcademicCapIcon,
         href: '/aihome/teacher-link',
-        label: '老師專區'
+        label: '管理者專區'
       };
 
       // 插入到設定按鈕之前
@@ -334,7 +334,7 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
   // 處理導航點擊
   const handleNavigation = (href: string) => {
     if (href === '/aihome/parent/bound-students' && !user) {
-      toast('請先登入才能查看家長連結');
+      toast('請先登入才能查看用戶連結');
       router.push('/aihome/auth/login');
       return;
     }

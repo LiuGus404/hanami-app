@@ -4,12 +4,12 @@ import { getSaasServerSupabaseClient, getServerSupabaseClient } from '@/lib/supa
 export async function POST(request: NextRequest) {
   try {
     const { studentId, studentName, studentOid, institution, bindingType, notes, parentId } = await request.json();
-    
+
     // 驗證必要參數
     if (!parentId) {
       return NextResponse.json({ error: '缺少家長 ID' }, { status: 400 });
     }
-    
+
     if (!studentId || !studentName) {
       return NextResponse.json({ error: '缺少學生信息' }, { status: 400 });
     }
@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
     // 如果表不存在，返回友好錯誤
     if (checkError && checkError.code === '42P01') {
       console.error('資料庫表不存在:', checkError);
-      return NextResponse.json({ 
-        error: '資料庫表尚未創建，請聯繫管理員' 
+      return NextResponse.json({
+        error: '資料庫表尚未創建，請聯繫管理員'
       }, { status: 503 });
     }
 
@@ -57,21 +57,21 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('綁定孩子錯誤:', insertError);
-      return NextResponse.json({ 
-        error: '綁定失敗，請稍後再試' 
+      return NextResponse.json({
+        error: '綁定失敗，請稍後再試'
       }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       binding,
-      message: '孩子綁定成功！' 
+      message: '孩子綁定成功！'
     });
 
   } catch (error) {
     console.error('綁定孩子 API 錯誤:', error);
-    return NextResponse.json({ 
-      error: '服務器錯誤' 
+    return NextResponse.json({
+      error: '服務器錯誤'
     }, { status: 500 });
   }
 }
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const parentId = searchParams.get('parentId');
-    
+
     if (!parentId) {
       return NextResponse.json({ error: '缺少家長 ID' }, { status: 400 });
     }
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     const saasSupabase = getSaasServerSupabaseClient();
     const mainSupabase = getServerSupabaseClient();
 
-    // 獲取已綁定的孩子列表
+    // 獲取已綁定的學習者列表
     const { data: bindings, error } = await saasSupabase
       .from('parent_student_bindings')
       .select('*')
@@ -99,23 +99,23 @@ export async function GET(request: NextRequest) {
     // 如果表不存在，返回空列表
     if (error && error.code === '42P01') {
       console.error('資料庫表不存在:', error);
-      return NextResponse.json({ 
-        success: true, 
-        bindings: [] 
+      return NextResponse.json({
+        success: true,
+        bindings: []
       });
     }
 
     if (error) {
       console.error('獲取綁定孩子錯誤:', error);
-      return NextResponse.json({ 
-        error: '獲取綁定孩子失敗' 
+      return NextResponse.json({
+        error: '獲取綁定孩子失敗'
       }, { status: 500 });
     }
 
     // 如果有綁定資料，從學生表中獲取完整的學生資訊（包括年齡）
     if (bindings && bindings.length > 0) {
       const studentIds = bindings.map((binding: any) => binding.student_id);
-      
+
       // 從主要學生資料庫獲取學生詳細資訊
       const { data: studentsData, error: studentsError } = await ((mainSupabase as any)
         .from('Hanami_Students')
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
       // 合併綁定資料和學生詳細資訊
       const enrichedBindings = bindings.map((binding: any) => {
         const studentInfo: any = studentsData?.find((s: any) => s.id === binding.student_id);
-        
+
         // 計算月齡
         let ageInMonths = null;
         if (studentInfo?.student_dob) {
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
           const years = now.getFullYear() - birthDate.getFullYear();
           const months = now.getMonth() - birthDate.getMonth();
           const days = now.getDate() - birthDate.getDate();
-          
+
           let totalMonths = years * 12 + months;
           if (days < 0) {
             totalMonths -= 1;
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
             ageInMonths = age;
           }
         }
-        
+
         return {
           ...binding,
           student_age_months: ageInMonths,
@@ -160,21 +160,21 @@ export async function GET(request: NextRequest) {
         };
       });
 
-      return NextResponse.json({ 
-        success: true, 
-        bindings: enrichedBindings 
+      return NextResponse.json({
+        success: true,
+        bindings: enrichedBindings
       });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      bindings 
+    return NextResponse.json({
+      success: true,
+      bindings
     });
 
   } catch (error) {
     console.error('獲取綁定孩子 API 錯誤:', error);
-    return NextResponse.json({ 
-      error: '服務器錯誤' 
+    return NextResponse.json({
+      error: '服務器錯誤'
     }, { status: 500 });
   }
 }
@@ -184,11 +184,11 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const bindingId = searchParams.get('bindingId');
     const parentId = searchParams.get('parentId');
-    
+
     if (!bindingId) {
       return NextResponse.json({ error: '缺少綁定 ID' }, { status: 400 });
     }
-    
+
     if (!parentId) {
       return NextResponse.json({ error: '缺少家長 ID' }, { status: 400 });
     }
@@ -204,20 +204,20 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('取消綁定錯誤:', error);
-      return NextResponse.json({ 
-        error: '取消綁定失敗' 
+      return NextResponse.json({
+        error: '取消綁定失敗'
       }, { status: 500 });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: '取消綁定成功' 
+    return NextResponse.json({
+      success: true,
+      message: '取消綁定成功'
     });
 
   } catch (error) {
     console.error('取消綁定 API 錯誤:', error);
-    return NextResponse.json({ 
-      error: '服務器錯誤' 
+    return NextResponse.json({
+      error: '服務器錯誤'
     }, { status: 500 });
   }
 }

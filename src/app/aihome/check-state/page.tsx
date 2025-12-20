@@ -8,9 +8,9 @@ import { useRouter } from 'next/navigation';
 
 export default function CheckStatePage() {
   const { user } = useSaasAuth();
-  const { 
-    teacherAccess, 
-    hasTeacherAccess, 
+  const {
+    teacherAccess,
+    hasTeacherAccess,
     loading,
     checkTeacherAccess,
     clearTeacherAccess,
@@ -41,15 +41,15 @@ export default function CheckStatePage() {
   // 強制檢查並刷新
   const forceCheckAndRefresh = async () => {
     if (!user?.email) return;
-    
+
     console.log('開始強制檢查並刷新');
-    
+
     // 清除現有狀態
     clearTeacherAccess();
-    
+
     // 強制檢查
     await checkTeacherAccess(user.email, true);
-    
+
     // 等待一下然後強制刷新
     setTimeout(() => {
       console.log('強制刷新狀態');
@@ -68,7 +68,7 @@ export default function CheckStatePage() {
           <h1 className="text-3xl font-bold text-hanami-text mb-6 text-center">
             🔍 狀態檢查工具
           </h1>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             {/* Hook 狀態 */}
             <div className="bg-gray-50 rounded-lg p-4">
@@ -76,10 +76,9 @@ export default function CheckStatePage() {
               <div className="space-y-2 text-sm">
                 <p><strong>用戶:</strong> {user?.email || '未登入'}</p>
                 <p><strong>載入中:</strong> {loading ? '是' : '否'}</p>
-                <p><strong>教師權限:</strong> 
-                  <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                    hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
+                <p><strong>教師權限:</strong>
+                  <span className={`ml-2 px-2 py-1 rounded text-xs ${hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
                     {hasTeacherAccess ? '✓ 有' : '✗ 無'}
                   </span>
                 </p>
@@ -101,10 +100,9 @@ export default function CheckStatePage() {
                   <>
                     <p><strong>有數據:</strong> ✓ 是</p>
                     <p><strong>Email:</strong> {sessionData.email}</p>
-                    <p><strong>教師權限:</strong> 
-                      <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                        sessionData.hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
+                    <p><strong>教師權限:</strong>
+                      <span className={`ml-2 px-2 py-1 rounded text-xs ${sessionData.hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
                         {sessionData.hasTeacherAccess ? '✓ 有' : '✗ 無'}
                       </span>
                     </p>
@@ -125,10 +123,9 @@ export default function CheckStatePage() {
             <div className="bg-blue-50 rounded-lg p-4">
               {sessionData && teacherAccess ? (
                 <div className="space-y-2 text-sm">
-                  <p><strong>Hook vs SessionStorage 權限狀態:</strong> 
-                    <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                      hasTeacherAccess === sessionData.hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                  <p><strong>Hook vs SessionStorage 權限狀態:</strong>
+                    <span className={`ml-2 px-2 py-1 rounded text-xs ${hasTeacherAccess === sessionData.hasTeacherAccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {hasTeacherAccess === sessionData.hasTeacherAccess ? '✓ 一致' : '✗ 不一致'}
                     </span>
                   </p>
@@ -143,29 +140,29 @@ export default function CheckStatePage() {
 
           {/* 操作按鈕 */}
           <div className="flex flex-wrap gap-4 mb-6">
-            <HanamiButton 
+            <HanamiButton
               onClick={forceCheckAndRefresh}
               disabled={!user || loading}
               variant="cute"
             >
               {loading ? '處理中...' : '強制檢查並刷新'}
             </HanamiButton>
-            
-            <HanamiButton 
+
+            <HanamiButton
               onClick={() => forceRefreshState()}
               variant="primary"
             >
               強制刷新狀態
             </HanamiButton>
-            
-            <HanamiButton 
+
+            <HanamiButton
               onClick={() => checkSessionStorage()}
               variant="secondary"
             >
               刷新 SessionStorage
             </HanamiButton>
-            
-            <HanamiButton 
+
+            <HanamiButton
               onClick={() => clearTeacherAccess()}
               variant="danger"
             >
@@ -194,16 +191,16 @@ export default function CheckStatePage() {
 
           {/* 測試按鈕 */}
           <div className="flex space-x-4">
-            <HanamiButton 
+            <HanamiButton
               onClick={() => router.push('/aihome/teacher-zone')}
               disabled={!hasTeacherAccess}
               variant="cute"
             >
               測試教師專區訪問
             </HanamiButton>
-            
-            <HanamiButton 
-              onClick={() => router.push('/aihome')}
+
+            <HanamiButton
+              onClick={() => router.push('/')}
               variant="secondary"
             >
               返回首頁

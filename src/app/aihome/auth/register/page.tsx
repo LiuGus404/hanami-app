@@ -109,7 +109,7 @@ export default function RegisterPage() {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          onClick={() => router.push('/aihome')}
+          onClick={() => router.push('/')}
           className="group flex items-center gap-2 mb-6 px-4 py-2 rounded-xl bg-white/50 hover:bg-white/80 border border-[#EADBC8] hover:border-[#FFD59A] transition-all duration-200 text-[#4B4036] hover:text-[#FFD59A]"
         >
           <HomeIcon className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />

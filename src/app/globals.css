@@ -5,10 +5,13 @@
 
 /* 搜尋結果高亮動畫 */
 @keyframes highlight-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     background-color: rgba(255, 213, 154, 0);
     transform: scale(1);
   }
+
   50% {
     background-color: rgba(255, 213, 154, 0.3);
     transform: scale(1.02);
@@ -48,578 +51,315 @@ body {
 .hanami-btn {
   @apply rounded-full px-4 py-2 font-bold text-[#4B4036] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] shadow-lg transition-all duration-300 ease-out transform;
   box-shadow: 0 4px 12px 0 #ebc9a42a, 0 2px 4px 0 #ebc9a415;
-  border: 2px solid #EAC29D;
 }
 
-.hanami-btn:hover {
-  @apply bg-gradient-to-br from-[#EBC9A4] to-[#FDE6B8] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #ebc9a440, 0 4px 8px 0 #ebc9a425;
-  transform: translateY(-2px) scale(1.05);
-}
+/* ... existing styles ... */
 
-.hanami-btn:active {
-  @apply bg-gradient-to-br from-[#FFFDF8] to-[#F5E7D4] scale-95 shadow-md;
-  transform: translateY(0px) scale(0.95);
-}
-
-.hanami-btn:focus {
-  @apply outline-none ring-2 ring-[#FFD59A] ring-offset-2;
-}
-
-.hanami-btn:disabled {
-  @apply opacity-60 cursor-not-allowed bg-gradient-to-br from-[#F5E7D4] to-[#F0E0C8] transform-none;
-  box-shadow: 0 2px 4px 0 #ebc9a415;
-}
-
-/* 可愛動畫按鈕變體 */
-.hanami-btn-cute {
-  @apply rounded-full px-4 py-2 font-bold text-[#4B4036] bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] shadow-lg transition-all duration-300 ease-out transform;
-  box-shadow: 0 4px 12px 0 #ffb6c12a, 0 2px 4px 0 #ffb6c115;
-  border: 2px solid #FFB6C1;
-}
-
-.hanami-btn-cute:hover {
-  @apply bg-gradient-to-br from-[#FFC0CB] to-[#FFB6C1] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #ffb6c140, 0 4px 8px 0 #ffb6c125;
-  transform: translateY(-2px) scale(1.05) rotate(1deg);
-}
-
-.hanami-btn-cute:active {
-  @apply bg-gradient-to-br from-[#FFF0F5] to-[#FFE4E1] scale-95 shadow-md;
-  transform: translateY(0px) scale(0.95) rotate(-1deg);
-}
-
-/* 柔軟動畫按鈕 */
-.hanami-btn-soft {
-  @apply rounded-full px-4 py-2 font-bold text-[#2B3A3B] bg-gradient-to-br from-[#F5E7D4] to-[#F0E0C8] shadow-lg transition-all duration-300 ease-out transform;
-  box-shadow: 0 4px 12px 0 #f5e7d42a, 0 2px 4px 0 #f5e7d415;
-  border: 2px solid #EADBC8;
-}
-
-.hanami-btn-soft:hover {
-  @apply bg-gradient-to-br from-[#F0E0C8] to-[#F5E7D4] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #f5e7d440, 0 4px 8px 0 #f5e7d425;
-  transform: translateY(-2px) scale(1.05);
-}
-
-.hanami-btn-soft:active {
-  @apply bg-gradient-to-br from-[#FFFDF8] to-[#F5E7D4] scale-95 shadow-md;
-  transform: translateY(0px) scale(0.95);
-}
-
-/* 成功動畫按鈕 */
-.hanami-btn-success {
-  @apply rounded-full px-4 py-2 font-bold text-[#2B3A3B] bg-gradient-to-br from-[#E0F2E0] to-[#D4F2D4] shadow-lg transition-all duration-300 ease-out transform;
-  box-shadow: 0 4px 12px 0 #e0f2e02a, 0 2px 4px 0 #e0f2e015;
-  border: 2px solid #C8EAC8;
-}
-
-.hanami-btn-success:hover {
-  @apply bg-gradient-to-br from-[#D4F2D4] to-[#C8EAC8] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #e0f2e040, 0 4px 8px 0 #e0f2e025;
-  transform: translateY(-2px) scale(1.05);
-}
-
-/* 主要動畫按鈕 */
-.hanami-btn-primary {
-  @apply rounded-full px-4 py-2 font-bold text-[#A64B2A] bg-gradient-to-br from-[#FDE6B8] to-[#FCE2C8] shadow-lg transition-all duration-300 ease-out transform;
-  box-shadow: 0 4px 12px 0 #fde6b82a, 0 2px 4px 0 #fde6b815;
-  border: 2px solid #EAC29D;
-}
-
-.hanami-btn-primary:hover {
-  @apply bg-gradient-to-br from-[#FCE2C8] to-[#FAD8B8] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #fde6b840, 0 4px 8px 0 #fde6b825;
-  transform: translateY(-2px) scale(1.05);
-}
-
-/* 次要動畫按鈕 */
-.hanami-btn-secondary {
-  @apply rounded-full px-4 py-2 font-bold text-[#2B3A3B] bg-gradient-to-br from-white to-[#FFFCEB] shadow-lg transition-all duration-300 ease-out transform;
-  box-shadow: 0 4px 12px 0 #fffceb2a, 0 2px 4px 0 #fffceb15;
-  border: 2px solid #EADBC8;
-}
-
-.hanami-btn-secondary:hover {
-  @apply bg-gradient-to-br from-[#FFFCEB] to-[#FFF8E6] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #fffceb40, 0 4px 8px 0 #fffceb25;
-  transform: translateY(-2px) scale(1.05);
-}
-
-/* 強調動畫按鈕 */
-.hanami-btn-accent {
-  @apply rounded-full px-4 py-2 font-bold text-[#4B4036] bg-gradient-to-br from-[#FFB6C1] to-[#FFC0CB] shadow-lg transition-all duration-300 ease-out transform;
-  box-shadow: 0 4px 12px 0 #ffb6c12a, 0 2px 4px 0 #ffb6c115;
-  border: 2px solid #FFB6C1;
-}
-
-.hanami-btn-accent:hover {
-  @apply bg-gradient-to-br from-[#FFC0CB] to-[#FFB6C1] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #ffb6c140, 0 4px 8px 0 #ffb6c125;
-  transform: translateY(-2px) scale(1.05);
-}
-
-/* 危險動畫按鈕 */
-.hanami-btn-danger {
-  @apply rounded-full px-4 py-2 font-bold text-[#A64B2A] bg-gradient-to-br from-[#FFE0E0] to-[#FFD4D4] shadow-lg transition-all duration-300 ease-out transform;
-  box-shadow: 0 4px 12px 0 #ffe0e02a, 0 2px 4px 0 #ffe0e015;
-  border: 2px solid #EAC29D;
-}
-
-.hanami-btn-danger:hover {
-  @apply bg-gradient-to-br from-[#FFD4D4] to-[#FFC8C8] scale-105 shadow-xl;
-  box-shadow: 0 8px 25px 0 #ffe0e040, 0 4px 8px 0 #ffe0e025;
-  transform: translateY(-2px) scale(1.05);
-}
-
-/* 自定義動畫 */
-@keyframes bounce-subtle {
-  0%, 100% {
-    transform: translateY(0) scale(1.05);
-  }
-  50% {
-    transform: translateY(-4px) scale(1.05);
-  }
-}
-
-@keyframes press {
-  0% {
-    transform: scale(1.05);
-  }
-  50% {
-    transform: scale(0.95);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-@keyframes wiggle {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-  25% {
-    transform: rotate(2deg);
-  }
-  75% {
-    transform: rotate(-2deg);
-  }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 4px 12px 0 #ebc9a42a, 0 2px 4px 0 #ebc9a415;
-  }
-  50% {
-    box-shadow: 0 8px 25px 0 #ebc9a440, 0 4px 8px 0 #ebc9a425;
-  }
-}
-
-/* 動畫類別 */
-.animate-bounce-subtle {
-  animation: bounce-subtle 0.6s ease-in-out;
-}
-
-.animate-press {
-  animation: press 0.2s ease-in-out;
-}
-
-.animate-wiggle {
-  animation: wiggle 0.5s ease-in-out;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-/* 搜尋相關動畫 */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes search-glow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(253, 230, 184, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(253, 230, 184, 0);
-  }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out;
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s ease-out;
-}
-
-.animate-scale-in {
-  animation: scale-in 0.2s ease-out;
-}
-
-.animate-search-glow {
-  animation: search-glow 2s infinite;
-}
-
-/* 響應式按鈕尺寸 */
-@media (max-width: 640px) {
-  .hanami-btn,
-  .hanami-btn-cute,
-  .hanami-btn-soft,
-  .hanami-btn-success,
-  .hanami-btn-danger {
-    @apply px-3 py-1.5 text-sm;
-  }
-}
-
-/* 按鈕群組樣式 */
-.hanami-btn-group {
-  @apply flex gap-2 flex-wrap;
-}
-
-.hanami-btn-group .hanami-btn,
-.hanami-btn-group .hanami-btn-cute,
-.hanami-btn-group .hanami-btn-soft,
-.hanami-btn-group .hanami-btn-success,
-.hanami-btn-group .hanami-btn-danger {
-  @apply flex-1 min-w-0;
-}
-
-/* 浮動按鈕 */
-.hanami-btn-floating {
-  @apply fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] shadow-xl transition-all duration-300 ease-out transform;
-  box-shadow: 0 8px 25px 0 #ebc9a440, 0 4px 8px 0 #ebc9a425;
-  border: 2px solid #EAC29D;
-  z-index: 1000;
-}
-
-.hanami-btn-floating:hover {
-  @apply bg-gradient-to-br from-[#EBC9A4] to-[#FDE6B8] scale-110 shadow-2xl;
-  box-shadow: 0 12px 35px 0 #ebc9a450, 0 6px 12px 0 #ebc9a430;
-  transform: translateY(-4px) scale(1.1);
-}
-
-.hanami-btn-floating:active {
-  @apply bg-gradient-to-br from-[#FFFDF8] to-[#F5E7D4] scale-95 shadow-lg;
-  transform: translateY(0px) scale(0.95);
-}
-
-/* 課堂活動管理頁面動畫 */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes gradient-shift {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@keyframes card-hover {
-  0% {
-    transform: scale(1) translateY(0);
-  }
-  100% {
-    transform: scale(1.05) translateY(-8px);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -1000px 0;
-  }
-  100% {
-    background-position: 1000px 0;
-  }
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.6s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-.animate-gradient-shift {
-  background-size: 200% 200%;
-  animation: gradient-shift 3s ease infinite;
-}
-
-.animate-card-hover {
-  animation: card-hover 0.3s ease-out forwards;
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    rgba(255, 255, 255, 0.4) 50%, 
-    transparent 100%);
-  background-size: 1000px 100%;
-  animation: shimmer 2s infinite;
-}
-
-/* 卡片特效 */
-.hanami-card-glow {
-  position: relative;
-  overflow: hidden;
-}
-
-.hanami-card-glow::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, 
-    transparent, 
-    rgba(255, 213, 154, 0.3), 
-    transparent);
-  transition: left 0.5s;
-}
-
-.hanami-card-glow:hover::before {
-  left: 100%;
-}
-
-/* 時段標題特效 */
-.time-slot-header {
-  background: linear-gradient(-45deg, #FFD59A, #EBC9A4, #FFB6C1, #FFC0CB);
-  background-size: 400% 400%;
-  animation: gradient-shift 4s ease infinite;
-}
-
-/* 學生卡片特效 */
-.student-card {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(255, 249, 242, 0.8) 50%,
-    rgba(255, 253, 248, 0.9) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 213, 154, 0.3);
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.student-card:hover {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 1) 0%,
-    rgba(255, 249, 242, 0.95) 50%,
-    rgba(255, 253, 248, 1) 100%);
-  border: 1px solid rgba(255, 213, 154, 0.6);
-  box-shadow: 
-    0 20px 40px rgba(255, 213, 154, 0.2),
-    0 10px 20px rgba(235, 201, 164, 0.15),
-    0 0 0 1px rgba(255, 213, 154, 0.1);
-}
-
-/* 頭像動畫 */
-.avatar-glow {
-  position: relative;
-}
-
-.avatar-glow::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(45deg, #FFD59A, #EBC9A4, #FFB6C1);
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.avatar-glow:hover::after {
-  opacity: 1;
-}
-
-/* 徽章動畫 */
-.trial-badge {
-  animation: float 2s ease-in-out infinite;
-  background: linear-gradient(45deg, #FFB6C1, #FFC0CB, #FF69B4);
-  background-size: 200% 200%;
-  animation: gradient-shift 2s ease infinite, float 3s ease-in-out infinite;
-}
-
-/* 按鈕特效 */
-.hanami-action-btn {
-  background: linear-gradient(45deg, #FFD59A, #EBC9A4);
-  background-size: 200% 200%;
-  position: relative;
-  overflow: hidden;
+/* Vision Pro Style 3D Glass Panel */
+.glass-panel-3d {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 8px 32px 0 rgba(31, 38, 135, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  transform-style: preserve-3d;
   transition: all 0.3s ease;
 }
 
-.hanami-action-btn::before {
+.glass-panel-3d:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.2) 100%);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 12px 40px 0 rgba(31, 38, 135, 0.15),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px) scale(1.01);
+}
+
+/* ============================================
+   PASTEL UI DESIGN SYSTEM
+   ============================================ */
+
+/* Pastel Color Palette CSS Variables */
+:root {
+  --pastel-cream: #FFF8F0;
+  --pastel-peach-light: #FFECD2;
+  --pastel-peach: #FFD1AA;
+  --pastel-mint-light: #E8F5E9;
+  --pastel-mint: #A5D6A7;
+  --pastel-lavender-light: #F3E5F5;
+  --pastel-lavender: #D8B4FE;
+  --pastel-sky: #B3E5FC;
+  --pastel-coral: #FFAB91;
+  --pastel-charcoal: #4A4A4A;
+  --pastel-text-muted: #7A7A7A;
+}
+
+/* Pill Button - Soft, rounded, with subtle shadow */
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px -3px rgba(0, 0, 0, 0.1);
+  border: none;
+  cursor: pointer;
+}
+
+.pill-btn-primary {
+  background: linear-gradient(135deg, var(--pastel-peach) 0%, var(--pastel-coral) 100%);
+  color: white;
+}
+
+.pill-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(255, 171, 145, 0.4);
+}
+
+.pill-btn-secondary {
+  background: linear-gradient(135deg, var(--pastel-mint-light) 0%, var(--pastel-mint) 100%);
+  color: var(--pastel-charcoal);
+}
+
+.pill-btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(165, 214, 167, 0.4);
+}
+
+.pill-btn-lavender {
+  background: linear-gradient(135deg, var(--pastel-lavender-light) 0%, var(--pastel-lavender) 100%);
+  color: var(--pastel-charcoal);
+}
+
+.pill-btn-lavender:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -4px rgba(216, 180, 254, 0.4);
+}
+
+/* Pastel Card - Soft, rounded, with gentle shadow */
+.pastel-card {
+  background: white;
+  border-radius: 24px;
+  padding: 1.5rem;
+  box-shadow:
+    0 4px 20px -5px rgba(0, 0, 0, 0.08),
+    0 2px 8px -2px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.pastel-card:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 12px 30px -8px rgba(0, 0, 0, 0.12),
+    0 4px 12px -2px rgba(0, 0, 0, 0.06);
+}
+
+/* Pastel Card Variants */
+.pastel-card-peach {
+  background: linear-gradient(135deg, var(--pastel-cream) 0%, var(--pastel-peach-light) 100%);
+}
+
+.pastel-card-mint {
+  background: linear-gradient(135deg, #FAFFF8 0%, var(--pastel-mint-light) 100%);
+}
+
+.pastel-card-lavender {
+  background: linear-gradient(135deg, #FEFAFF 0%, var(--pastel-lavender-light) 100%);
+}
+
+.pastel-card-sky {
+  background: linear-gradient(135deg, #F8FDFF 0%, var(--pastel-sky) 100%);
+}
+
+/* Organic Blob Shapes */
+.organic-blob {
+  position: absolute;
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+  filter: blur(40px);
+  opacity: 0.6;
+  animation: blob-morph 15s ease-in-out infinite;
+}
+
+@keyframes blob-morph {
+
+  0%,
+  100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  33% {
+    border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+    transform: translate(10px, -10px) rotate(5deg);
+  }
+
+  66% {
+    border-radius: 50% 40% 50% 60% / 40% 70% 50% 30%;
+    transform: translate(-5px, 10px) rotate(-5deg);
+  }
+}
+
+/* Floating animation for decorative elements */
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Neumorphic 3D Button Style - Clean White with Warm Glow */
+.btn-3d {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 2.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4B4036;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8F5F0 100%);
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  box-shadow:
+    0 8px 24px rgba(75, 64, 54, 0.15),
+    0 4px 8px rgba(75, 64, 54, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.btn-3d::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: -100%;
+  bottom: -8px;
+  left: 20%;
+  right: 20%;
+  height: 20px;
+  background: radial-gradient(ellipse at center, rgba(255, 180, 100, 0.5) 0%, transparent 70%);
+  filter: blur(8px);
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.btn-3d:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 12px 32px rgba(75, 64, 54, 0.2),
+    0 6px 12px rgba(75, 64, 54, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.btn-3d:hover::after {
+  opacity: 1;
+  bottom: -10px;
+}
+
+.btn-3d:active {
+  transform: translateY(0);
+  box-shadow:
+    0 4px 12px rgba(75, 64, 54, 0.15),
+    0 2px 4px rgba(75, 64, 54, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.btn-3d-accent {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FFF9F2 100%);
+  color: #4B4036;
+}
+
+.btn-3d-accent::after {
+  background: radial-gradient(ellipse at center, rgba(255, 165, 80, 0.6) 0%, transparent 70%);
+}
+
+.btn-3d-purple {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F8F5FF 100%);
+  color: #5B21B6;
+}
+
+.btn-3d-purple::after {
+  background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.5) 0%, transparent 70%);
+}
+
+/* Fog Transition Divider between sections */
+.fog-divider {
+  position: relative;
+  height: 180px;
   width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, 
-    transparent, 
-    rgba(255, 255, 255, 0.4), 
-    transparent);
-  transition: left 0.5s;
+  margin-top: -90px;
+  margin-bottom: -90px;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-.hanami-action-btn:hover {
-  background-position: right center;
-  transform: scale(1.05);
-  box-shadow: 0 8px 25px rgba(255, 213, 154, 0.4);
+.fog-divider::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom,
+      transparent 0%,
+      rgba(255, 253, 248, 0.3) 15%,
+      rgba(255, 249, 242, 0.7) 35%,
+      rgba(248, 245, 236, 0.95) 50%,
+      rgba(255, 249, 242, 0.7) 65%,
+      rgba(255, 253, 248, 0.3) 85%,
+      transparent 100%);
+  filter: blur(12px);
 }
 
-.hanami-action-btn:hover::before {
-  left: 100%;
+.fog-divider::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 30%;
+  bottom: 30%;
+  background: radial-gradient(ellipse 80% 50% at center,
+      rgba(255, 213, 154, 0.15) 0%,
+      transparent 60%);
+  filter: blur(20px);
 }
 
-/* 響應式調整 */
-@media (max-width: 768px) {
-  .animate-fade-in-up {
-    animation-duration: 0.4s;
+/* Wavy gradient background */
+.pastel-wave-bg {
+  background: linear-gradient(135deg,
+      var(--pastel-cream) 0%,
+      var(--pastel-peach-light) 25%,
+      var(--pastel-lavender-light) 50%,
+      var(--pastel-mint-light) 75%,
+      var(--pastel-cream) 100%);
+  background-size: 400% 400%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
   }
-  
-  .student-card:hover {
-    transform: scale(1.02) translateY(-4px);
+
+  50% {
+    background-position: 100% 50%;
   }
-}
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* 進度條樣式 */
-.slider {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 8px;
-  border-radius: 4px;
-  outline: none;
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #3B82F6;
-  cursor: pointer;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-}
-
-.slider::-webkit-slider-thumb:hover {
-  background: #2563EB;
-  transform: scale(1.1);
-}
-
-.slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #3B82F6;
-  cursor: pointer;
-  border: 2px solid white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-}
-
-.slider::-moz-range-thumb:hover {
-  background: #2563EB;
-  transform: scale(1.1);
-}
-
-/* 進度條背景漸變 */
-.slider::-webkit-slider-track {
-  background: linear-gradient(to right, #3B82F6 0%, #10B981 100%);
-  border-radius: 4px;
-  height: 8px;
-}
-
-.slider::-moz-range-track {
-  background: linear-gradient(to right, #3B82F6 0%, #10B981 100%);
-  border-radius: 4px;
-  height: 8px;
-  border: none;
-}
-
-/* 文字截斷和行數限制 */
-.truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  100% {
+    background-position: 0% 50%;
+  }
 }

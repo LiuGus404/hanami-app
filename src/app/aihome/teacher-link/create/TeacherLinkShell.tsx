@@ -625,129 +625,134 @@ export function TeacherLinkShell({
 
   return (
     <TeacherLinkShellContext.Provider value={contextValue}>
-      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
-        <div className="flex">
+      <div className="h-screen overflow-hidden bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
+        <div className="flex h-full">
           <AppSidebar
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             currentPath={currentPath}
           />
 
-          <div className="flex-1 flex flex-col">
-            <UnifiedNavbar
-              onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-              user={saasUser}
-              onLogout={handleLogout}
-              onLogin={() => router.push('/aihome/auth/login')}
-              onRegister={() => router.push('/aihome/auth/register')}
-              customRightContent={<UnifiedRightContent user={saasUser} onLogout={handleLogout} onNavigate={handleNavigate} />}
-            />
-            <div className="bg-white/80 border-b border-[#EADBC8]">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="py-2 flex flex-wrap items-center gap-2">
-                  <div className="rounded-full bg-[#FFF9F2] px-3 py-1 text-xs text-[#4B4036]">
-                    {organizationResolved
-                      ? organization?.name || fallbackOrganization.name
-                      : '載入中…'}
-                  </div>
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-[#4B4036]">
-                      {displayInitial}
-                    </span>
+          <div className="flex-1 flex flex-col h-full">
+            <main className="flex-1 overflow-y-auto">
+              {/* Navbar 和組織欄放在可滾動區域內，使用 sticky 定位 */}
+              <div className="sticky top-0 z-50">
+                <UnifiedNavbar
+                  onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+                  user={saasUser}
+                  onLogout={handleLogout}
+                  onLogin={() => router.push('/aihome/auth/login')}
+                  onRegister={() => router.push('/aihome/auth/register')}
+                  customRightContent={<UnifiedRightContent user={saasUser} onLogout={handleLogout} onNavigate={handleNavigate} />}
+                />
+                <div className="bg-white/80 border-b border-[#EADBC8]">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="py-2 flex flex-wrap items-center gap-2">
+                      <div className="rounded-full bg-[#FFF9F2] px-3 py-1 text-xs text-[#4B4036]">
+                        {organizationResolved
+                          ? organization?.name || fallbackOrganization.name
+                          : '載入中…'}
+                      </div>
+                      <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-[#4B4036]">
+                          {displayInitial}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <main className={mainClassName}>
-              {(() => {
-                console.log('TeacherLinkShell: 渲染邏輯檢查', {
-                  showOrganizationSelector,
-                  showOnboardingPage,
-                  showCreatePanel,
-                  showOrganizationOnboarding,
-                  userOrganizationsCount: userOrganizations.length,
-                  hasValidOrgId,
-                  orgId,
-                  organizationResolved,
-                  allowOrgData,
-                });
-                return null;
-              })()}
-              {(() => {
-                // 優先級：選擇面板 > 介紹頁面 > 創建面板 > 主內容
-                // 但如果當前路徑是 join-organization 或 select-organization，則不顯示選擇面板或介紹頁面，直接渲染 children
-                const isJoinPage = currentPath?.includes('/join-organization');
-                const isSelectPage = currentPath?.includes('/select-organization');
+              <div className={contentClassName || 'bg-[#FFFDF8]'}>
+                {(() => {
+                  console.log('TeacherLinkShell: 渲染邏輯檢查', {
+                    showOrganizationSelector,
+                    showOnboardingPage,
+                    showCreatePanel,
+                    showOrganizationOnboarding,
+                    userOrganizationsCount: userOrganizations.length,
+                    hasValidOrgId,
+                    orgId,
+                    organizationResolved,
+                    allowOrgData,
+                  });
+                  return null;
+                })()}
+                {(() => {
+                  // 優先級：選擇面板 > 介紹頁面 > 創建面板 > 主內容
+                  // 但如果當前路徑是 join-organization 或 select-organization，則不顯示選擇面板或介紹頁面，直接渲染 children
+                  const isJoinPage = currentPath?.includes('/join-organization');
+                  const isSelectPage = currentPath?.includes('/select-organization');
 
-                // 如果在選擇機構頁面或加入機構頁面，直接渲染 children
-                if (isSelectPage || isJoinPage) {
-                  console.log('TeacherLinkShell: 在選擇/加入機構頁面，直接渲染 children');
-                  return children;
-                }
+                  // 如果在選擇機構頁面或加入機構頁面，直接渲染 children
+                  if (isSelectPage || isJoinPage) {
+                    console.log('TeacherLinkShell: 在選擇/加入機構頁面，直接渲染 children');
+                    return children;
+                  }
 
-                if (showOrganizationSelector && !isJoinPage) {
-                  console.log('TeacherLinkShell: 渲染選擇面板');
-                  return (
-                    <OrganizationSelectorPanel
-                      organizations={userOrganizations}
-                      onSelect={handleOrganizationSelect}
-                      onCreateNew={handleCreateNew}
-                      onJoinExisting={handleJoinExisting}
-                      currentOrgId={hasValidOrgId ? orgId : null}
-                    />
-                  );
-                }
-                if (showOnboardingPage && !isJoinPage) {
-                  console.log('TeacherLinkShell: 渲染介紹頁面');
-                  return (
-                    <OrganizationOnboardingPage
-                      onCreateOrganization={handleCreateNew}
-                      onJoinOrganization={handleJoinExisting}
-                    />
-                  );
-                }
-                if (showCreatePanel && !isJoinPage) {
-                  console.log('TeacherLinkShell: 渲染創建面板');
-                  return (
-                    <CreateOrganizationPanel
-                      userEmail={saasUser?.email ?? null}
-                      userId={saasUser?.id ?? null}
-                      onCreated={(createdOrg) => {
-                        setOrganization(createdOrg);
-                        setShowOrganizationSelector(false);
-                        setShowCreatePanel(false);
-                        setShowOnboardingPage(false);
-                        setOrganizationResolved(true);
-                        // 重新獲取機構列表
-                        getUserOrganizations(supabase, saasUser?.id, saasUser?.email).then(orgs => {
-                          setUserOrganizations(orgs);
-                          // 如果只有一個機構，自動選擇它
-                          if (orgs.length === 1) {
-                            handleOrganizationSelect(createdOrg);
-                          } else {
-                            // 如果有多個機構，顯示選擇器
-                            setShowOrganizationSelector(true);
+                  if (showOrganizationSelector && !isJoinPage) {
+                    console.log('TeacherLinkShell: 渲染選擇面板');
+                    return (
+                      <OrganizationSelectorPanel
+                        organizations={userOrganizations}
+                        onSelect={handleOrganizationSelect}
+                        onCreateNew={handleCreateNew}
+                        onJoinExisting={handleJoinExisting}
+                        currentOrgId={hasValidOrgId ? orgId : null}
+                      />
+                    );
+                  }
+                  if (showOnboardingPage && !isJoinPage) {
+                    console.log('TeacherLinkShell: 渲染介紹頁面');
+                    return (
+                      <OrganizationOnboardingPage
+                        onCreateOrganization={handleCreateNew}
+                        onJoinOrganization={handleJoinExisting}
+                      />
+                    );
+                  }
+                  if (showCreatePanel && !isJoinPage) {
+                    console.log('TeacherLinkShell: 渲染創建面板');
+                    return (
+                      <CreateOrganizationPanel
+                        userEmail={saasUser?.email ?? null}
+                        userId={saasUser?.id ?? null}
+                        onCreated={(createdOrg) => {
+                          setOrganization(createdOrg);
+                          setShowOrganizationSelector(false);
+                          setShowCreatePanel(false);
+                          setShowOnboardingPage(false);
+                          setOrganizationResolved(true);
+                          // 重新獲取機構列表
+                          getUserOrganizations(supabase, saasUser?.id, saasUser?.email).then(orgs => {
+                            setUserOrganizations(orgs);
+                            // 如果只有一個機構，自動選擇它
+                            if (orgs.length === 1) {
+                              handleOrganizationSelect(createdOrg);
+                            } else {
+                              // 如果有多個機構，顯示選擇器
+                              setShowOrganizationSelector(true);
+                            }
+                          });
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem(
+                              'hanami_current_org',
+                              JSON.stringify({
+                                id: createdOrg.id,
+                                name: createdOrg.name,
+                                slug: createdOrg.slug,
+                                status: createdOrg.status ?? null,
+                              }),
+                            );
                           }
-                        });
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem(
-                            'hanami_current_org',
-                            JSON.stringify({
-                              id: createdOrg.id,
-                              name: createdOrg.name,
-                              slug: createdOrg.slug,
-                              status: createdOrg.status ?? null,
-                            }),
-                          );
-                        }
-                      }}
-                    />
-                  );
-                }
-                console.log('TeacherLinkShell: 渲染主內容（children）');
-                return children;
-              })()}
+                        }}
+                      />
+                    );
+                  }
+                  console.log('TeacherLinkShell: 渲染主內容（children）');
+                  return children;
+                })()}
+              </div>
             </main>
           </div>
         </div>

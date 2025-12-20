@@ -114,6 +114,8 @@ export default function CourseActivitiesPage() {
     images: string[];
     minAge?: number | null;
     maxAge?: number | null;
+    minAgeUnit?: 'years' | 'months' | null;
+    maxAgeUnit?: 'years' | 'months' | null;
     // 透過 flatMap 時附帶的所屬機構
     // @ts-ignore
     _inst?: Institution;
@@ -161,9 +163,8 @@ export default function CourseActivitiesPage() {
         console.log('📥 開始載入機構和課程數據...');
 
         // 使用 API 端點獲取機構列表（繞過 RLS）
-        // 先獲取所有機構（包括 inactive），因為課程可能屬於 inactive 機構
-        // 但在顯示時會過濾掉 inactive 的機構
-        const orgResponse = await fetch('/api/organizations/list?status=all', {
+        // 只獲取公開的機構 (is_public = true)，同時排除 inactive 機構
+        const orgResponse = await fetch('/api/organizations/list?status=all&isPublic=true', {
           credentials: 'include',
         });
         let orgList: any[] = [];
@@ -268,6 +269,8 @@ export default function CourseActivitiesPage() {
             images,
             minAge: typeof ct.min_age === 'number' ? ct.min_age : null,
             maxAge: typeof ct.max_age === 'number' ? ct.max_age : null,
+            minAgeUnit: ct.min_age_unit || 'years',
+            maxAgeUnit: ct.max_age_unit || 'years',
           } as Course;
         };
 
@@ -934,6 +937,8 @@ export default function CourseActivitiesPage() {
                             discountConfigs={c.discountConfigs}
                             minAge={c.minAge}
                             maxAge={c.maxAge}
+                            minAgeUnit={c.minAgeUnit}
+                            maxAgeUnit={c.maxAgeUnit}
                             onClick={() => router.push(courseRoute)}
                           />
                         );
@@ -959,7 +964,7 @@ export default function CourseActivitiesPage() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => router.push('/aihome')}
+                  onClick={() => router.push('/')}
                   className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   探索課程

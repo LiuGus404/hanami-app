@@ -37,11 +37,11 @@ export default function TestBindingPage() {
       try {
         const getResponse = await fetch(`/api/parent/bind-student?parentId=${parentId}`);
         const getData = await getResponse.json();
-        
+
         results.tests.push({
           name: '測試 GET API',
           status: getResponse.ok ? 'success' : 'error',
-          message: getResponse.ok 
+          message: getResponse.ok
             ? `成功獲取 ${getData.bindings?.length || 0} 個綁定記錄`
             : `錯誤: ${getData.error || '未知錯誤'}`
         });
@@ -67,7 +67,7 @@ export default function TestBindingPage() {
           }),
         });
         const postData = await postResponse.json();
-        
+
         results.tests.push({
           name: '測試 POST API',
           status: postResponse.ok && postData?.success !== false ? 'success' : 'error',
@@ -123,7 +123,7 @@ export default function TestBindingPage() {
         {/* 頂部導航 */}
         <div className="mb-8">
           <motion.button
-            onClick={() => router.push('/aihome')}
+            onClick={() => router.push('/')}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors mb-4"
@@ -131,7 +131,7 @@ export default function TestBindingPage() {
             <ArrowLeft className="w-4 h-4" />
             <span>返回首頁</span>
           </motion.button>
-          
+
           <div className="flex items-center space-x-3">
             <Database className="w-8 h-8 text-[#4B4036]" />
             <h1 className="text-3xl font-bold text-[#4B4036]">綁定系統測試</h1>
@@ -156,7 +156,7 @@ export default function TestBindingPage() {
         {testResults && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-[#4B4036]">測試結果</h2>
-            
+
             {/* 用戶信息 */}
             <div className="bg-white rounded-lg p-4 shadow-lg border border-[#EADBC8]">
               <h3 className="font-medium text-[#4B4036] mb-2">用戶信息</h3>

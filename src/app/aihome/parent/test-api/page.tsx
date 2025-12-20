@@ -47,11 +47,11 @@ export default function TestApiPage() {
         console.log('測試 GET API...');
         const getResponse = await fetch(`/api/parent/bind-student?parentId=${parentId}`);
         const getData = await getResponse.json();
-        
+
         results.tests.push({
           name: '測試 GET API',
           status: getResponse.ok ? 'success' : 'error',
-          message: getResponse.ok 
+          message: getResponse.ok
             ? `成功獲取 ${getData.bindings?.length || 0} 個綁定記錄`
             : `錯誤: ${getData.error || '未知錯誤'}`,
           details: {
@@ -89,11 +89,11 @@ export default function TestApiPage() {
           body: JSON.stringify(testStudentData),
         });
         const postData = await postResponse.json();
-        
+
         results.tests.push({
           name: '測試 POST API',
           status: postResponse.ok ? 'success' : 'error',
-          message: postResponse.ok 
+          message: postResponse.ok
             ? 'API 端點正常，綁定成功'
             : `錯誤: ${postData.error || '未知錯誤'}`,
           details: {
@@ -116,11 +116,11 @@ export default function TestApiPage() {
         console.log('再次測試 GET API...');
         const getResponse2 = await fetch(`/api/parent/bind-student?parentId=${parentId}`);
         const getData2 = await getResponse2.json();
-        
+
         results.tests.push({
           name: '驗證 GET API（第二次）',
           status: getResponse2.ok ? 'success' : 'error',
-          message: getResponse2.ok 
+          message: getResponse2.ok
             ? `成功獲取 ${getData2.bindings?.length || 0} 個綁定記錄`
             : `錯誤: ${getData2.error || '未知錯誤'}`,
           details: {
@@ -178,7 +178,7 @@ export default function TestApiPage() {
         {/* 頂部導航 */}
         <div className="mb-8">
           <motion.button
-            onClick={() => router.push('/aihome')}
+            onClick={() => router.push('/')}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors mb-4"
@@ -186,7 +186,7 @@ export default function TestApiPage() {
             <ArrowLeft className="w-4 h-4" />
             <span>返回首頁</span>
           </motion.button>
-          
+
           <div className="flex items-center space-x-3">
             <TestTube className="w-8 h-8 text-[#4B4036]" />
             <h1 className="text-3xl font-bold text-[#4B4036]">API 測試工具</h1>
@@ -211,7 +211,7 @@ export default function TestApiPage() {
         {testResults && (
           <div className="space-y-4">
             <h2 className="text-xl font-semibold text-[#4B4036]">測試結果</h2>
-            
+
             {/* 測試信息 */}
             <div className="bg-white rounded-lg p-4 shadow-lg border border-[#EADBC8]">
               <h3 className="font-medium text-[#4B4036] mb-2">測試信息</h3>
@@ -241,7 +241,7 @@ export default function TestApiPage() {
                   <div className="flex-1">
                     <h3 className="font-medium text-[#4B4036]">{test.name}</h3>
                     <p className="text-[#2B3A3B] text-sm mt-1">{test.message}</p>
-                    
+
                     {/* 詳細信息 */}
                     {test.details && (
                       <details className="mt-2">

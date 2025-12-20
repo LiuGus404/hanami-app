@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  User, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  User,
   MapPin,
   Bell,
   ChevronLeft,
@@ -42,7 +42,7 @@ export default function SchedulePage() {
     const loadSchedule = async () => {
       try {
         setLoading(true);
-        
+
         // 模擬課程安排資料
         const mockSchedule: ScheduleItem[] = [
           {
@@ -82,7 +82,7 @@ export default function SchedulePage() {
             type: 'exam'
           }
         ];
-        
+
         setScheduleItems(mockSchedule);
       } catch (error) {
         console.error('載入課程安排失敗:', error);
@@ -192,7 +192,7 @@ export default function SchedulePage() {
         {/* 頂部導航 */}
         <div className="mb-8">
           <motion.button
-            onClick={() => router.push('/aihome')}
+            onClick={() => router.push('/')}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-2 px-4 py-2 bg-[#FFD59A] text-[#2B3A3B] rounded-lg hover:bg-[#EBC9A4] transition-colors mb-4"
@@ -200,7 +200,7 @@ export default function SchedulePage() {
             <ArrowLeft className="w-4 h-4" />
             <span>返回首頁</span>
           </motion.button>
-          
+
           <div className="flex items-center space-x-3">
             <Calendar className="w-8 h-8 text-[#4B4036]" />
             <h1 className="text-3xl font-bold text-[#4B4036]">課程安排</h1>
@@ -221,7 +221,7 @@ export default function SchedulePage() {
                 <h2 className="text-xl font-bold text-[#4B4036]">今日課程</h2>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {todaySchedule.map((item, index) => (
                 <motion.div
@@ -291,7 +291,7 @@ export default function SchedulePage() {
               <h2 className="text-xl font-bold text-[#4B4036]">即將到來的課程</h2>
             </div>
           </div>
-          
+
           {upcomingSchedule.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="w-16 h-16 text-[#EADBC8] mx-auto mb-4" />

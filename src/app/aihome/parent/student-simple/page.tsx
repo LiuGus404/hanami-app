@@ -286,7 +286,7 @@ export default function SimpleStudentDetailPage() {
                 返回家長連結
               </motion.button>
               <motion.button
-                onClick={() => router.push('/aihome')}
+                onClick={() => router.push('/')}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="w-full inline-flex items-center justify-center px-6 py-3 bg-white border border-[#EADBC8] text-[#4B4036] rounded-xl font-semibold hover:bg-[#FFD59A]/10 transition-all duration-200"
@@ -362,7 +362,7 @@ export default function SimpleStudentDetailPage() {
             {[
               { key: 'basic', label: '基本資料', icon: UserCircle, description: '學生基本資訊管理' },
               { key: 'lessons', label: '課程記錄', icon: BookOpen, description: '課程與學習記錄' },
-              { key: 'avatar', label: '學生狀態', icon: Sparkles, description: '3D角色與學習進度' },
+              { key: 'avatar', label: '學習狀態', icon: Sparkles, description: '3D角色與學習進度' },
               { key: 'media', label: '媒體庫', icon: Camera, description: '課堂影片與相片' }
             ].map(({ key, label, icon: Icon, description }) => {
               const studentOrgId = student?.org_id ?? null;
@@ -503,7 +503,7 @@ export default function SimpleStudentDetailPage() {
     <ParentShell
       currentPath="/aihome/parent/student-simple"
       pageTitle={student.full_name}
-      pageSubtitle="查看孩子的完整資料與課程記錄"
+      pageSubtitle="查看成員的完整資料與課程記錄"
       user={user}
       onLogout={handleLogout}
       onLogin={() => router.push('/aihome/auth/login')}

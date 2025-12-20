@@ -1800,7 +1800,7 @@ export default function ClassActivitiesPage(
     } else if (remainingLessons <= 2) {
       return 'bg-gradient-to-br from-orange-100 to-yellow-100 border-orange-300';
     } else {
-      return 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200';
+      return 'bg-gradient-to-br from-[#FFFDFB] to-[#FFF8F0] border-[#F0E6DA]';
     }
   };
 
@@ -3216,7 +3216,7 @@ export default function ClassActivitiesPage(
                   >
                     {/* 時段標題卡片 */}
                     <div
-                      className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+                      className="time-slot-header hanami-card-glow bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
                       onClick={() => {
                         const timeSlotKey = `${group.date}_${group.timeSlot}`;
                         toggleTimeSlotExpansion(timeSlotKey);
@@ -3945,7 +3945,7 @@ export default function ClassActivitiesPage(
                   >
                     {/* 班級標題卡片 */}
                     <div
-                      className="time-slot-header hanami-card-glow rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
+                      className="time-slot-header hanami-card-glow bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 mb-4 sm:mb-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] cursor-pointer"
                       onClick={() => toggleClassExpansion(classGroup.id)}
                     >
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">

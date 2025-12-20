@@ -296,7 +296,7 @@ export default function DirectSupabaseCheckPage() {
 
           <div className="flex space-x-4">
             <HanamiButton
-              onClick={() => router.push('/aihome')}
+              onClick={() => router.push('/')}
               variant="secondary"
             >
               返回首頁

@@ -53,6 +53,7 @@ function OrganizationSettingsContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(false); // 是否公開顯示於課程活動頁面
 
   const [orgName, setOrgName] = useState('');
   const [countryCode, setCountryCode] = useState('+852');
@@ -192,7 +193,7 @@ function OrganizationSettingsContent() {
       try {
         // 使用 API 端點查詢機構資訊（繞過 RLS）
         const userEmail = user?.email || '';
-        
+
         const orgResponse = await fetch(
           `/api/organizations/get?orgId=${encodeURIComponent(orgId)}&userEmail=${encodeURIComponent(userEmail)}`
         );
@@ -246,8 +247,8 @@ function OrganizationSettingsContent() {
             typeof link?.customLabel === 'string'
               ? link.customLabel
               : typeof link?.label === 'string'
-              ? link.label
-              : '',
+                ? link.label
+                : '',
           url: typeof link?.url === 'string' ? link.url : '',
         }));
 
@@ -255,13 +256,13 @@ function OrganizationSettingsContent() {
           initialSocialLinks.length > 0
             ? initialSocialLinks
             : [
-                {
-                  id: crypto.randomUUID(),
-                  platform: 'instagram',
-                  customLabel: '',
-                  url: '',
-                },
-              ],
+              {
+                id: crypto.randomUUID(),
+                platform: 'instagram',
+                customLabel: '',
+                url: '',
+              },
+            ],
         );
 
         setCoverPreview(
@@ -269,6 +270,9 @@ function OrganizationSettingsContent() {
             ? fetchedSettings.coverImageUrl
             : null,
         );
+
+        // 設置是否公開（預設為不公開 false）
+        setIsPublic(data?.is_public === true);
 
         setOrgName(data?.org_name ?? organization.name ?? '');
         setDescription(fetchedSettings.description ?? '');
@@ -392,7 +396,7 @@ function OrganizationSettingsContent() {
 
     try {
       setSaving(true);
-      
+
       // 使用 API 端點更新機構資訊（繞過 RLS）
       const userEmail = user?.email || '';
       const updateResponse = await fetch('/api/organizations/update', {
@@ -408,6 +412,7 @@ function OrganizationSettingsContent() {
             contact_phone: `${countryCode} ${trimmedPhone}`,
             contact_email: trimmedEmail || null,
             settings: updatedSettings,
+            is_public: isPublic,
           },
         }),
       });
@@ -421,19 +426,19 @@ function OrganizationSettingsContent() {
       setEditableSocialLinks(
         socialLinks.length > 0
           ? socialLinks.map((link) => ({
-              id: crypto.randomUUID(),
-              platform: link.platform,
-              customLabel: link.customLabel ?? '',
-              url: link.url,
-            }))
+            id: crypto.randomUUID(),
+            platform: link.platform,
+            customLabel: link.customLabel ?? '',
+            url: link.url,
+          }))
           : [
-              {
-                id: crypto.randomUUID(),
-                platform: 'instagram',
-                customLabel: '',
-                url: '',
-              },
-            ],
+            {
+              id: crypto.randomUUID(),
+              platform: 'instagram',
+              customLabel: '',
+              url: '',
+            },
+          ],
       );
       if (!selectedCategories.includes('custom')) {
         setCustomCategory('');
@@ -588,6 +593,46 @@ function OrganizationSettingsContent() {
               </p>
             </div>
 
+            {/* 公開/隱藏 Toggle Switch */}
+            <div className="rounded-2xl border-2 border-[#EADBC8] bg-[#FFFDF8] p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-semibold text-[#4B4036]">機構公開顯示</label>
+                  <p className="mt-1 text-xs text-[#8A7C70]">
+                    {isPublic
+                      ? '您的機構將會顯示在「課程活動」頁面，讓用戶可以探索您的課程'
+                      : '您的機構目前為隱藏狀態，不會顯示在「課程活動」頁面'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPublic(!isPublic)}
+                  className={`
+                    relative inline-flex h-8 w-16 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+                    transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFD59A] focus:ring-offset-2
+                    ${isPublic ? 'bg-gradient-to-r from-[#4CAF50] to-[#81C784]' : 'bg-[#D9D9D9]'}
+                  `}
+                >
+                  <span className="sr-only">{isPublic ? '公開' : '隱藏'}</span>
+                  <span
+                    className={`
+                      pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0
+                      transition-transform duration-300 ease-in-out
+                      ${isPublic ? 'translate-x-8' : 'translate-x-0'}
+                    `}
+                  />
+                </button>
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs">
+                <span className={`px-2 py-1 rounded-full ${!isPublic ? 'bg-[#EADBC8] text-[#4B4036] font-medium' : 'text-[#8A7C70]'}`}>
+                  隱藏
+                </span>
+                <span className={`px-2 py-1 rounded-full ${isPublic ? 'bg-[#C8E6C9] text-[#2E7D32] font-medium' : 'text-[#8A7C70]'}`}>
+                  公開
+                </span>
+              </div>
+            </div>
+
             <div>
               <span className="text-sm font-semibold text-[#4B4036]">
                 機構類別<span className="ml-1 text-red-500">*</span>
@@ -639,10 +684,9 @@ function OrganizationSettingsContent() {
                                 <div
                                   className={`
                                     flex w-full items-center gap-3 rounded-2xl border-2 px-3 py-3 text-sm font-medium transition-all duration-200
-                                    ${
-                                      checked
-                                        ? 'border-[#FFD59A] bg-gradient-to-r from-[#FFF4DF] via-[#FFE9C6] to-[#FFF4DF] text-[#4B4036] shadow-sm'
-                                        : 'border-transparent bg-white text-[#2B3A3B] shadow-[0_1px_4px_rgba(234,219,200,0.35)]'
+                                    ${checked
+                                      ? 'border-[#FFD59A] bg-gradient-to-r from-[#FFF4DF] via-[#FFE9C6] to-[#FFF4DF] text-[#4B4036] shadow-sm'
+                                      : 'border-transparent bg-white text-[#2B3A3B] shadow-[0_1px_4px_rgba(234,219,200,0.35)]'
                                     }
                                     hover:border-[#FFE0B2] hover:shadow-md
                                   `}
@@ -814,11 +858,11 @@ function OrganizationSettingsContent() {
                                   prev.map((item) =>
                                     item.id === link.id
                                       ? {
-                                          ...item,
-                                          platform: value,
-                                          customLabel:
-                                            value === 'custom' ? item.customLabel : '',
-                                        }
+                                        ...item,
+                                        platform: value,
+                                        customLabel:
+                                          value === 'custom' ? item.customLabel : '',
+                                      }
                                       : item,
                                   ),
                                 );

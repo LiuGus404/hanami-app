@@ -85,6 +85,8 @@ interface CourseType {
   status: boolean | null;
   min_age: number | null;
   max_age: number | null;
+  min_age_unit?: 'years' | 'months' | null;
+  max_age_unit?: 'years' | 'months' | null;
   duration_minutes: number | null;
   max_students: number | null;
   difficulty_level: string | null;
@@ -284,6 +286,8 @@ export default function MultiCourseScheduleManagementPanel() {
     status: true,
     min_age: null,
     max_age: null,
+    min_age_unit: 'years',
+    max_age_unit: 'years',
     duration_minutes: 45,
     max_students: 6,
     difficulty_level: 'beginner',
@@ -467,6 +471,8 @@ export default function MultiCourseScheduleManagementPanel() {
             status,
             min_age,
             max_age,
+            min_age_unit,
+            max_age_unit,
             duration_minutes,
             max_students,
             difficulty_level,
@@ -1413,6 +1419,8 @@ export default function MultiCourseScheduleManagementPanel() {
       status: true,
       min_age: null,
       max_age: null,
+      min_age_unit: 'years',
+      max_age_unit: 'years',
       duration_minutes: 45,
       max_students: 6,
       difficulty_level: 'beginner',
@@ -1458,6 +1466,8 @@ export default function MultiCourseScheduleManagementPanel() {
       status: courseType.status ?? true,
       min_age: courseType.min_age,
       max_age: courseType.max_age,
+      min_age_unit: courseType.min_age_unit || 'years',
+      max_age_unit: courseType.max_age_unit || 'years',
       duration_minutes: courseType.duration_minutes ?? 45,
       max_students: courseType.max_students ?? 6,
       difficulty_level: courseType.difficulty_level || 'beginner',
@@ -1835,6 +1845,8 @@ export default function MultiCourseScheduleManagementPanel() {
         status: courseTypeForm.status ?? true,
         min_age: courseTypeForm.min_age ?? null,
         max_age: courseTypeForm.max_age ?? null,
+        min_age_unit: courseTypeForm.min_age_unit || 'years',
+        max_age_unit: courseTypeForm.max_age_unit || 'years',
         duration_minutes: courseTypeForm.duration_minutes ?? null,
         max_students: courseTypeForm.max_students ?? null,
         difficulty_level: courseTypeForm.difficulty_level || 'beginner',
@@ -2012,10 +2024,19 @@ export default function MultiCourseScheduleManagementPanel() {
                   const active = courseType.status ?? true;
                   const packages = courseType.discount_configs?.packages || [];
                   const trialBundles = courseType.discount_configs?.trialBundles || [];
-                  const ageRangeLabel =
-                    courseType.min_age !== null && courseType.max_age !== null
-                      ? `${courseType.min_age} - ${courseType.max_age} 歲`
-                      : '未設定年齡';
+                  const ageRangeLabel = (() => {
+                    if (courseType.min_age === null && courseType.max_age === null) {
+                      return '未設定年齡';
+                    }
+                    const minUnit = courseType.min_age_unit === 'months' ? '月' : '歲';
+                    const maxUnit = courseType.max_age_unit === 'months' ? '月' : '歲';
+                    const minStr = courseType.min_age !== null ? `${courseType.min_age}${minUnit}` : '';
+                    const maxStr = courseType.max_age !== null ? `${courseType.max_age}${maxUnit}` : '';
+                    if (minStr && maxStr) {
+                      return `${minStr} - ${maxStr}`;
+                    }
+                    return minStr || maxStr || '未設定年齡';
+                  })();
                   const durationLabel = courseType.duration_minutes
                     ? `${courseType.duration_minutes} 分鐘`
                     : '未設定時長';
@@ -4188,25 +4209,73 @@ export default function MultiCourseScheduleManagementPanel() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-[#8A7C70] mb-1">最小年齡</label>
-                          <input
-                            type="number"
-                            min={0}
-                            className="w-full rounded-xl border border-[#EADBC8] bg-[#FFFDF7] px-3 py-2 text-sm focus:border-[#A68A64] focus:outline-none focus:ring-2 focus:ring-[#A68A64]/30"
-                            value={courseTypeForm.min_age ?? ''}
-                            onChange={(e) => updateCourseTypeForm('min_age', e.target.value ? Number(e.target.value) : null)}
-                            placeholder="例如：3"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min={0}
+                              className="flex-1 rounded-xl border border-[#EADBC8] bg-[#FFFDF7] px-3 py-2 text-sm focus:border-[#A68A64] focus:outline-none focus:ring-2 focus:ring-[#A68A64]/30"
+                              value={courseTypeForm.min_age ?? ''}
+                              onChange={(e) => updateCourseTypeForm('min_age', e.target.value ? Number(e.target.value) : null)}
+                              placeholder={courseTypeForm.min_age_unit === 'months' ? '例如：18' : '例如：3'}
+                            />
+                            <div className="flex rounded-xl border border-[#EADBC8] bg-[#FFFDF7] overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => updateCourseTypeForm('min_age_unit', 'years')}
+                                className={`px-3 py-2 text-xs font-medium transition-all ${(courseTypeForm.min_age_unit || 'years') === 'years'
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-[#4B4036]'
+                                  : 'bg-transparent text-[#8A7C70] hover:bg-[#FFF3E4]'
+                                  }`}
+                              >
+                                歲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateCourseTypeForm('min_age_unit', 'months')}
+                                className={`px-3 py-2 text-xs font-medium transition-all ${courseTypeForm.min_age_unit === 'months'
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-[#4B4036]'
+                                  : 'bg-transparent text-[#8A7C70] hover:bg-[#FFF3E4]'
+                                  }`}
+                              >
+                                月
+                              </button>
+                            </div>
+                          </div>
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-[#8A7C70] mb-1">最大年齡</label>
-                          <input
-                            type="number"
-                            min={0}
-                            className="w-full rounded-xl border border-[#EADBC8] bg-[#FFFDF7] px-3 py-2 text-sm focus:border-[#A68A64] focus:outline-none focus:ring-2 focus:ring-[#A68A64]/30"
-                            value={courseTypeForm.max_age ?? ''}
-                            onChange={(e) => updateCourseTypeForm('max_age', e.target.value ? Number(e.target.value) : null)}
-                            placeholder="例如：8"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min={0}
+                              className="flex-1 rounded-xl border border-[#EADBC8] bg-[#FFFDF7] px-3 py-2 text-sm focus:border-[#A68A64] focus:outline-none focus:ring-2 focus:ring-[#A68A64]/30"
+                              value={courseTypeForm.max_age ?? ''}
+                              onChange={(e) => updateCourseTypeForm('max_age', e.target.value ? Number(e.target.value) : null)}
+                              placeholder={courseTypeForm.max_age_unit === 'months' ? '例如：36' : '例如：8'}
+                            />
+                            <div className="flex rounded-xl border border-[#EADBC8] bg-[#FFFDF7] overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => updateCourseTypeForm('max_age_unit', 'years')}
+                                className={`px-3 py-2 text-xs font-medium transition-all ${(courseTypeForm.max_age_unit || 'years') === 'years'
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-[#4B4036]'
+                                  : 'bg-transparent text-[#8A7C70] hover:bg-[#FFF3E4]'
+                                  }`}
+                              >
+                                歲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateCourseTypeForm('max_age_unit', 'months')}
+                                className={`px-3 py-2 text-xs font-medium transition-all ${courseTypeForm.max_age_unit === 'months'
+                                  ? 'bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-[#4B4036]'
+                                  : 'bg-transparent text-[#8A7C70] hover:bg-[#FFF3E4]'
+                                  }`}
+                              >
+                                月
+                              </button>
+                            </div>
+                          </div>
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-[#8A7C70] mb-1">課堂時長 (分鐘)</label>

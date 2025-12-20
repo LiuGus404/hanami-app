@@ -110,7 +110,7 @@ export default function AuthCallbackPage() {
                                     返回登入頁面
                                 </button>
                                 <button
-                                    onClick={() => router.push('/aihome')}
+                                    onClick={() => router.push('/')}
                                     className="flex items-center justify-center space-x-2 w-full px-4 py-2 text-sm text-[#2B3A3B] hover:text-[#4B4036] hover:bg-[#FFD59A]/20 rounded-lg transition-all duration-200"
                                 >
                                     <HomeIcon className="w-4 h-4" />
