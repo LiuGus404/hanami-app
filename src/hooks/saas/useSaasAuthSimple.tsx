@@ -522,7 +522,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = async (nextPath?: string) => {
     try {
-      const redirectUrl = new URL(`${window.location.origin}/aihome/auth/callback`);
+      const redirectUrl = new URL(`${window.location.origin}/aihome/api/auth/callback`);
       if (nextPath) {
         redirectUrl.searchParams.set('next', nextPath);
       }
@@ -548,7 +548,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithApple = async (nextPath?: string) => {
     try {
-      const redirectUrl = new URL(`${window.location.origin}/aihome/auth/callback`);
+      const redirectUrl = new URL(`${window.location.origin}/aihome/api/auth/callback`);
       if (nextPath) {
         redirectUrl.searchParams.set('next', nextPath);
       }
