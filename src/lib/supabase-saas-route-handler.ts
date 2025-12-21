@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 
-const saasUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL || 'https://laowyqplcthwqckyigiy.supabase.co';
+const saasUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL || '';
 const saasAnonKey = process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY || '';
 
 /**
@@ -10,7 +10,7 @@ const saasAnonKey = process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY || '';
  */
 export async function createSaasRouteHandlerClient() {
   const cookieStore = await cookies();
-  
+
   // 創建 Supabase 客戶端
   const supabase = createClient(saasUrl, saasAnonKey, {
     auth: {
@@ -22,7 +22,7 @@ export async function createSaasRouteHandlerClient() {
 
   // 手動從 cookies 中讀取會話並設置到客戶端
   const projectRef = saasUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
-  
+
   // 嘗試多種可能的 cookie 名稱
   // 注意：根據 middleware.ts，實際使用的名稱是 'sb-hanamiecho-auth-token'（不包含 project-ref）
   const possibleCookieNames = [
@@ -35,9 +35,9 @@ export async function createSaasRouteHandlerClient() {
   ].filter(Boolean) as string[];
 
   let sessionData: any = null;
-  
+
   console.log('[createSaasRouteHandlerClient] 嘗試的 cookie 名稱:', possibleCookieNames);
-  
+
   for (const cookieName of possibleCookieNames) {
     const authCookie = cookieStore.get(cookieName);
     if (authCookie?.value) {
@@ -55,13 +55,13 @@ export async function createSaasRouteHandlerClient() {
   // 如果沒有找到，嘗試查找所有包含 'supabase' 和 'auth' 的 cookies
   if (!sessionData) {
     const allCookies = cookieStore.getAll();
-    const authCookies = allCookies.filter(c => 
-      (c.name.includes('supabase') || c.name.includes('sb-')) && 
+    const authCookies = allCookies.filter(c =>
+      (c.name.includes('supabase') || c.name.includes('sb-')) &&
       (c.name.includes('auth') || c.name.includes('token'))
     );
-    
+
     console.log(`[createSaasRouteHandlerClient] 找到 ${authCookies.length} 個可能的認證 cookies:`, authCookies.map(c => c.name));
-    
+
     for (const authCookie of authCookies) {
       if (authCookie.value) {
         try {
@@ -74,7 +74,7 @@ export async function createSaasRouteHandlerClient() {
       }
     }
   }
-  
+
   if (!sessionData) {
     console.log('[createSaasRouteHandlerClient] ❌ 未找到會話數據');
     const allCookies = cookieStore.getAll();

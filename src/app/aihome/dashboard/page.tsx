@@ -132,12 +132,12 @@ export default function DashboardPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] relative overflow-hidden">
+        <div className="h-screen overflow-hidden bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#F8F5EC] relative">
             {/* Organic Blob Decorations */}
             <div className="organic-blob w-[400px] h-[400px] bg-[#FFD59A]/30 top-[-10%] right-[-10%]" />
             <div className="organic-blob w-[300px] h-[300px] bg-[#C084FC]/20 bottom-[20%] left-[-5%]" style={{ animationDelay: '5s' }} />
 
-            <div className="flex relative z-10">
+            <div className="flex h-full relative z-10">
                 {/* 側邊欄選單 */}
                 <AppSidebar
                     isOpen={sidebarOpen}
@@ -146,77 +146,78 @@ export default function DashboardPage() {
                 />
 
                 {/* 主內容區域 */}
-                <div className="flex-1 flex flex-col">
-                    <UnifiedNavbar
-                        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-                        user={user}
-                        onLogout={handleLogout}
-                        onLogin={() => router.push('/aihome/auth/login')}
-                        onRegister={() => router.push('/aihome/auth/register')}
-                        customRightContent={<UnifiedRightContent user={user} onLogout={handleLogout} />}
-                    />
+                <div className="flex-1 flex flex-col h-full">
+                    <main className="flex-1 overflow-y-auto">
+                        {/* Top Navbar - Sticky inside scrollable area */}
+                        <UnifiedNavbar
+                            onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+                            user={user}
+                            onLogout={handleLogout}
+                            onLogin={() => router.push('/aihome/auth/login')}
+                            onRegister={() => router.push('/aihome/auth/register')}
+                            customRightContent={<UnifiedRightContent user={user} onLogout={handleLogout} />}
+                        />
 
-                    {/* 主內容區域 */}
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 min-h-full pb-24 md:pb-8">
-                        {/* 歡迎區域 with Blinking Doll */}
-                        <motion.div
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-                            transition={{ duration: 0.8 }}
-                            className="text-center mb-12"
-                        >
+                        {/* 主內容區域 */}
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 pb-24 md:pb-8">
+                            {/* 歡迎區域 with Blinking Doll */}
                             <motion.div
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.8, delay: 0.2 }}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-sm text-[#4B4036] text-sm font-bold mb-6"
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+                                transition={{ duration: 0.8 }}
+                                className="text-center mb-12"
                             >
-                                <SparklesIcon className="w-4 h-4 text-[#FFD59A]" />
-                                <span>歡迎回來，{user?.full_name || user?.email?.split('@')[0] || '用戶'}！</span>
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.8, delay: 0.2 }}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-sm text-[#4B4036] text-sm font-bold mb-6"
+                                >
+                                    <SparklesIcon className="w-4 h-4 text-[#FFD59A]" />
+                                    <span>歡迎回來，{user?.full_name || user?.email?.split('@')[0] || '用戶'}！</span>
+                                </motion.div>
+
+                                <h1 className="text-4xl lg:text-5xl font-bold text-[#4B4036] mb-4">
+                                    HanamiEcho 控制台
+                                </h1>
+                                <p className="text-lg text-[#6B5D52] max-w-2xl mx-auto mb-8">
+                                    您的智能 AI 助手，為兒童和成人提供個性化的協作體驗和情感支持
+                                </p>
+
+                                {/* Blinking Doll */}
+                                <div className="flex items-center justify-center mb-8">
+                                    <LuLuCharacterSimpleBlink size="xxl" />
+                                </div>
                             </motion.div>
 
-                            <h1 className="text-4xl lg:text-5xl font-bold text-[#4B4036] mb-4">
-                                HanamiEcho 控制台
-                            </h1>
-                            <p className="text-lg text-[#6B5D52] max-w-2xl mx-auto mb-8">
-                                您的智能 AI 助手，為兒童和成人提供個性化的協作體驗和情感支持
-                            </p>
-
-                            {/* Blinking Doll */}
-                            <div className="flex justify-center mb-8">
-                                <div className="relative w-[280px] h-[280px]">
-                                    <LuLuCharacterSimpleBlink />
+                            {/* 快速導航 - 3D Button Style */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={isLoaded ? { opacity: 1, y: 0 } : {}}
+                                transition={{ duration: 0.8, delay: 0.2 }}
+                                className="mb-12"
+                            >
+                                <div className="flex flex-wrap justify-center gap-4">
+                                    {quickNav.map((item, index) => (
+                                        <motion.div
+                                            key={item.label}
+                                            initial={{ opacity: 0, scale: 0.8 }}
+                                            animate={isLoaded ? { opacity: 1, scale: 1 } : {}}
+                                            transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
+                                        >
+                                            <Link href={item.href}>
+                                                <button className="btn-3d flex items-center gap-2 text-sm">
+                                                    <item.icon className="w-5 h-5" />
+                                                    <span>{item.label}</span>
+                                                </button>
+                                            </Link>
+                                        </motion.div>
+                                    ))}
                                 </div>
-                            </div>
-                        </motion.div>
+                            </motion.div>
 
-                        {/* 快速導航 - 3D Button Style */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={isLoaded ? { opacity: 1, y: 0 } : {}}
-                            transition={{ duration: 0.8, delay: 0.2 }}
-                            className="mb-12"
-                        >
-                            <div className="flex flex-wrap justify-center gap-4">
-                                {quickNav.map((item, index) => (
-                                    <motion.div
-                                        key={item.label}
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={isLoaded ? { opacity: 1, scale: 1 } : {}}
-                                        transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                                    >
-                                        <Link href={item.href}>
-                                            <button className="btn-3d flex items-center gap-2 text-sm">
-                                                <item.icon className="w-5 h-5" />
-                                                <span>{item.label}</span>
-                                            </button>
-                                        </Link>
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
-
-                    </div>
+                        </div>
+                    </main>
                 </div>
             </div>
 

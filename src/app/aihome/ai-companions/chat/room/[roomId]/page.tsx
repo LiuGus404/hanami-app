@@ -4836,7 +4836,7 @@ export default function RoomChatPage() {
       console.log('📤 [Edge] Invoking chat-processor...');
 
       // CRITICAL FIX: Use correct environment variables (SAAS versions)
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL || 'https://laowyqplcthwqckyigiy.supabase.co';
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL || '';
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY || '';
 
       console.log('🔍 [Edge] Using direct fetch to:', `${supabaseUrl}/functions/v1/chat-processor`);
@@ -5754,8 +5754,8 @@ export default function RoomChatPage() {
         console.warn('⚠️ [Edge] Invoke failed or timed out. Attempting direct fallback fetch...', invokeError);
 
         // Fallback: Direct Fetch
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL || 'https://laowyqplcthwqckyigiy.supabase.co';
-        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxhb3d5cXBsY3Rod3Fja3lpZ2l5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMDE0MjYsImV4cCI6MjA3Mjg3NzQyNn0.LU37G9rZSBP5_BoAGQ_1QncFS2wemcI1w2J-wZzC-cI';
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_SAAS_URL || '';
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_SAAS_ANON_KEY || '';
 
         try {
           const response = await fetch(`${supabaseUrl}/functions/v1/chat-processor`, {
