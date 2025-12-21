@@ -238,6 +238,9 @@ export default function LandingPage() {
                                                     <p className="text-xl lg:text-2xl font-medium text-[#6B5D52]">
                                                         從管理到教學，我們一起用 AI <span className="text-[#A67C52] font-bold">重新定義教育</span>。
                                                     </p>
+                                                    <p className="text-lg font-medium text-[#8B7E74] italic tracking-wide mt-2">
+                                                        Built by educator for educators
+                                                    </p>
                                                 </motion.div>
 
                                                 <motion.div
