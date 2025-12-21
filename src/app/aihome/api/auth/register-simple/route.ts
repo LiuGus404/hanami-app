@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
       }
 
       if (existingPhone) {
-        console.error('電話號碼已被使用:', { 
-          phone, 
+        console.error('電話號碼已被使用:', {
+          phone,
           existingUser: (existingPhone as any).email,
-          existingName: (existingPhone as any).full_name 
+          existingName: (existingPhone as any).full_name
         });
         return NextResponse.json(
           { success: false, error: '該電話號碼已註冊過，如需要請按忘記密碼' },
@@ -73,28 +73,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 創建 SAAS 用戶記錄
+    // 更新 SAAS 用戶記錄（觸發器已創建基礎記錄）
+    // 只更新額外字段如 phone，因為觸發器已經創建了記錄
     const { error: saasError } = await supabase
       .from('saas_users')
-      .insert({
-        id: authData.user.id,
-        email: email,
+      .update({
         full_name: nickname,
         phone: phone || null,
-        subscription_status: 'trial',
-        usage_limit: 10,
-        is_verified: false, // 需要郵箱驗證
-        verification_method: 'email'
-      } as any);
+        updated_at: new Date().toISOString()
+      } as any)
+      .eq('id', authData.user.id);
 
     if (saasError) {
-      console.error('創建 SAAS 用戶失敗:', saasError);
-      // 如果 SAAS 用戶創建失敗，嘗試清理認證用戶
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return NextResponse.json(
-        { success: false, error: '創建用戶記錄失敗' },
-        { status: 500 }
-      );
+      // 更新失敗不是致命錯誤，觸發器已經創建了基本記錄
+      console.warn('更新 SAAS 用戶額外字段失敗（非致命）:', saasError);
     }
 
     console.log('用戶創建成功:', authData.user.id);
@@ -102,7 +94,7 @@ export async function POST(request: NextRequest) {
     // 發送確認郵件（直接調用，不通過 HTTP）
     try {
       console.log('開始發送確認郵件:', { email, nickname });
-      
+
       // 使用 inviteUserByEmail 發送確認郵件
       const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
         redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/aihome/auth/verification-success`,
@@ -115,7 +107,7 @@ export async function POST(request: NextRequest) {
 
       if (inviteError) {
         console.error('發送確認郵件失敗 (inviteUserByEmail):', inviteError);
-        
+
         // 備用方案：使用 generateLink 生成鏈接
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
           type: 'signup',
