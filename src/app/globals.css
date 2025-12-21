@@ -363,3 +363,55 @@ body {
     background-position: 0% 50%;
   }
 }
+
+/* ============================================
+   MOBILE PERFORMANCE OPTIMIZATIONS
+   ============================================ */
+
+/* Enable native smooth scrolling on touch devices */
+.scrollbar-hide {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* Reduce animation intensity on mobile devices */
+@media (max-width: 768px),
+(prefers-reduced-motion: reduce) {
+  .organic-blob {
+    animation: none !important;
+    filter: blur(60px);
+    /* Simpler static blur */
+  }
+
+  .animate-float {
+    animation: none !important;
+  }
+
+  .fog-divider {
+    display: none;
+    /* Hide heavy blur dividers on mobile */
+  }
+
+  /* Reduce motion on cards */
+  .pastel-card:hover {
+    transform: none;
+  }
+}
+
+/* Improve touch responsiveness for all interactive elements */
+button,
+a,
+[role="button"],
+.btn-3d,
+.pill-btn,
+.pastel-card {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure scrollable areas don't block on touch */
+main,
+[data-scroll-container] {
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
+}

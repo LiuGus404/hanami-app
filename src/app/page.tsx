@@ -34,8 +34,8 @@ import PhysicsParticleSystem from '@/components/ui/PhysicsParticleSystem';
 // --- Components ---
 
 const ParticleBackground = ({ type = 'air-clock' }: { type?: 'air-clock' | 'growth-tree' | 'mind-switch' }) => {
-    // Simple particle system using Framer Motion
-    const count = 30;
+    // Detect mobile for reduced particle count
+    const [isMobile, setIsMobile] = useState(true); // Default to mobile for SSR
     const [particles, setParticles] = useState<any[]>([]);
 
     // Colors based on type
@@ -46,6 +46,15 @@ const ParticleBackground = ({ type = 'air-clock' }: { type?: 'air-clock' | 'grow
     }[type] || ['#FFFFFF'];
 
     useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    useEffect(() => {
+        // Reduce particle count on mobile for better performance
+        const count = isMobile ? 10 : 30;
         const newParticles = Array.from({ length: count }).map((_, i) => ({
             id: i,
             x: Math.random() * 100,
@@ -56,9 +65,12 @@ const ParticleBackground = ({ type = 'air-clock' }: { type?: 'air-clock' | 'grow
             color: colors[Math.floor(Math.random() * colors.length)]
         }));
         setParticles(newParticles);
-    }, [count, type]);
+    }, [isMobile, type]);
 
-    if (particles.length === 0) return null; // Prevent hydration mismatch by rendering nothing initially
+    // Skip rendering on mobile for even better performance
+    if (isMobile) return null;
+
+    if (particles.length === 0) return null;
 
     return (
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -175,10 +187,21 @@ export default function LandingPage() {
     const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
     const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.9]);
 
+    // Mobile detection for performance optimization
+    const [isMobile, setIsMobile] = useState(true); // Default to mobile for SSR
+
     // Navigation State
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { user, logout } = useSaasAuth();
     const router = useRouter();
+
+    // Detect mobile on mount
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const handleLogout = async () => {
         try {
@@ -222,7 +245,7 @@ export default function LandingPage() {
                                         <div className="organic-blob w-[250px] h-[250px] bg-[#A67C52]/30 bottom-[10%] left-[5%]" style={{ animationDelay: '10s' }} />
 
                                         <motion.div
-                                            style={{ opacity, scale }}
+                                            style={isMobile ? {} : { opacity, scale }}
                                             className="flex flex-col lg:flex-row items-center justify-between gap-12 relative z-10 max-w-7xl"
                                         >
                                             {/* Text Content */}

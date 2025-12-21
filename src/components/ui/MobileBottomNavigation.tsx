@@ -146,7 +146,8 @@ export default function MobileBottomNavigation({ className = '' }: MobileBottomN
     window.addEventListener('storage', handleStorageChange);
 
     // 定期檢查教師權限狀態（因為 sessionStorage 變化不會觸發 storage 事件）
-    const intervalId = setInterval(handleStorageChange, 2000);
+    // Reduced from 2000ms to 10000ms for better mobile performance
+    const intervalId = setInterval(handleStorageChange, 10000);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
