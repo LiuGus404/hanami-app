@@ -41,23 +41,23 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
     const [isLoadingBlocks, setIsLoadingBlocks] = useState(false);
     const [showBlockSelector, setShowBlockSelector] = useState(false);
 
-    // 组件挂载日志
+    // 組件掛載日志
     useEffect(() => {
-        console.log('🎯 [角色装备] 面板已打开');
-        console.log('🔍 [角色装备] 当前用户:', currentUser ? { id: currentUser.id, email: currentUser.email } : '未登录');
+        console.log('🎯 [角色裝備] 面板已開啟');
+        console.log('🔍 [角色裝備] 當前用戶:', currentUser ? { id: currentUser.id, email: currentUser.email } : '未登入');
     }, []);
 
-    // 加载所有角色（公开 + 用户自己的）
+    // 載入所有角色（公开 + 用戶自己的）
     useEffect(() => {
         const loadAllRoles = async () => {
-            console.log('🔍 [角色装备] useEffect 触发，currentUser:', currentUser ? '已登录' : '未登录');
+            console.log('🔍 [角色裝備] useEffect 觸發，currentUser:', currentUser ? '已登入' : '未登入');
 
             if (!currentUser) {
-                console.log('🔍 [角色装备] 等待用户登录...');
-                // 即使没有用户，也尝试加载公开角色
+                console.log('🔍 [角色裝備] 等待用戶登入...');
+                // 即使没有用戶，也嘗試載入公開角色
                 setRolesLoading(true);
                 try {
-                    console.log('🔍 [角色装备] 尝试加载公开角色（无用户）...');
+                    console.log('🔍 [角色裝備] 嘗試載入公開角色（无用戶）...');
                     const { data: publicRoles, error } = await supabase
                         .from('ai_roles')
                         .select('*')
@@ -65,33 +65,33 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                         .order('created_at', { ascending: false });
 
                     if (error) {
-                        console.error('❌ [角色装备] 加载公开角色失败:', error);
+                        console.error('❌ [角色裝備] 載入公開角色失敗:', error);
                     } else {
-                        console.log('✅ [角色装备] 加载公开角色成功，数量:', publicRoles?.length || 0);
+                        console.log('✅ [角色裝備] 載入公開角色成功，數量:', publicRoles?.length || 0);
                         setRoles((publicRoles || []) as any[]);
                     }
                 } catch (error) {
-                    console.error('❌ [角色装备] 加载公开角色异常:', error);
+                    console.error('❌ [角色裝備] 載入公開角色異常:', error);
                 } finally {
                     setRolesLoading(false);
                 }
                 return;
             }
 
-            console.log('🔍 [角色装备] 开始加载角色，用户 ID:', currentUser.id);
+            console.log('🔍 [角色裝備] 開始載入角色，用戶 ID:', currentUser.id);
             setRolesLoading(true);
 
             try {
-                // 先尝试获取所有角色（不限制状态）
-                console.log('🔍 [角色装备] 查询所有角色...');
+                // 先嘗試獲取所有角色（不限制状态）
+                console.log('🔍 [角色裝備] 查詢所有角色...');
                 const { data: allRolesData, error: allRolesError } = await supabase
                     .from('ai_roles')
                     .select('*')
                     .order('created_at', { ascending: false });
 
                 if (allRolesError) {
-                    console.error('❌ [角色装备] 查询所有角色失败:', allRolesError);
-                    // 如果查询所有角色失败，尝试分别查询
+                    console.error('❌ [角色裝備] 查詢所有角色失敗:', allRolesError);
+                    // 如果查詢所有角色失敗，嘗試分别查詢
                     const [publicRolesResult, userRolesResult] = await Promise.all([
                         supabase
                             .from('ai_roles')
@@ -108,41 +108,41 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                     const publicRoles = (publicRolesResult.data as any[]) || [];
                     const userRoles = (userRolesResult.data as any[]) || [];
 
-                    console.log('🔍 [角色装备] 公开角色数量:', publicRoles.length);
-                    console.log('🔍 [角色装备] 用户角色数量:', userRoles.length);
+                    console.log('🔍 [角色裝備] 公開角色數量:', publicRoles.length);
+                    console.log('🔍 [角色裝備] 用戶角色數量:', userRoles.length);
 
                     if (publicRolesResult.error) {
-                        console.warn('⚠️ [角色装备] 加载公开角色失败:', publicRolesResult.error);
+                        console.warn('⚠️ [角色裝備] 載入公開角色失敗:', publicRolesResult.error);
                     }
                     if (userRolesResult.error) {
-                        console.warn('⚠️ [角色装备] 加载用户角色失败:', userRolesResult.error);
+                        console.warn('⚠️ [角色裝備] 載入用戶角色失敗:', userRolesResult.error);
                     }
 
-                    // 合并并去重（基于 id）
+                    // 合併并去重（基于 id）
                     const allRolesMap = new Map<string, AIRole>();
                     [...publicRoles, ...userRoles].forEach((role: any) => {
                         allRolesMap.set(role.id, role as any);
                     });
 
                     const allRoles = Array.from(allRolesMap.values()) as any[];
-                    console.log('✅ [角色装备] 合并后角色数量:', allRoles.length);
+                    console.log('✅ [角色裝備] 合併後角色數量:', allRoles.length);
                     setRoles(allRoles);
                 } else {
-                    // 成功获取所有角色
+                    // 成功獲取所有角色
                     const allRoles = (allRolesData as any[]) || [];
-                    console.log('✅ [角色装备] 成功加载所有角色，数量:', allRoles.length);
+                    console.log('✅ [角色裝備] 成功載入所有角色，數量:', allRoles.length);
 
-                    // 过滤：只显示公开角色或用户自己创建的角色
+                    // 過濾：只显示公開角色或用戶自己創建的角色
                     const filteredRoles = allRoles.filter((role: any) =>
                         role.is_public === true || role.creator_user_id === currentUser.id
                     );
 
-                    console.log('🔍 [角色装备] 过滤后角色数量:', filteredRoles.length);
+                    console.log('🔍 [角色裝備] 過濾後角色數量:', filteredRoles.length);
                     setRoles(filteredRoles as any[]);
                 }
             } catch (error) {
-                console.error('❌ [角色装备] 加载角色异常:', error);
-                toast.error('加载角色失败，请检查控制台');
+                console.error('❌ [角色裝備] 載入角色異常:', error);
+                toast.error('載入角色失敗，请檢查控制台');
             } finally {
                 setRolesLoading(false);
             }
@@ -151,13 +151,13 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
         loadAllRoles();
     }, [currentUser, supabase]);
 
-    // 加载已装备的思维积木
+    // 載入已裝備的思維積木
     const loadEquippedBlocks = async (roleId: string) => {
         if (!currentUser || !roleId) return;
 
         setIsLoadingBlocks(true);
         try {
-            // 先获取装备记录
+            // 先獲取裝備記錄
             const { data: equipmentData, error: equipmentError } = await (supabase as any)
                 .from('role_mind_blocks')
                 .select('id, is_active, mind_block_id')
@@ -172,7 +172,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                 return;
             }
 
-            // 获取所有相关的思维积木
+            // 獲取所有相关的思維積木
             const mindBlockIds = equipmentData.map((item: any) => item.mind_block_id);
             const { data: blocksData, error: blocksError } = await supabase
                 .from('mind_blocks' as any)
@@ -181,7 +181,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
 
             if (blocksError) throw blocksError;
 
-            // 合并数据
+            // 合併数据
             const blocks = (blocksData || []).map((block: any) => {
                 const equipment = (equipmentData as any[]).find((e: any) => e.mind_block_id === block.id);
                 return {
@@ -193,14 +193,14 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
 
             setEquippedBlocks(blocks);
         } catch (error) {
-            console.error('加载已装备积木失败:', error);
-            toast.error('加载已装备积木失败');
+            console.error('載入已裝備積木失敗:', error);
+            toast.error('載入已裝備積木失敗');
         } finally {
             setIsLoadingBlocks(false);
         }
     };
 
-    // 加载可用的思维积木
+    // 載入可用的思維積木
     const loadAvailableBlocks = async () => {
         if (!currentUser) return;
 
@@ -217,19 +217,19 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
             if (error) throw error;
             setAvailableBlocks((data || []) as any[]);
         } catch (error) {
-            console.error('加载可用积木失败:', error);
-            toast.error('加载可用积木失败');
+            console.error('載入可用積木失敗:', error);
+            toast.error('載入可用積木失敗');
         } finally {
             setIsLoadingBlocks(false);
         }
     };
 
-    // 装备思维积木到角色
+    // 裝備思維積木到角色
     const equipBlock = async (mindBlockId: string) => {
         if (!selectedRole || !currentUser) return;
 
         try {
-            // 检查是否已经装备
+            // 檢查是否已經裝備
             const { data: existing } = await (supabase as any)
                 .from('role_mind_blocks')
                 .select('id')
@@ -239,16 +239,16 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                 .maybeSingle();
 
             if (existing) {
-                // 如果已存在，激活它
+                // 如果已存在，啟用它
                 const { error } = await (supabase as any)
                     .from('role_mind_blocks')
                     .update({ is_active: true })
                     .eq('id', (existing as any).id);
 
                 if (error) throw error;
-                toast.success('思维积木已激活');
+                toast.success('思維積木已啟用');
             } else {
-                // 创建新的装备记录
+                // 創建新的裝備記錄
                 const { error } = await (supabase as any)
                     .from('role_mind_blocks')
                     .insert({
@@ -259,24 +259,24 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                     });
 
                 if (error) throw error;
-                toast.success('思维积木已装备');
+                toast.success('思維積木已裝備');
             }
 
-            // 重新加载已装备的积木
+            // 重新載入已裝備的積木
             await loadEquippedBlocks(selectedRole.id);
             setShowBlockSelector(false);
             onEquipBlock?.(selectedRole.id, mindBlockId);
         } catch (error) {
-            console.error('装备积木失败:', error);
-            toast.error('装备积木失败');
+            console.error('裝備積木失敗:', error);
+            toast.error('裝備積木失敗');
         }
     };
 
-    // 卸载思维积木
+    // 卸載思維積木
     const unequipBlock = async (equipmentId: string) => {
         if (!selectedRole || !currentUser) return;
 
-        if (!confirm('确定要卸载这个思维积木吗？')) return;
+        if (!confirm('確定要卸載这个思維積木吗？')) return;
 
         try {
             const { error } = await (supabase as any)
@@ -286,15 +286,15 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
 
             if (error) throw error;
 
-            toast.success('思维积木已卸载');
+            toast.success('思維積木已卸載');
             await loadEquippedBlocks(selectedRole.id);
         } catch (error) {
-            console.error('卸载积木失败:', error);
-            toast.error('卸载积木失败');
+            console.error('卸載積木失敗:', error);
+            toast.error('卸載積木失敗');
         }
     };
 
-    // 当选择角色时，加载已装备的积木
+    // 当選擇角色時，載入已裝備的積木
     useEffect(() => {
         if (selectedRole) {
             loadEquippedBlocks(selectedRole.id);
@@ -303,7 +303,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
         }
     }, [selectedRole, currentUser]);
 
-    // 初始加载可用积木
+    // 初始載入可用積木
     useEffect(() => {
         if (showBlockSelector) {
             loadAvailableBlocks();
@@ -317,15 +317,15 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
             exit={{ opacity: 0, y: -20 }}
             className="bg-white rounded-xl border border-[#EADBC8] shadow-lg p-6 space-y-6"
         >
-            {/* 标题栏 */}
+            {/* 標題栏 */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] flex items-center justify-center">
                         <UserIcon className="w-6 h-6 text-[#4B4036]" />
                     </div>
                     <div>
-                        <h3 className="text-lg font-bold text-[#4B4036]">角色装备管理</h3>
-                        <p className="text-sm text-[#4B4036]/60">为角色装备思维积木</p>
+                        <h3 className="text-lg font-bold text-[#4B4036]">角色裝備管理</h3>
+                        <p className="text-sm text-[#4B4036]/60">為角色裝備思維積木</p>
                     </div>
                 </div>
                 <button
@@ -336,19 +336,19 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                 </button>
             </div>
 
-            {/* 角色选择 */}
+            {/* 角色選擇 */}
             <div className="space-y-2">
-                <label className="text-sm font-bold text-[#4B4036]">选择角色</label>
+                <label className="text-sm font-bold text-[#4B4036]">選擇角色</label>
                 {rolesLoading ? (
                     <div className="flex items-center justify-center py-8">
                         <ArrowPathIcon className="w-5 h-5 animate-spin text-[#FFD59A]" />
-                        <span className="ml-2 text-[#4B4036]/60">加载角色中...</span>
+                        <span className="ml-2 text-[#4B4036]/60">載入角色中...</span>
                     </div>
                 ) : roles.length === 0 ? (
                     <div className="p-8 text-center bg-[#FFF9F2] rounded-xl border border-[#EADBC8]">
                         <UserIcon className="w-12 h-12 text-[#4B4036]/20 mx-auto mb-3" />
-                        <p className="text-sm text-[#4B4036]/60 mb-2">还没有可用的角色</p>
-                        <p className="text-xs text-[#4B4036]/40">请先创建角色或等待公开角色加载</p>
+                        <p className="text-sm text-[#4B4036]/60 mb-2">還沒有可用的角色</p>
+                        <p className="text-xs text-[#4B4036]/40">请先創建角色或等待公開角色載入</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto">
@@ -381,10 +381,10 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                                         <div className="font-bold text-[#4B4036] truncate" title={role.name}>
                                             {role.name && role.name.length > 20 ? role.name.substring(0, 20) + '...' : role.name}
                                         </div>
-                                        <div className="text-xs text-[#4B4036]/60 truncate" title={role.description || '无描述'}>
+                                        <div className="text-xs text-[#4B4036]/60 truncate" title={role.description || '無描述'}>
                                             {role.description && role.description.length > 30
                                                 ? role.description.substring(0, 30) + '...'
-                                                : (role.description || '无描述')}
+                                                : (role.description || '無描述')}
                                         </div>
                                     </div>
                                     {selectedRole?.id === role.id && (
@@ -412,7 +412,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                         </div>
                         <div className="space-y-2 text-sm">
                             <div className="flex items-center justify-between gap-2">
-                                <span className="text-[#4B4036]/60 flex-shrink-0">默认模型:</span>
+                                <span className="text-[#4B4036]/60 flex-shrink-0">預設模型:</span>
                                 <span className="font-medium text-[#4B4036] truncate text-right" title={selectedRole.default_model}>
                                     {selectedRole.default_model && selectedRole.default_model.length > 30
                                         ? selectedRole.default_model.substring(0, 30) + '...'
@@ -420,7 +420,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                                 </span>
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                                <span className="text-[#4B4036]/60 flex-shrink-0">温度:</span>
+                                <span className="text-[#4B4036]/60 flex-shrink-0">溫度:</span>
                                 <span className="font-medium text-[#4B4036]">{selectedRole.temperature}</span>
                             </div>
                             <div className="flex items-center justify-between gap-2">
@@ -430,36 +430,36 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                         </div>
                     </div>
 
-                    {/* 已装备的思维积木 */}
+                    {/* 已裝備的思維積木 */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <label className="text-sm font-bold text-[#4B4036] flex items-center gap-2">
                                 <PuzzlePieceIcon className="w-4 h-4" />
-                                已装备的思维积木
+                                已裝備的思維積木
                             </label>
                             <button
                                 onClick={() => setShowBlockSelector(true)}
                                 className="px-3 py-1.5 bg-gradient-to-r from-[#FFB6C1] to-[#FFD59A] text-white rounded-lg text-sm font-bold hover:shadow-md transition-all flex items-center gap-1"
                             >
                                 <PlusIcon className="w-4 h-4" />
-                                装备积木
+                                裝備積木
                             </button>
                         </div>
 
                         {isLoadingBlocks ? (
                             <div className="flex items-center justify-center py-8">
                                 <ArrowPathIcon className="w-5 h-5 animate-spin text-[#FFD59A]" />
-                                <span className="ml-2 text-[#4B4036]/60">加载中...</span>
+                                <span className="ml-2 text-[#4B4036]/60">載入中...</span>
                             </div>
                         ) : equippedBlocks.length === 0 ? (
                             <div className="p-8 text-center bg-[#FFF9F2] rounded-xl border border-[#EADBC8]">
                                 <PuzzlePieceIcon className="w-12 h-12 text-[#4B4036]/20 mx-auto mb-3" />
-                                <p className="text-sm text-[#4B4036]/60">还没有装备任何思维积木</p>
+                                <p className="text-sm text-[#4B4036]/60">還沒有裝備任何思維積木</p>
                                 <button
                                     onClick={() => setShowBlockSelector(true)}
                                     className="mt-3 px-4 py-2 bg-[#FFD59A] text-[#4B4036] rounded-lg text-sm font-bold hover:bg-[#FFC56D] transition-colors"
                                 >
-                                    立即装备
+                                    立即裝備
                                 </button>
                             </div>
                         ) : (
@@ -484,7 +484,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                                         <button
                                             onClick={() => unequipBlock(block.equipment_id)}
                                             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                            title="卸载"
+                                            title="卸載"
                                         >
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
@@ -496,7 +496,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                 </motion.div>
             )}
 
-            {/* 积木选择器模态框 */}
+            {/* 積木選擇器模态框 */}
             <AnimatePresence>
                 {showBlockSelector && (
                     <motion.div
@@ -516,7 +516,7 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                             <div className="p-6 border-b border-[#EADBC8] bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] flex items-center justify-between">
                                 <h3 className="text-xl font-bold text-[#4B4036] flex items-center gap-2">
                                     <SparklesIcon className="w-5 h-5" />
-                                    选择思维积木
+                                    選擇思維積木
                                 </h3>
                                 <button
                                     onClick={() => setShowBlockSelector(false)}
@@ -530,12 +530,12 @@ export function RoleEquipmentPanel({ onClose, onEquipBlock }: RoleEquipmentPanel
                                 {isLoadingBlocks ? (
                                     <div className="flex items-center justify-center py-12">
                                         <ArrowPathIcon className="w-5 h-5 animate-spin text-[#FFD59A]" />
-                                        <span className="ml-2 text-[#4B4036]/60">加载中...</span>
+                                        <span className="ml-2 text-[#4B4036]/60">載入中...</span>
                                     </div>
                                 ) : availableBlocks.length === 0 ? (
                                     <div className="text-center py-12">
                                         <PuzzlePieceIcon className="w-16 h-16 text-[#4B4036]/20 mx-auto mb-4" />
-                                        <p className="text-[#4B4036]/60">没有可用的思维积木</p>
+                                        <p className="text-[#4B4036]/60">没有可用的思維積木</p>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-1 gap-3">

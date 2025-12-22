@@ -299,7 +299,7 @@ export function BlockSelectionModal({
                             選擇{slotType === 'role' ? '角色' : slotType === 'style' ? '風格' : '任務'}積木
                         </h3>
                         <p className="text-xs text-[#4B4036]/60">
-                            為換腦工房裝備新的思維零件
+                            為換腦工房裝備新的思維積木
                         </p>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors">

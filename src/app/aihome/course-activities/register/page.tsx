@@ -208,12 +208,12 @@ export default function HanamiMusicRegisterPage() {
         const discountConfigs = courseData.discount_configs;
         const trialBundles = Array.isArray(discountConfigs.trialBundles) ? discountConfigs.trialBundles : [];
         const firstActiveTrial = trialBundles.find((b: any) => b?.is_active !== false) || trialBundles[0];
-        
+
         if (firstActiveTrial?.price != null) {
           return Number(firstActiveTrial.price);
         }
       }
-      
+
       // 如果沒有試堂套票，使用課程的單堂價格
       if (courseData.price_per_lesson && typeof courseData.price_per_lesson === 'number' && courseData.price_per_lesson > 0) {
         return courseData.price_per_lesson;
@@ -254,7 +254,7 @@ export default function HanamiMusicRegisterPage() {
   const loadOrganizations = useCallback(async () => {
     try {
       setLoadingOrganizations(true);
-      const response = await fetch('/api/organizations/list?status=all', {
+      const response = await fetch('/api/organizations/list?status=all&isPublic=true', {
         credentials: 'include'
       });
 
@@ -647,7 +647,7 @@ export default function HanamiMusicRegisterPage() {
             else targetStep = 7;
 
             setCurrentStep(targetStep);
-            
+
             // 清除 URL 參數中的 token，但保留其他參數
             const newUrl = new URL(window.location.href);
             newUrl.searchParams.delete('token');
@@ -1794,8 +1794,8 @@ export default function HanamiMusicRegisterPage() {
                 <div
                   key={index}
                   className={`h-1.5 rounded-full flex-1 transition-all duration-300 ${index <= currentStep
-                      ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]'
-                      : 'bg-gray-200'
+                    ? 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4]'
+                    : 'bg-gray-200'
                     }`}
                 />
               ))}
@@ -1982,8 +1982,8 @@ export default function HanamiMusicRegisterPage() {
                                 whileTap={{ scale: 0.98 }}
                                 onClick={() => handleOrganizationSelect(org.id)}
                                 className={`w-full rounded-xl border-2 transition-all duration-200 text-left overflow-hidden ${isSelected
-                                    ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/30 shadow-lg'
-                                    : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/60'
+                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/30 shadow-lg'
+                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/60'
                                   }`}
                               >
                                 {/* 機構圖案 */}
@@ -2095,8 +2095,8 @@ export default function HanamiMusicRegisterPage() {
                           whileTap={{ scale: 0.98 }}
                           onClick={() => setFormData(prev => ({ ...prev, courseNature: 'trial' }))}
                           className={`p-6 sm:p-8 rounded-2xl border-2 transition-all duration-200 ${formData.courseNature === 'trial'
-                              ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
                             }`}
                         >
                           <SparklesIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
@@ -2114,8 +2114,8 @@ export default function HanamiMusicRegisterPage() {
                             setFormData(prev => ({ ...prev, courseNature: 'regular' }));
                           }}
                           className={`p-6 sm:p-8 rounded-2xl border-2 transition-all duration-200 ${formData.courseNature === 'regular'
-                              ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
                             }`}
                         >
                           <CheckCircleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-[#4B4036] mx-auto mb-4" />
@@ -2183,8 +2183,8 @@ export default function HanamiMusicRegisterPage() {
                               whileTap={{ scale: 0.98 }}
                               onClick={() => setFormData(prev => ({ ...prev, courseType: course.id }))}
                               className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 text-left relative ${formData.courseType === course.id
-                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
                                 }`}
                             >
                               {/* 精選標籤 */}
@@ -2273,8 +2273,8 @@ export default function HanamiMusicRegisterPage() {
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => setFormData(prev => ({ ...prev, selectedPlan: plan.id }))}
                                     className={`p-4 sm:p-6 rounded-xl border-2 transition-all duration-200 relative ${formData.selectedPlan === plan.id
-                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
-                                        : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                      ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20 shadow-lg'
+                                      : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
                                       }`}
                                   >
                                     {plan.is_featured && (
@@ -2407,8 +2407,8 @@ export default function HanamiMusicRegisterPage() {
                             value={formData.childFullName}
                             onChange={(e) => setFormData(prev => ({ ...prev, childFullName: e.target.value }))}
                             className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.childFullName
-                                ? 'border-red-500 focus:border-red-500'
-                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
+                              ? 'border-red-500 focus:border-red-500'
+                              : 'border-[#EADBC8] focus:border-[#FFD59A]'
                               } focus:outline-none`}
                             placeholder="請輸入您孩子全名"
                           />
@@ -2441,8 +2441,8 @@ export default function HanamiMusicRegisterPage() {
                               value={formData.childBirthDate}
                               onChange={(e) => setFormData(prev => ({ ...prev, childBirthDate: e.target.value }))}
                               className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.childBirthDate
-                                  ? 'border-red-500 focus:border-red-500'
-                                  : 'border-[#EADBC8] focus:border-[#FFD59A]'
+                                ? 'border-red-500 focus:border-red-500'
+                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
                                 } focus:outline-none`}
                             />
                             <CakeIcon className="absolute right-3 top-3.5 sm:top-4 w-5 h-5 text-[#4B4036] pointer-events-none" />
@@ -2475,8 +2475,8 @@ export default function HanamiMusicRegisterPage() {
                               whileTap={{ scale: 0.98 }}
                               onClick={() => setFormData(prev => ({ ...prev, childGender: '男' }))}
                               className={`p-4 rounded-xl border-2 transition-all duration-200 ${formData.childGender === '男'
-                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
-                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
+                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
                                 }`}
                             >
                               <div className="text-center">
@@ -2496,8 +2496,8 @@ export default function HanamiMusicRegisterPage() {
                               whileTap={{ scale: 0.98 }}
                               onClick={() => setFormData(prev => ({ ...prev, childGender: '女' }))}
                               className={`p-4 rounded-xl border-2 transition-all duration-200 ${formData.childGender === '女'
-                                  ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
-                                  : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFF9F2] to-[#FFD59A]/20'
+                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
                                 }`}
                             >
                               <div className="text-center">
@@ -2528,8 +2528,8 @@ export default function HanamiMusicRegisterPage() {
                             value={formData.childPreferences}
                             onChange={(e) => setFormData(prev => ({ ...prev, childPreferences: e.target.value }))}
                             className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 resize-none ${errors.childPreferences
-                                ? 'border-red-500 focus:border-red-500'
-                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
+                              ? 'border-red-500 focus:border-red-500'
+                              : 'border-[#EADBC8] focus:border-[#FFD59A]'
                               } focus:outline-none`}
                             placeholder="例如：喜歡音樂、玩具、顏色等"
                             rows={3}
@@ -2732,10 +2732,10 @@ export default function HanamiMusicRegisterPage() {
                                           }
                                         }}
                                         className={`relative p-2 rounded-xl border-2 transition-all duration-200 min-h-[60px] flex flex-col justify-center items-center ${isSelected
-                                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
-                                            : day.isFullyBooked
-                                              ? 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed'
-                                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                          ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                          : day.isFullyBooked
+                                            ? 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed'
+                                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
                                           }`}
                                       >
                                         <div className="text-center w-full">
@@ -2820,12 +2820,12 @@ export default function HanamiMusicRegisterPage() {
                                           }
                                         }}
                                         className={`relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 min-h-[80px] flex flex-col justify-center items-center ${isSelected
-                                            ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
-                                            : day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')
-                                              ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                              : day.isFullyBooked
-                                                ? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
-                                                : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                          ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                          : day.isPast || !day.isCurrentMonth || day.isBeyondTwoMonths || (day.isToday && formData.courseNature === 'trial')
+                                            ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                            : day.isFullyBooked
+                                              ? 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
+                                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
                                           }`}
                                       >
                                         <div className="text-center w-full">
@@ -2867,10 +2867,10 @@ export default function HanamiMusicRegisterPage() {
                                                     </span>
                                                   ) : (
                                                     <span className={`text-xs font-bold px-2 py-1 rounded-full ${day.availableSlots <= 3
-                                                        ? 'text-red-500 bg-red-100'
-                                                        : day.availableSlots <= 5
-                                                          ? 'text-orange-500 bg-orange-100'
-                                                          : 'text-green-500 bg-green-100'
+                                                      ? 'text-red-500 bg-red-100'
+                                                      : day.availableSlots <= 5
+                                                        ? 'text-orange-500 bg-orange-100'
+                                                        : 'text-green-500 bg-green-100'
                                                       }`}>
                                                       {day.availableSlots} 空位
                                                     </span>
@@ -2960,30 +2960,30 @@ export default function HanamiMusicRegisterPage() {
                                       }
                                     }}
                                     className={`p-4 rounded-xl border-2 transition-all duration-200 ${isSelected
-                                        ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
-                                        : slot.available
-                                          ? 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
-                                          : 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
+                                      ? 'border-[#FFD59A] bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] shadow-lg'
+                                      : slot.available
+                                        ? 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50 hover:bg-[#FFF9F2]'
+                                        : 'border-red-200 bg-red-50 text-red-600 hover:border-red-300'
                                       }`}
                                   >
                                     <div className="flex flex-col items-center text-center">
                                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${isSelected
-                                          ? 'bg-white/20'
-                                          : slot.available
-                                            ? 'bg-[#FFF9F2]'
-                                            : 'bg-gray-100'
+                                        ? 'bg-white/20'
+                                        : slot.available
+                                          ? 'bg-[#FFF9F2]'
+                                          : 'bg-gray-100'
                                         }`}>
                                         <ClockIcon className={`w-5 h-5 ${isSelected ? 'text-[#4B4036]' : 'text-[#2B3A3B]'
                                           }`} />
                                       </div>
                                       <span className="font-bold text-sm mb-2">{slot.time}</span>
                                       <div className={`text-xs px-3 py-1 rounded-full font-medium ${slot.available
-                                          ? slot.remainingSpots <= 3
-                                            ? 'text-red-600 bg-red-100'
-                                            : slot.remainingSpots <= 5
-                                              ? 'text-orange-600 bg-orange-100'
-                                              : 'text-green-600 bg-green-100'
-                                          : 'text-red-500 bg-red-100'
+                                        ? slot.remainingSpots <= 3
+                                          ? 'text-red-600 bg-red-100'
+                                          : slot.remainingSpots <= 5
+                                            ? 'text-orange-600 bg-orange-100'
+                                            : 'text-green-600 bg-green-100'
+                                        : 'text-red-500 bg-red-100'
                                         }`}>
                                         {slot.available ?
                                           `${slot.remainingSpots} 空位`
@@ -3100,8 +3100,8 @@ export default function HanamiMusicRegisterPage() {
                             value={formData.parentTitle}
                             onChange={(e) => setFormData(prev => ({ ...prev, parentTitle: e.target.value }))}
                             className={`w-full px-4 py-3 sm:py-4 text-base rounded-xl border-2 transition-all duration-200 ${errors.parentTitle
-                                ? 'border-red-500 focus:border-red-500'
-                                : 'border-[#EADBC8] focus:border-[#FFD59A]'
+                              ? 'border-red-500 focus:border-red-500'
+                              : 'border-[#EADBC8] focus:border-[#FFD59A]'
                               } focus:outline-none`}
                             placeholder="例如：陳媽媽、李爸爸、王小姐等"
                           />
@@ -3190,8 +3190,8 @@ export default function HanamiMusicRegisterPage() {
                                           whileHover={{ scale: 1.02 }}
                                           whileTap={{ scale: 0.98 }}
                                           className={`w-full px-3 py-2 text-xs rounded-lg border-2 transition-all duration-200 ${isSelected
-                                              ? 'border-[#FFD59A] bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
-                                              : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
+                                            ? 'border-[#FFD59A] bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]'
+                                            : 'border-[#EADBC8] bg-white hover:border-[#FFD59A]/50'
                                             }`}
                                         >
                                           {period}
@@ -3491,8 +3491,8 @@ export default function HanamiMusicRegisterPage() {
                 whileHover={!(currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 1.02 } : {}}
                 whileTap={!(currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded) ? { scale: 0.98 } : {}}
                 className={`flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold shadow-lg transition-all duration-200 flex-1 ${currentStep === 6 && formData.paymentMethod === 'screenshot' && !formData.screenshotUploaded
-                    ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:shadow-xl'
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] hover:shadow-xl'
                   }`}
               >
                 <span className="text-sm sm:text-base">

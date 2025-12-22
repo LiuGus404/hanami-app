@@ -3197,7 +3197,7 @@ export default function AICompanionsPage() {
                     >
                       <PuzzlePieceIcon className="w-8 h-8 text-[#FFB6C1] mr-3" />
                     </motion.div>
-                    <h1 className="text-4xl font-bold text-[#4B4036]">思維零件 (Mind Blocks)</h1>
+                    <h1 className="text-4xl font-bold text-[#4B4036]">思維積木 (MindSwitch)</h1>
                   </div>
                   <p className="text-lg text-[#2B3A3B] max-w-2xl mx-auto">
                     為換腦工房裝備強大的思維流程，或創造屬於你的獨特零件
@@ -3227,8 +3227,8 @@ export default function AICompanionsPage() {
                     <div className="w-16 h-16 bg-[#A78BFA]/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                       <PuzzlePieceIcon className="w-8 h-8 text-[#4B4036]" />
                     </div>
-                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">我的零件庫</h3>
-                    <p className="text-[#4B4036]/70">管理您儲存的思維零件組合，隨時載入並繼續編輯。</p>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">我的積木庫</h3>
+                    <p className="text-[#4B4036]/70">管理您儲存的思維積木組合，隨時載入並繼續編輯。</p>
                   </motion.div>
 
                   {/* Library Card */}
@@ -3240,8 +3240,8 @@ export default function AICompanionsPage() {
                     <div className="w-16 h-16 bg-[#FFB6C1]/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                       <ArrowPathIcon className="w-8 h-8 text-[#4B4036]" />
                     </div>
-                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">瀏覽零件庫</h3>
-                    <p className="text-[#4B4036]/70">探索社群分享的思維零件，一鍵 Remix 成為你的專屬工具。</p>
+                    <h3 className="text-2xl font-bold text-[#4B4036] mb-2">瀏覽積木庫</h3>
+                    <p className="text-[#4B4036]/70">探索社群分享的思維積木，一鍵 Remix 成為你的專屬工具。</p>
                   </motion.div>
                 </div>
               </motion.div>
@@ -3644,7 +3644,7 @@ export default function AICompanionsPage() {
                       >
                         <div className="flex items-center gap-2">
                           <PuzzlePieceIcon className="w-5 h-5 text-[#4B4036]" />
-                          <h3 className="text-lg font-semibold text-[#4B4036]">思維零件 (Mind Blocks)</h3>
+                          <h3 className="text-lg font-semibold text-[#4B4036]">思維積木 (Mind Blocks)</h3>
                         </div>
                         <motion.span animate={{ rotate: openPanels.mind ? 180 : 0 }}>
                           <svg className="w-5 h-5 text-[#4B4036]" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>

@@ -9,6 +9,8 @@ import { Toaster } from 'react-hot-toast';
 import SessionProviderWrapper from '@/components/SessionProviderWrapper';
 import SaasProviderWrapper from '@/components/SaasProviderWrapper';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import DisableConsole from '@/components/DisableConsole';
+import MusicPlayerWrapper from '@/components/MusicPlayerWrapper';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -163,7 +165,10 @@ export default async function RootLayout({
         <SessionProviderWrapper initialSession={userSession}>
           <SaasProviderWrapper>
             <LoadingScreen />
-            {children}
+            <DisableConsole />
+            <MusicPlayerWrapper>
+              {children}
+            </MusicPlayerWrapper>
             <Toaster
               position="top-right"
               toastOptions={{

@@ -25,6 +25,14 @@ interface MusicPlayerContextType {
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
+// 全局音頻實例，確保整個應用只有一個 Audio 元素
+declare global {
+    interface Window {
+        __HANAMI_AUDIO_INSTANCE__?: HTMLAudioElement;
+        __HANAMI_AUDIO_INITIALIZED__?: boolean;
+    }
+}
+
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -36,26 +44,39 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const isInitializedRef = useRef(false);
 
-    // 初始化 Audio 和設備偵測 - 只執行一次
+    // 初始化 Audio 和設備偵測 - 使用全局單例模式
     useEffect(() => {
         if (isInitializedRef.current) return;
         isInitializedRef.current = true;
 
-        if (!audioRef.current) {
-            audioRef.current = new Audio(playlist[currentTrackIndex]);
-            audioRef.current.volume = volume;
+        // 使用全局音頻實例，防止多個 Provider 創建多個音頻元素
+        if (typeof window !== 'undefined') {
+            if (window.__HANAMI_AUDIO_INSTANCE__) {
+                // 使用現有的全局音頻實例
+                audioRef.current = window.__HANAMI_AUDIO_INSTANCE__;
+                console.log('🎵 使用現有的全局音頻實例');
+            } else {
+                // 創建新的全局音頻實例
+                audioRef.current = new Audio(playlist[currentTrackIndex]);
+                audioRef.current.volume = volume;
+                audioRef.current.loop = true; // 預設啟用單曲循環
+                window.__HANAMI_AUDIO_INSTANCE__ = audioRef.current;
+                console.log('🎵 創建新的全局音頻實例');
+            }
         }
 
         // 偵測設備類型：如果是桌面版 (寬度 >= 1024px)，嘗試自動播放
         // 注意：瀏覽器可能仍會阻止沒有交互的自動播放
-        const isDesktop = window.innerWidth >= 1024;
-        if (isDesktop) {
-            setIsPlaying(true);
+        if (typeof window !== 'undefined') {
+            const isDesktop = window.innerWidth >= 1024;
+            if (isDesktop && !window.__HANAMI_AUDIO_INITIALIZED__) {
+                setIsPlaying(true);
+                window.__HANAMI_AUDIO_INITIALIZED__ = true;
+            }
         }
-        // 不再設置 setIsPlaying(false)，保持當前狀態
 
         return () => {
-            // 只有在組件真正卸載時才清理
+            // 不清理全局音頻實例，讓它在頁面導航時保持播放
         };
     }, []);
 
@@ -110,29 +131,60 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 
     // 音量控制
     useEffect(() => {
-        if (audioRef.current) {
-            audioRef.current.volume = volume;
+        // 確保使用全局音頻實例
+        let audio = audioRef.current;
+        if (!audio && typeof window !== 'undefined' && window.__HANAMI_AUDIO_INSTANCE__) {
+            audio = window.__HANAMI_AUDIO_INSTANCE__;
+            audioRef.current = audio;
+        }
+
+        if (audio) {
+            audio.volume = volume;
+            console.log('🎵 音量設置為:', volume);
         }
     }, [volume]);
 
-    // 循環與自動下一首
+    // 循環控制 - 使用 HTML5 Audio 的 loop 屬性
     useEffect(() => {
-        if (!audioRef.current) return;
+        // 確保 audioRef.current 已經初始化
+        let audio = audioRef.current;
+        if (!audio && typeof window !== 'undefined' && window.__HANAMI_AUDIO_INSTANCE__) {
+            audio = window.__HANAMI_AUDIO_INSTANCE__;
+            audioRef.current = audio;
+        }
+
+        if (audio) {
+            audio.loop = isLooping;
+            console.log('🎵 循環模式設置為:', isLooping);
+        }
+    }, [isLooping]);
+
+    // 當循環模式關閉時，處理自動播放下一首
+    useEffect(() => {
+        let audio = audioRef.current;
+        if (!audio && typeof window !== 'undefined' && window.__HANAMI_AUDIO_INSTANCE__) {
+            audio = window.__HANAMI_AUDIO_INSTANCE__;
+            audioRef.current = audio;
+        }
+
+        if (!audio) return;
 
         const handleEnded = () => {
-            if (isLooping) {
-                audioRef.current!.currentTime = 0;
-                audioRef.current!.play();
-            } else {
-                nextTrack();
+            console.log('🎵 歌曲播放結束，isLooping:', isLooping);
+            // 如果是單曲循環模式，HTML5 loop 屬性會自動處理
+            // 只有在非循環模式下才需要手動播放下一首
+            if (!isLooping) {
+                setCurrentTrackIndex((prev) => (prev + 1) % playlist.length);
             }
         };
 
-        audioRef.current.addEventListener('ended', handleEnded);
+        audio.addEventListener('ended', handleEnded);
+        console.log('🎵 已添加 ended 事件監聽器');
+
         return () => {
-            audioRef.current?.removeEventListener('ended', handleEnded);
+            audio?.removeEventListener('ended', handleEnded);
         };
-    }, [isLooping, playlist.length, currentTrackIndex]); // 依賴 isLooping 和 nextTrack 邏輯
+    }, [isLooping, playlist.length]);
 
     // 核心功能
     const togglePlay = () => setIsPlaying(!isPlaying);

@@ -269,7 +269,7 @@ export default function MindLibraryPage() {
                         className="flex items-center space-x-2 text-[#4B4036]/60 hover:text-[#4B4036] transition-colors group"
                     >
                         <ArrowLeftIcon className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-medium">返回思維零件</span>
+                        <span className="font-medium">返回思維積木</span>
                     </button>
                 </div>
 
@@ -285,7 +285,7 @@ export default function MindLibraryPage() {
                                 className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-[#4B4036]/60 hover:text-[#4B4036] transition-all min-w-[140px] justify-center"
                             >
                                 <UserIcon className="w-5 h-5" />
-                                <span>我的零件庫</span>
+                                <span>我的積木庫</span>
                             </motion.button>
                             <motion.button
                                 onClick={() => router.push('/aihome/mind-library')}
@@ -349,7 +349,7 @@ export default function MindLibraryPage() {
                                     }`}
                             >
                                 <Square2StackIcon className="w-5 h-5" />
-                                思維零件組合
+                                思維積木組合
                             </button>
                             <button
                                 onClick={() => setActiveTab('block')}

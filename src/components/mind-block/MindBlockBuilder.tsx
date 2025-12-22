@@ -94,7 +94,7 @@ export default function MindBlockBuilder() {
     const [compiledPrompt, setCompiledPrompt] = useState('');
     const [isSavingComposition, setIsSavingComposition] = useState(false);
     const [compositionMetadata, setCompositionMetadata] = useState({
-        title: '我的思維零件',
+        title: '我的思維積木',
         description: '',
         isPublic: false
     });
@@ -597,14 +597,14 @@ export default function MindBlockBuilder() {
 
             if (data) {
                 setCompositionMetadata({
-                    title: (data as any).title || '我的思維零件',
+                    title: (data as any).title || '我的思維積木',
                     description: (data as any).description || '',
                     isPublic: (data as any).is_public || false
                 });
             }
         } else {
             setCompositionMetadata({
-                title: '我的思維零件',
+                title: '我的思維積木',
                 description: '',
                 isPublic: false
             });
@@ -651,7 +651,7 @@ export default function MindBlockBuilder() {
                 console.error('Error saving composition:', error);
                 alert('儲存失敗：' + error.message);
             } else {
-                alert(editingTemplateId ? '思維零件組合已更新！' : '思維零件組合已儲存！');
+                alert(editingTemplateId ? '思維積木組合已更新！' : '思維積木組合已儲存！');
                 // 清除編輯狀態
                 setEditingTemplateId(null);
                 setIsSavingComposition(false);
@@ -702,7 +702,7 @@ export default function MindBlockBuilder() {
                         <div className="p-4 border-b border-[#EADBC8] bg-[#FFF9F2]/30 flex items-center justify-between">
                             <h3 className="font-bold text-[#4B4036] flex items-center gap-2">
                                 <BookOpenIcon className="w-5 h-5 text-amber-500" />
-                                零件庫
+                                積木庫
                             </h3>
                             <div className="flex items-center gap-1">
                                 <button
@@ -755,7 +755,7 @@ export default function MindBlockBuilder() {
                             {/* Saved Templates Section */}
                             {savedTemplates.length > 0 && (
                                 <div>
-                                    <div className="text-xs font-bold text-[#4B4036]/40 uppercase tracking-wider mb-2">我的自訂零件</div>
+                                    <div className="text-xs font-bold text-[#4B4036]/40 uppercase tracking-wider mb-2">我的自訂積木</div>
                                     <div className="space-y-2">
                                         {savedTemplates.map((template, index) => {
                                             const typeDef = allBlockTypes.find(t => t.type === template.type) || allBlockTypes[0];
@@ -842,20 +842,7 @@ export default function MindBlockBuilder() {
                                                         </div>
                                                     </div>
 
-                                                    {/* 快速装备到角色按钮 */}
-                                                    <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity px-3">
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setShowRoleEquipment(true);
-                                                            }}
-                                                            className="px-2 py-1 text-xs bg-[#FFD59A] text-[#4B4036] rounded-lg font-bold hover:bg-[#FFC56D] transition-colors flex items-center gap-1"
-                                                            title="装备到角色"
-                                                        >
-                                                            <UserIcon className="w-3 h-3" />
-                                                            装备到角色
-                                                        </button>
-                                                    </div>
+
                                                 </div>
                                             );
                                         })}
@@ -898,9 +885,9 @@ export default function MindBlockBuilder() {
                             className={`p-2 rounded-xl transition-colors flex items-center gap-2 font-bold text-sm ${showLibrary ? 'bg-[#FFD59A] text-[#4B4036]' : 'bg-white text-[#4B4036] border border-[#EADBC8]'}`}
                         >
                             <BookOpenIcon className="w-5 h-5" />
-                            <span className="hidden md:inline">{!showLibrary && "打開零件庫"}</span>
+                            <span className="hidden md:inline">{!showLibrary && "打開積木庫"}</span>
                         </button>
-                        <h1 className="text-2xl font-bold text-[#4B4036] hidden md:block">思維零件構建器</h1>
+                        <h1 className="text-2xl font-bold text-[#4B4036] hidden md:block">思維積木構建器</h1>
                     </div>
 
                     <div className="flex items-center gap-4 flex-wrap">
@@ -1381,7 +1368,7 @@ export default function MindBlockBuilder() {
                         >
                             <div className="p-4 border-b border-[#EADBC8] bg-[#FFF9F2]/50 flex items-center justify-between">
                                 <h3 className="font-bold text-[#4B4036]">
-                                    {editingTemplateId ? '更新思維零件組合' : '儲存思維零件組合'}
+                                    {editingTemplateId ? '更新思維積木組合' : '儲存思維積木組合'}
                                 </h3>
                                 <button
                                     onClick={() => setIsSavingComposition(false)}
