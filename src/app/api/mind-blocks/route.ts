@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSaasAdminClient } from '@/lib/supabase-saas';
+import { createSaasAdminClient, supabaseUrl } from '@/lib/supabase-saas';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,6 +8,15 @@ export async function GET(request: NextRequest) {
     const slotType = request.nextUrl.searchParams.get('slotType'); // Optional filter
 
     console.log('🧩 [API] 載入積木:', { userId, tab, slotType });
+
+    // 檢查環境變數
+    const hasServiceKey = !!process.env.SUPABASE_SAAS_SERVICE_ROLE_KEY;
+    const hasUrl = !!supabaseUrl && supabaseUrl !== '';
+    console.log('🔧 [API] 環境變數檢查:', { hasServiceKey, hasUrl, supabaseUrl: supabaseUrl?.substring(0, 30) + '...' });
+
+    if (!hasServiceKey) {
+      console.error('❌ [API] SUPABASE_SAAS_SERVICE_ROLE_KEY 未設置');
+    }
 
     const supabase = createSaasAdminClient();
 
@@ -23,9 +32,11 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
+      console.log('🔍 [API] 查詢用戶積木，userId:', userId);
       query = query.eq('user_id', userId);
     } else {
       // Community tab - show public blocks
+      console.log('🔍 [API] 查詢公開積木');
       query = query.eq('is_public', true);
     }
 
@@ -35,21 +46,37 @@ export async function GET(request: NextRequest) {
     //   query = query.eq('block_type', slotType);
     // }
 
-    const { data, error } = await query;
+    const { data, error, status, statusText } = await query;
 
     if (error) {
-      console.error('❌ [API] 載入積木失敗:', error);
+      console.error('❌ [API] 載入積木失敗:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        status,
+        statusText
+      });
+
+      // 如果是 42P01 錯誤，表示表不存在
+      if (error.code === '42P01') {
+        return NextResponse.json(
+          { success: false, error: 'mind_blocks 表不存在，請確認資料庫遷移已執行' },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
+        { success: false, error: error.message, code: error.code },
+        { status: status || 500 }
       );
     }
 
     console.log('✅ [API] 載入積木成功:', data?.length || 0, '個');
 
-    return NextResponse.json({ 
-      success: true, 
-      data: data || [] 
+    return NextResponse.json({
+      success: true,
+      data: data || []
     });
 
   } catch (error: any) {
