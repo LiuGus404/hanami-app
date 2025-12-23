@@ -60,6 +60,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
   const dataFetchedRef = useRef(false);
   const loadingRef = useRef(false);
   const currentIdRef = useRef<string | null>(null);
+  const courseUpdateTriggerRef = useRef(0);
 
   useEffect(() => {
     if (orgDataDisabled) {
@@ -91,7 +92,14 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
       return;
     }
 
-    if (currentIdRef.current === studentId && dataFetchedRef.current) return;
+    // 當 courseUpdateTrigger 改變時，強制重新獲取資料
+    const triggerChanged = courseUpdateTriggerRef.current !== courseUpdateTrigger;
+    if (triggerChanged) {
+      courseUpdateTriggerRef.current = courseUpdateTrigger;
+      dataFetchedRef.current = false; // 重置以允許重新獲取
+    }
+
+    if (currentIdRef.current === studentId && dataFetchedRef.current && !triggerChanged) return;
     if (loadingRef.current) return;
 
     loadingRef.current = true;

@@ -103,24 +103,24 @@ export async function PUT(request: NextRequest) {
 
             if (studentUpdateError) throw studentUpdateError;
         } else if (status === 'rejected') {
-            // If rejected, just decrement pending_confirmation_count?
-            // Or should we restore the lesson?
-            // The requirement says: "變為待確認堂數...審核該資料通過時，才會由待確認堂數變回待安排堂數"
-            // It doesn't explicitly say what happens on rejection.
-            // Usually, rejection means the leave is not granted, so the lesson is considered "absent" or "attended" (but it was deleted!).
-            // Or maybe we restore the lesson?
-            // Given the lesson was DELETED, restoring it is hard unless we stored the lesson details.
-            // But we didn't store full lesson details in `hanami_leave_requests`.
-            // This is a potential issue in the design if rejection requires restoring the lesson.
-            // However, for "Sick Leave", usually if rejected, it counts as "Absent" (deducted).
-            // If accepted, it counts as "Leave" (not deducted, or deducted but with makeup? "變回待安排堂數" implies makeup/reschedule).
-            // "待安排堂數" means "Pending Arrangement" (Makeup credit).
-            // So Approved -> Makeup Credit.
-            // Rejected -> No Makeup Credit (Lesson lost).
-            // So on rejection, we just decrement `pending_confirmation_count` and do NOT increment `approved_lesson_nonscheduled`.
-            // The lesson remains deleted (consumed).
-
+            // 拒絕時：減少待確認堂數，並恢復課堂狀態（從「請假」改為 NULL）
             const studentId = requestData.student_id;
+            const lessonId = requestData.lesson_id;
+
+            // 1. 恢復課堂狀態
+            if (lessonId) {
+                const { error: lessonUpdateError } = await (supabase as any)
+                    .from('hanami_student_lesson')
+                    .update({ lesson_status: null })
+                    .eq('id', lessonId);
+
+                if (lessonUpdateError) {
+                    console.error('恢復課堂狀態失敗:', lessonUpdateError);
+                    // 不中斷流程，繼續處理
+                }
+            }
+
+            // 2. 減少待確認堂數
             const { data: student, error: fetchError } = await (supabase as any)
                 .from('Hanami_Students')
                 .select('pending_confirmation_count')

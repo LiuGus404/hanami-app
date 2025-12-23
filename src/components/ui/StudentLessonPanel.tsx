@@ -430,9 +430,25 @@ export default function StudentLessonPanel({
     // 清除緩存狀態，強制重新獲取
     lessonsFetchedRef.current = false;
     loadingRef.current = false;
-    
+
     try {
       await fetchLessons();
+
+      // 重新計算剩餘堂數
+      if (studentData && studentData.student_type === '常規') {
+        try {
+          const remaining = await calculateRemainingLessons(studentData.id, new Date());
+          setCalculatedRemainingLessons(remaining);
+        } catch (calcError) {
+          console.error('重新計算剩餘堂數失敗:', calcError);
+        }
+      }
+
+      // 通知父組件刷新學生資料（包含 pending_confirmation_count, approved_lesson_nonscheduled 等）
+      if (onCourseUpdate) {
+        onCourseUpdate();
+      }
+
       toast.success('課堂資料已刷新', {
         duration: 2000,
         style: {
@@ -525,6 +541,16 @@ export default function StudentLessonPanel({
       setSelected([]);
       await fetchLessons();
       setIsDeleteConfirmOpen(false);
+
+      // 重新計算剩餘堂數
+      if (studentData && studentData.student_type === '常規') {
+        try {
+          const remaining = await calculateRemainingLessons(studentData.id, new Date());
+          setCalculatedRemainingLessons(remaining);
+        } catch (calcError) {
+          console.error('重新計算剩餘堂數失敗:', calcError);
+        }
+      }
     } catch (err) {
       console.error('刪除課堂記錄時發生錯誤：', err);
       toast.error('刪除課堂記錄失敗，請稍後再試');
@@ -747,6 +773,16 @@ export default function StudentLessonPanel({
         await fetchLessons();
         setIsModalOpen(false);
         setEditingLesson(null);
+
+        // 重新計算剩餘堂數
+        if (studentData && studentData.student_type === '常規') {
+          try {
+            const remaining = await calculateRemainingLessons(studentData.id, new Date());
+            setCalculatedRemainingLessons(remaining);
+          } catch (calcError) {
+            console.error('重新計算剩餘堂數失敗:', calcError);
+          }
+        }
       }
     } catch (error) {
       console.error('Error saving lesson:', error);
@@ -1128,18 +1164,17 @@ export default function StudentLessonPanel({
             <button
               onClick={handleRefresh}
               disabled={loading}
-              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${
-                loading 
-                  ? 'bg-[#F0ECE1] cursor-wait opacity-70' 
-                  : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
-              }`}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${loading
+                ? 'bg-[#F0ECE1] cursor-wait opacity-70'
+                : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
+                }`}
               title="刷新課堂資料"
             >
-              <svg 
-                className={`w-5 h-5 sm:w-6 sm:h-6 mb-0.5 ${loading ? 'animate-spin' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
+              <svg
+                className={`w-5 h-5 sm:w-6 sm:h-6 mb-0.5 ${loading ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
                 viewBox="0 0 24 24"
               >
                 <path d="M4 4v5h.582M20 20v-5h-.581M5.635 19A9 9 0 1 1 19 5.635" strokeLinecap="round" strokeLinejoin="round" />
@@ -1283,7 +1318,7 @@ export default function StudentLessonPanel({
                         onPendingClick();
                       } else {
                         // 跳轉到待審核學生管理頁面
-                        window.location.href = '/admin/pending-students';
+                        window.location.href = '/aihome/teacher-link/create/pending-students';
                       }
                     }}
                     className="bg-gradient-to-r from-[#FFB6C1] to-[#EBC9A4] hover:from-[#FF9BB3] hover:to-[#D4B896] text-[#2B3A3B] px-3 py-1 rounded-full text-xs font-medium shadow-md border border-[#F3EAD9] transition-all duration-200 hover:shadow-lg hover:scale-105 flex items-center gap-1 mx-auto"
@@ -1306,13 +1341,13 @@ export default function StudentLessonPanel({
               <div className="text-center">
                 <div className="text-xs font-medium text-[#4B4036]/70 mb-1">待安排堂數</div>
                 <button
-                  className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${(studentData.approved_lesson_nonscheduled || 0) > 0
+                  className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${(studentData.approved_lesson_nonscheduled || 0) > 0 && !isParentView
                     ? 'bg-gradient-to-r from-[#E3F2FD] to-[#BBDEFB] text-[#1565C0] hover:from-[#BBDEFB] hover:to-[#90CAF9] hover:shadow-md'
                     : 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed'
                     }`}
                   onClick={handlePendingLessonsClick}
-                  disabled={(studentData.approved_lesson_nonscheduled || 0) === 0}
-                  title={(studentData.approved_lesson_nonscheduled || 0) > 0 ? '點擊新增課堂' : '暫無待安排堂數'}
+                  disabled={(studentData.approved_lesson_nonscheduled || 0) === 0 || isParentView}
+                  title={isParentView ? '家長視角暫不開放此功能' : ((studentData.approved_lesson_nonscheduled || 0) > 0 ? '點擊新增課堂' : '暫無待安排堂數')}
                 >
                   {studentData.approved_lesson_nonscheduled || 0} 堂
                 </button>

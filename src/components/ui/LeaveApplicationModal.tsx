@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HanamiButton } from '@/components/ui/HanamiButton';
 import { HanamiInput } from '@/components/ui/HanamiInput';
 import { HanamiSelect } from '@/components/ui/HanamiSelect';
@@ -32,17 +32,20 @@ export default function LeaveApplicationModal({
     const [submitting, setSubmitting] = useState(false);
     const [eligibleLessons, setEligibleLessons] = useState<Lesson[]>([]);
 
+    // 防抖機制：使用 ref 來防止快速連續點擊
+    const isSubmittingRef = useRef(false);
+
     // Filter eligible lessons based on leave type
     useEffect(() => {
         const now = new Date();
         const filtered = lessons.filter((lesson) => {
             if (!lesson.lesson_date) return false;
-            
+
             // 排除已請假的課堂
             if (lesson.lesson_status === '請假') {
                 return false;
             }
-            
+
             const lessonDate = parseISO(lesson.lesson_date); // Assuming lesson.lesson_date is YYYY-MM-DD or ISO string
 
             if (leaveType === 'personal') {
@@ -92,6 +95,12 @@ export default function LeaveApplicationModal({
     };
 
     const handleSubmit = async () => {
+        // 防抖：如果已經在提交中，直接返回
+        if (isSubmittingRef.current || submitting) {
+            console.log('Already submitting, ignoring duplicate click');
+            return;
+        }
+
         if (!selectedLessonId) {
             toast.error('請選擇課堂');
             return;
@@ -107,6 +116,8 @@ export default function LeaveApplicationModal({
             return;
         }
 
+        // 立即設置防抖標記
+        isSubmittingRef.current = true;
         setSubmitting(true);
         let proofUrl = null;
 
@@ -117,6 +128,7 @@ export default function LeaveApplicationModal({
                 setUploading(false);
                 if (!proofUrl) {
                     setSubmitting(false);
+                    isSubmittingRef.current = false;
                     return;
                 }
             }
@@ -154,6 +166,10 @@ export default function LeaveApplicationModal({
         } finally {
             setSubmitting(false);
             setUploading(false);
+            // 延遲重置防抖標記，避免過快的重複點擊
+            setTimeout(() => {
+                isSubmittingRef.current = false;
+            }, 1000);
         }
     };
 

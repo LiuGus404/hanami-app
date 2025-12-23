@@ -52,49 +52,9 @@ export async function calculateRemainingLessons(
   studentId: string,
   today?: Date,
 ): Promise<number> {
-  const supabase = getSupabaseClient();
-  const now = today ? new Date(today) : getHongKongDate();
-  const todayStr = now.toISOString().slice(0, 10);
-
-  try {
-    // 優先使用修復版 SQL 函數，確保包含剩餘堂數為 0 的學生
-    const { data: remainingData, error: remainingError } = await (supabase as any)
-      .rpc('calculate_remaining_lessons_batch_fixed', {
-        student_ids: [studentId],
-        today_date: todayStr
-      });
-
-    if (remainingError) {
-      // 嘗試使用原始函數作為備用
-      const { data: originalData, error: originalError } = await (supabase as any)
-        .rpc('calculate_remaining_lessons_batch', {
-          student_ids: [studentId],
-          today_date: todayStr
-        });
-
-      if (originalError) {
-        // 兩個 RPC 函數都失敗，回退到原始方法
-        return await calculateRemainingLessonsFallback(studentId, today);
-      }
-
-      // 返回結果
-      if (originalData && Array.isArray(originalData) && originalData.length > 0) {
-        return originalData[0].remaining_lessons || 0;
-      }
-
-      return 0;
-    }
-
-    // 返回結果
-    if (remainingData && Array.isArray(remainingData) && remainingData.length > 0) {
-      return remainingData[0].remaining_lessons || 0;
-    }
-
-    return 0;
-  } catch (error) {
-    // 回退到原始方法
-    return await calculateRemainingLessonsFallback(studentId, today);
-  }
+  // 直接使用 fallback 方法，因為它包含正確的過濾邏輯（排除「請假」狀態的課堂）
+  // RPC 函數目前沒有此過濾邏輯，所以暫時跳過
+  return await calculateRemainingLessonsFallback(studentId, today);
 }
 
 // 回退方法：原始的計算邏輯
@@ -107,12 +67,13 @@ async function calculateRemainingLessonsFallback(
   const todayStr = now.toISOString().slice(0, 10);
 
   try {
-    // 取得所有未來和今天的課堂，不考慮 status
+    // 取得所有未來和今天的課堂，排除「請假」狀態的課堂
     const { data, error } = await supabase
       .from('hanami_student_lesson')
-      .select('id, lesson_date, actual_timeslot, lesson_duration')
+      .select('id, lesson_date, actual_timeslot, lesson_duration, lesson_status')
       .eq('student_id', studentId)
-      .gte('lesson_date', todayStr);
+      .gte('lesson_date', todayStr)
+      .or('lesson_status.is.null,lesson_status.neq.請假');
     if (error) {
       console.error('Error fetching future/today lessons:', error);
       return 0;
@@ -120,7 +81,7 @@ async function calculateRemainingLessonsFallback(
     if (!data) return 0;
 
     // 分類：大於今天的都算，等於今天的要判斷結束時間
-    const typedData = data as Array<{ lesson_date: string; actual_timeslot?: string | null; lesson_duration?: string | null; [key: string]: any; }>;
+    const typedData = data as Array<{ lesson_date: string; actual_timeslot?: string | null; lesson_duration?: string | null;[key: string]: any; }>;
     let count = 0;
     for (const lesson of typedData) {
       if (lesson.lesson_date > todayStr) {
@@ -185,7 +146,7 @@ export async function calculateRemainingLessonsBatch(
     }
 
     console.log('嘗試使用 API 端點計算剩餘堂數');
-    
+
     // 獲取用戶 email（如果可用）
     // 注意：這裡可能需要從上下文獲取，暫時使用空字符串
     const userEmail = ''; // TODO: 從上下文獲取用戶 email
@@ -243,12 +204,13 @@ async function calculateRemainingLessonsBatchFallback(
 
   console.log(`使用回退方法計算 ${studentIds.length} 個學生的剩餘堂數，今天日期: ${todayStr}`);
 
-  // 一次查詢所有學生今天及未來課堂，不考慮 status
+  // 一次查詢所有學生今天及未來課堂，排除「請假」狀態的課堂
   let query = supabase
     .from('hanami_student_lesson')
-    .select('id, student_id, lesson_date, actual_timeslot, lesson_duration')
+    .select('id, student_id, lesson_date, actual_timeslot, lesson_duration, lesson_status')
     .gte('lesson_date', todayStr)
-    .in('student_id', studentIds);
+    .in('student_id', studentIds)
+    .or('lesson_status.is.null,lesson_status.neq.請假');
 
   if (organizationId) {
     query = query.eq('org_id', organizationId);
@@ -264,13 +226,13 @@ async function calculateRemainingLessonsBatchFallback(
   console.log(`查詢到 ${lessonsData?.length || 0} 條課堂記錄`);
 
   // 依學生分組，使用與單個學生計算相同的邏輯
-  const typedLessonsData = lessonsData as Array<{ student_id: string; lesson_date: string; actual_timeslot?: string | null; lesson_duration?: string | null; [key: string]: any; }> | null;
+  const typedLessonsData = lessonsData as Array<{ student_id: string; lesson_date: string; actual_timeslot?: string | null; lesson_duration?: string | null;[key: string]: any; }> | null;
   studentIds.forEach(id => {
     const lessons = (typedLessonsData || []).filter(l => l.student_id === id);
     let count = 0;
-    
+
     console.log(`學生 ${id} 有 ${lessons.length} 條課堂記錄`);
-    
+
     for (const lesson of lessons) {
       if (lesson.lesson_date > todayStr) {
         count++;
@@ -301,7 +263,7 @@ async function calculateRemainingLessonsBatchFallback(
     console.log(`學生 ${id} 的總剩餘堂數: ${count}`);
     results[id] = count;
   });
-  
+
   console.log('剩餘堂數計算完成:', results);
   return results;
 } 

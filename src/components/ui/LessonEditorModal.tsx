@@ -98,7 +98,7 @@ export default function LessonEditorModal({
     if (mode === 'add' && initialLessonCount && initialLessonCount > 0) {
       console.log('更新初始堂數:', initialLessonCount);
       console.log('當前 form.lesson_count:', form.lesson_count);
-      
+
       // 確保 form.lesson_count 被正確設置
       setForm(prev => {
         console.log('設置前的 form.lesson_count:', prev.lesson_count);
@@ -106,7 +106,7 @@ export default function LessonEditorModal({
         console.log('設置後的 form.lesson_count:', updated.lesson_count);
         return updated;
       });
-      
+
       // 統一設置為自訂模式
       setPendingLessonCount('custom');
       setCustomLessonCount(initialLessonCount);
@@ -195,8 +195,8 @@ export default function LessonEditorModal({
       .order('lesson_date', { ascending: false })
       .limit(1)
       .single();
-    
-    const data = dataRaw as { regular_timeslot: string | null; actual_timeslot: string | null; lesson_date: string | null; [key: string]: any; } | null;
+
+    const data = dataRaw as { regular_timeslot: string | null; actual_timeslot: string | null; lesson_date: string | null;[key: string]: any; } | null;
 
     if (data) {
       setForm(prev => ({
@@ -213,7 +213,7 @@ export default function LessonEditorModal({
       .from('hanami_student_lesson')
       .select('course_type')
       .eq('student_id', studentId);
-    const data = dataRaw as Array<{ course_type: string | null; [key: string]: any; }> | null;
+    const data = dataRaw as Array<{ course_type: string | null;[key: string]: any; }> | null;
     if (data && data.length > 0) {
       const countMap: Record<string, number> = {};
       data.forEach(item => {
@@ -490,8 +490,8 @@ export default function LessonEditorModal({
       .select('course_type')
       .eq('id', studentId)
       .single();
-    
-    const data = dataRaw as { course_type: string | null; [key: string]: any; } | null;
+
+    const data = dataRaw as { course_type: string | null;[key: string]: any; } | null;
 
     if (data?.course_type) {
       setForm((prev) => ({
@@ -539,14 +539,14 @@ export default function LessonEditorModal({
       }
 
       // 1. 從 Supabase 取得學生資料
-      let studentData: { student_oid: string | null; regular_weekday: number | null; full_name: string | null; org_id: string | null; [key: string]: any; } | null = null;
+      let studentData: { student_oid: string | null; regular_weekday: number | null; full_name: string | null; org_id: string | null;[key: string]: any; } | null = null;
       try {
         const { data } = await supabase
           .from('Hanami_Students')
           .select('student_oid, regular_weekday, full_name, org_id')
           .eq('id', studentId)
           .single();
-        studentData = data as { student_oid: string | null; regular_weekday: number | null; full_name: string | null; org_id: string | null; [key: string]: any; } | null;
+        studentData = data as { student_oid: string | null; regular_weekday: number | null; full_name: string | null; org_id: string | null;[key: string]: any; } | null;
       } catch (e) {
         console.error('Error fetching student data:', e);
       }
@@ -605,13 +605,13 @@ export default function LessonEditorModal({
           ...payload,
           id: lesson.id, // 只在更新時包含id
         };
-        
+
         // hanami_student_lesson table type may not be fully defined
         const { error } = await ((supabase as any)
           .from('hanami_student_lesson')
           .update(updatePayload)
           .eq('id', lesson.id));
-        
+
         if (error) {
           console.error('Error updating lesson:', error);
           alert(`更新課堂記錄失敗，請稍後再試\n${error.message}`);
@@ -662,9 +662,32 @@ export default function LessonEditorModal({
             return;
           }
           if (data) {
-            const summary = (data as Array<{ lesson_date: string; actual_timeslot: string | null; regular_timeslot: string | null; [key: string]: any; }>)
-              .map((d: { lesson_date: string; actual_timeslot: string | null; regular_timeslot: string | null; [key: string]: any; }) => `日期：${d.lesson_date} 時間：${d.actual_timeslot || d.regular_timeslot}`)
+            const summary = (data as Array<{ lesson_date: string; actual_timeslot: string | null; regular_timeslot: string | null;[key: string]: any; }>)
+              .map((d: { lesson_date: string; actual_timeslot: string | null; regular_timeslot: string | null;[key: string]: any; }) => `日期：${d.lesson_date} 時間：${d.actual_timeslot || d.regular_timeslot}`)
               .join('\n');
+
+            // 如果是從「待安排堂數」新增課堂，減少 approved_lesson_nonscheduled
+            if (initialLessonCount && initialLessonCount > 0) {
+              const lessonsAdded = data.length;
+              try {
+                const { data: studentDataForUpdate, error: fetchErr } = await supabase
+                  .from('Hanami_Students')
+                  .select('approved_lesson_nonscheduled')
+                  .eq('id', studentId)
+                  .single();
+
+                if (!fetchErr && studentDataForUpdate) {
+                  const currentApproved = (studentDataForUpdate as any).approved_lesson_nonscheduled || 0;
+                  await (supabase as any)
+                    .from('Hanami_Students')
+                    .update({ approved_lesson_nonscheduled: Math.max(0, currentApproved - lessonsAdded) })
+                    .eq('id', studentId);
+                }
+              } catch (updateErr) {
+                console.error('更新待安排堂數失敗:', updateErr);
+              }
+            }
+
             alert(`課堂已成功新增！\n${summary}`);
           }
         } else {
@@ -687,6 +710,27 @@ export default function LessonEditorModal({
             return;
           }
           if (data && data[0]) {
+            // 如果是從「待安排堂數」新增課堂，減少 approved_lesson_nonscheduled
+            if (initialLessonCount && initialLessonCount > 0) {
+              try {
+                const { data: studentDataForUpdate, error: fetchErr } = await supabase
+                  .from('Hanami_Students')
+                  .select('approved_lesson_nonscheduled')
+                  .eq('id', studentId)
+                  .single();
+
+                if (!fetchErr && studentDataForUpdate) {
+                  const currentApproved = (studentDataForUpdate as any).approved_lesson_nonscheduled || 0;
+                  await (supabase as any)
+                    .from('Hanami_Students')
+                    .update({ approved_lesson_nonscheduled: Math.max(0, currentApproved - 1) })
+                    .eq('id', studentId);
+                }
+              } catch (updateErr) {
+                console.error('更新待安排堂數失敗:', updateErr);
+              }
+            }
+
             alert(
               '課堂已成功新增！\n' +
               `日期：${data[0].lesson_date}\n` +
@@ -711,7 +755,7 @@ export default function LessonEditorModal({
   const handleLessonCountChange = (value: string) => {
     const count = parseInt(value) || 0;
     setForm(prev => ({ ...prev, lesson_count: count }));
-    
+
     if (count > 0) {
       const previews = Array.from({ length: count }, (_, i) => {
         const date = new Date();
@@ -770,22 +814,22 @@ export default function LessonEditorModal({
     >
       <div className="flex items-center justify-center min-h-screen px-4 py-12">
         <Dialog.Panel className="bg-[#FFFDF8] p-6 rounded-2xl shadow-xl w-full max-w-md border border-[#F3EAD9]">
-            <div className="flex justify-between items-center mb-4">
-              <Dialog.Title className="text-lg font-bold">
-                {lesson ? '編輯課堂記錄' : (
-                  <div className="flex items-center gap-2">
-                    <span>新增課堂記錄</span>
-                    {mode === 'add' && initialLessonCount && initialLessonCount > 0 && (
-                      <div className="relative">
-                        <div className="bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] px-3 py-1 rounded-full text-sm font-semibold shadow-md border border-[#F3EAD9] animate-pulse">
-                          待安排 {initialLessonCount} 堂
-                        </div>
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFB6C1] rounded-full animate-bounce"></div>
+          <div className="flex justify-between items-center mb-4">
+            <Dialog.Title className="text-lg font-bold">
+              {lesson ? '編輯課堂記錄' : (
+                <div className="flex items-center gap-2">
+                  <span>新增課堂記錄</span>
+                  {mode === 'add' && initialLessonCount && initialLessonCount > 0 && (
+                    <div className="relative">
+                      <div className="bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#2B3A3B] px-3 py-1 rounded-full text-sm font-semibold shadow-md border border-[#F3EAD9] animate-pulse">
+                        待安排 {initialLessonCount} 堂
                       </div>
-                    )}
-                  </div>
-                )}
-              </Dialog.Title>
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#FFB6C1] rounded-full animate-bounce"></div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Dialog.Title>
             {(form.lesson_count ?? 1) > 1 && (
               <button
                 className="text-sm text-[#4B4036] underline hover:text-[#2B3A3B]"
@@ -1003,7 +1047,7 @@ export default function LessonEditorModal({
         </Dialog.Panel>
       </div>
       {/* Overlay Preview Dialog */}
-      
+
       {showPreview && (
         <Dialog className="fixed z-50 inset-0 overflow-y-auto" open={true} onClose={() => setShowPreview(false)}>
           <div className="flex items-center justify-center min-h-screen px-4">
