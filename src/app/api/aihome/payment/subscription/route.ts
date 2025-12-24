@@ -272,8 +272,8 @@ export async function POST(request: NextRequest) {
             }
 
             // Save subscription to database
-            const { error: dbError } = await (supabase
-                .from('org_subscriptions') as any)
+            const { error: dbError } = await (supabase as any)
+                .from('org_subscriptions')
                 .upsert({
                     org_id: org_id,
                     plan_id: plan_id,
@@ -424,8 +424,8 @@ export async function POST(request: NextRequest) {
             }
 
             // Save subscription to database
-            const { error: dbError } = await (supabase
-                .from('org_subscriptions') as any)
+            const { error: dbError } = await (supabase as any)
+                .from('org_subscriptions')
                 .upsert({
                     org_id: org_id,
                     plan_id: plan_id,
