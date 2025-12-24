@@ -13,6 +13,7 @@ import OrganizationPreviewCard from '@/components/ui/OrganizationPreviewCard';
 import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 import { TeacherLinkShell, useTeacherLinkOrganization } from '../TeacherLinkShell';
 import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
+import OrgSubscriptionInfoPanel from '@/components/aihome/OrgSubscriptionInfoPanel';
 import {
   CATEGORY_GROUPS,
   CATEGORY_LABEL_MAP,
@@ -511,7 +512,10 @@ function OrganizationSettingsContent() {
         </div>
       )}
 
-      <div className="space-y-6">
+      {/* Subscription Info Panel - visible for all org members */}
+      <OrgSubscriptionInfoPanel orgId={orgId} />
+
+      <div className="space-y-6 mt-6">
         <div className="rounded-3xl border border-[#EADBC8] bg-white/90 p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold text-[#4B4036]">基本資訊</h2>
           <div className="space-y-4">

@@ -83,9 +83,10 @@ type Props = {
   organizationName?: string;
   organizationEnglishName?: string;
   orgId?: string;
+  isSubscriptionReadOnly?: boolean; // 訂閱超額或暫停時禁用編輯
 }
 
-export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false, hideTeacherInfo = false, hideSensitiveInfo = false, readonlyFields = [], hideContactDays = false, organizationName, organizationEnglishName, orgId }: Props) {
+export default function StudentBasicInfo({ student, onUpdate, visibleFields = [], isInactive = false, hideTeacherInfo = false, hideSensitiveInfo = false, readonlyFields = [], hideContactDays = false, organizationName, organizationEnglishName, orgId, isSubscriptionReadOnly = false }: Props) {
   const allowAiFeatures = orgId === PREMIUM_AI_ORG_ID;
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState<StudentFormData>({
@@ -672,8 +673,10 @@ export default function StudentBasicInfo({ student, onUpdate, visibleFields = []
           </button>
           {!editMode && !isInactive && (
             <button
-              className="text-sm text-[#A68A64] hover:underline flex items-center gap-1"
-              onClick={() => setEditMode(true)}
+              className={`text-sm text-[#A68A64] flex items-center gap-1 ${isSubscriptionReadOnly ? 'opacity-50 cursor-not-allowed' : 'hover:underline'}`}
+              onClick={() => !isSubscriptionReadOnly && setEditMode(true)}
+              disabled={isSubscriptionReadOnly}
+              title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '編輯學生資料'}
             >
               <img alt="編輯" className="w-4 h-4" src="/icons/edit-pencil.png" /> 編輯
             </button>

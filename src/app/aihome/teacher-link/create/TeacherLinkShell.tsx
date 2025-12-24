@@ -654,10 +654,12 @@ export function TeacherLinkShell({
                           ? organization?.name || fallbackOrganization.name
                           : '載入中…'}
                       </div>
-                      {/* Subscription Status Badge */}
-                      {organizationResolved && hasValidOrgId && (
-                        <OrgSubscriptionBadge orgId={orgId} />
-                      )}
+                      {/* Subscription Status Badge - only show for owner and admin */}
+                      {organizationResolved && hasValidOrgId && (() => {
+                        const currentOrgIdentity = userOrganizations.find(org => org.orgId === orgId);
+                        const isOwnerOrAdmin = currentOrgIdentity?.role === 'owner' || currentOrgIdentity?.role === 'admin';
+                        return isOwnerOrAdmin ? <OrgSubscriptionBadge orgId={orgId} /> : null;
+                      })()}
                       <div className="w-8 h-8 bg-gradient-to-br from-[#FFD59A] to-[#EBC9A4] rounded-full flex items-center justify-center">
                         <span className="text-sm font-medium text-[#4B4036]">
                           {displayInitial}

@@ -11,7 +11,6 @@ import {
     SparklesIcon,
     RocketLaunchIcon,
     StarIcon,
-    ArrowRightIcon,
     ShieldCheckIcon,
     ChartBarIcon,
     BoltIcon,
@@ -20,6 +19,7 @@ import {
     ArrowTrendingUpIcon,
     AdjustmentsHorizontalIcon,
     ChatBubbleBottomCenterTextIcon,
+    CreditCardIcon,
 } from '@heroicons/react/24/outline';
 import AppSidebar from '@/components/AppSidebar';
 import Image from 'next/image';
@@ -150,12 +150,6 @@ export default function StudentPricingPage() {
     const router = useRouter();
     const { user, logout } = useSaasAuth();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
-
-    const handleSelectPlan = (planId: string) => {
-        setSelectedPlan(planId);
-        // Navigate to plan details or contact form
-    };
 
     return (
         <div className="min-h-screen bg-[#FFF9F2] text-[#4B4036] font-sans flex overflow-hidden">
@@ -243,6 +237,31 @@ export default function StudentPricingPage() {
                             我們深知經營教育中心的成本壓力。因此，我們打破傳統昂貴的收費模式，提供全港最具競爭力的管理系統方案。<br className="hidden md:block" />
                             無論您是剛起步的獨立導師，還是具規模的連鎖院校，都能找到最合適的選擇。
                         </motion.p>
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.25 }}
+                            className="pt-4 flex flex-col sm:flex-row gap-4 justify-center"
+                        >
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => router.push('/aihome/teacher-link/create/subscription-checkout')}
+                                className="px-8 py-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] font-bold rounded-xl shadow-lg hover:shadow-xl transition-all inline-flex items-center justify-center gap-2"
+                            >
+                                <CreditCardIcon className="w-5 h-5" />
+                                開始訂閱
+                            </motion.button>
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => router.push('/aihome/teacher-link/create/subscription-checkout?plan=seed')}
+                                className="px-8 py-4 bg-white text-[#4B4036] font-bold rounded-xl shadow-lg hover:shadow-xl transition-all inline-flex items-center justify-center gap-2 border border-[#EADBC8]"
+                            >
+                                <SparklesIcon className="w-5 h-5" />
+                                免費開始使用
+                            </motion.button>
+                        </motion.div>
                     </div>
 
                     {/* Pricing Table - Desktop */}
@@ -362,13 +381,6 @@ export default function StudentPricingPage() {
                                         <p className="text-sm text-[#8B7E74] leading-relaxed">{plan.description}</p>
                                     </div>
                                 </div>
-
-                                <button
-                                    onClick={() => handleSelectPlan(plan.id)}
-                                    className={`w-full mt-6 py-3 rounded-xl font-bold text-sm shadow-lg transform transition-all active:scale-95 hover:shadow-xl ${plan.btnColor}`}
-                                >
-                                    {plan.isFree ? '立即免費開始' : '選擇此方案'}
-                                </button>
                             </motion.div>
                         ))}
                     </div>
@@ -407,7 +419,7 @@ export default function StudentPricingPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.6 }}
-                        className="mb-20"
+                        className="mb-16"
                     >
                         <div className="text-center mb-12">
                             <h2 className="text-3xl font-bold text-[#4B4036] mb-4">為什麼選擇我們的系統？</h2>
@@ -432,6 +444,189 @@ export default function StudentPricingPage() {
                                     <p className="text-sm text-[#8B7E74] leading-relaxed">{benefit.description}</p>
                                 </motion.div>
                             ))}
+                        </div>
+                    </motion.div>
+
+                    {/* Features Section */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.7 }}
+                        className="mb-16"
+                    >
+                        <div className="text-center mb-8">
+                            <h2 className="text-2xl md:text-3xl font-bold text-[#4B4036] mb-2">功能</h2>
+                            <p className="text-[#8B7E74]">完整的教學管理工具集</p>
+                        </div>
+
+                        {/* Basic Features Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            {[
+                                { title: '學生管理', description: '輕鬆管理學生資料、課程記錄和學習進度', color: 'from-green-100 to-emerald-50', iconPath: '/icons/bear-face.PNG' },
+                                { title: '課程排程', description: '智能排課系統，自動優化課程安排', color: 'from-purple-100 to-pink-50', iconPath: '/icons/clock.PNG' },
+                                { title: '學習追蹤', description: '詳細的學習進度分析和能力評估', color: 'from-blue-100 to-blue-50', iconPath: '/icons/elephant.PNG' },
+                                { title: '教案管理', description: '建立和管理您的教學資源庫', color: 'from-amber-100 to-orange-50', iconPath: '/icons/book-elephant.PNG' },
+                                { title: '教師協作', description: '與團隊成員共享資源和協作教學', color: 'from-slate-100 to-gray-50', iconPath: '/icons/music.PNG' },
+                                { title: '財務管理', description: '智能管理收入和支出，清晰掌握機構財務狀況', color: 'from-green-100 to-emerald-50', iconPath: '/icons/bear-face.PNG' },
+                                { title: '家長端應用', description: '讓家長查看孩子學習進度和成長狀況，增進家校溝通', color: 'from-blue-100 to-blue-50', iconPath: '/icons/elephant.PNG' },
+                                { title: '多角色分層系統', description: '創建者、管理員、老師、成員分層權限，保護用戶資料安全', color: 'from-purple-100 to-pink-50', iconPath: '/icons/penguin-face.PNG' },
+                            ].map((feature, idx) => (
+                                <motion.div
+                                    key={feature.title}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.8 + idx * 0.05 }}
+                                    className={`p-6 rounded-3xl bg-gradient-to-b ${feature.color} shadow-[6px_6px_12px_#E6D9C5,-6px_-6px_12px_#FFFFFF] border border-[#EADBC8]/30 hover:scale-105 transition-transform`}
+                                >
+                                    <div className="w-14 h-14 rounded-2xl bg-white/60 flex items-center justify-center mb-4 shadow-sm">
+                                        <Image
+                                            src={feature.iconPath}
+                                            alt={feature.title}
+                                            width={36}
+                                            height={36}
+                                            className="object-contain"
+                                        />
+                                    </div>
+                                    <h3 className="font-bold text-lg mb-2 text-[#4B4036]">{feature.title}</h3>
+                                    <p className="text-sm text-[#8B7E74] leading-relaxed">{feature.description}</p>
+                                </motion.div>
+                            ))}
+                        </div>
+
+                        {/* Featured AI Features - Table (Desktop) */}
+                        <div className="hidden lg:block">
+                            <div className="overflow-hidden rounded-[2rem] border border-[#EADBC8] shadow-xl">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="bg-gradient-to-r from-[#4B4036] to-[#2C241B] text-white">
+                                            <th className="px-6 py-5 text-left font-bold">推薦功能</th>
+                                            <th className="px-6 py-5 text-left font-bold">功能說明</th>
+                                            <th className="px-6 py-5 text-center font-bold">狀態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {[
+                                            { title: 'AI 多角色智能助手', description: 'Hibi、墨墨、皮可等多個 AI 角色協助教學規劃、學習分析和創意設計，讓教學更智能', color: 'from-blue-100 to-blue-50', badgeColor: 'bg-blue-100 text-blue-700', iconPath: '/icons/penguin-face.PNG' },
+                                            { title: '自由畫布學習路徑', description: '視覺化學習路徑設計，自由拖拽節點，創建個性化學習旅程，讓每個學生都能找到最適合的成長路徑', color: 'from-amber-100 to-orange-50', badgeColor: 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]', iconPath: '/icons/elephant.PNG' },
+                                        ].map((feature, idx) => (
+                                            <tr
+                                                key={feature.title}
+                                                className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#FFF9F2]'} hover:bg-[#FFD59A]/10 transition-colors border-b border-[#EADBC8]/50`}
+                                            >
+                                                <td className="px-6 py-5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center shadow-sm`}>
+                                                            <Image
+                                                                src={feature.iconPath}
+                                                                alt={feature.title}
+                                                                width={32}
+                                                                height={32}
+                                                                className="object-contain"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-[#4B4036]">{feature.title}</div>
+                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${feature.badgeColor}`}>
+                                                                <SparklesIcon className="w-3 h-3 inline mr-1" />
+                                                                推薦
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <p className="text-sm text-[#8B7E74] leading-relaxed">{feature.description}</p>
+                                                </td>
+                                                <td className="px-6 py-5 text-center">
+                                                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                                        <CheckIcon className="w-3 h-3" />
+                                                        已包含
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Featured AI Features - Cards (Mobile & Tablet) */}
+                        <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {[
+                                { title: 'AI 多角色智能助手', description: 'Hibi、墨墨、皮可等多個 AI 角色協助教學規劃、學習分析和創意設計，讓教學更智能', color: 'from-blue-100 to-blue-50', badgeColor: 'bg-blue-100 text-blue-700', iconPath: '/icons/penguin-face.PNG' },
+                                { title: '自由畫布學習路徑', description: '視覺化學習路徑設計，自由拖拽節點，創建個性化學習旅程，讓每個學生都能找到最適合的成長路徑', color: 'from-amber-100 to-orange-50', badgeColor: 'bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036]', iconPath: '/icons/elephant.PNG' },
+                            ].map((feature, idx) => (
+                                <motion.div
+                                    key={feature.title}
+                                    initial={{ opacity: 0, y: 30 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.9 + idx * 0.1 }}
+                                    className={`relative p-6 rounded-[2rem] bg-gradient-to-b ${feature.color} border border-white/50 shadow-xl transition-all duration-300`}
+                                >
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-12 h-12 rounded-xl bg-white/60 flex items-center justify-center shadow-sm">
+                                            <Image
+                                                src={feature.iconPath}
+                                                alt={feature.title}
+                                                width={32}
+                                                height={32}
+                                                className="object-contain"
+                                            />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-[#4B4036]">{feature.title}</h3>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${feature.badgeColor}`}>
+                                                <SparklesIcon className="w-3 h-3 inline mr-1" />
+                                                推薦
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-white/40 rounded-xl">
+                                        <p className="text-sm text-[#8B7E74] leading-relaxed">{feature.description}</p>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </motion.div>
+
+                    {/* Security Features */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.8 }}
+                        className="relative mb-16 p-10 rounded-[2.5rem] bg-gradient-to-br from-[#FFF9F2] to-[#FFF0E0] shadow-[inset_0_0_40px_rgba(255,255,255,0.8),0_10px_40px_-10px_rgba(212,131,71,0.2)] border border-[#EADBC8]/50 overflow-hidden"
+                    >
+                        {/* Abstract Background Blobs */}
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-[#FFD59A]/20 to-[#FFB6C1]/20 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-[#C6DBF0]/20 to-[#E5D4EF]/20 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none" />
+
+                        <div className="relative z-10 text-center">
+                            <div className="inline-flex items-center gap-2 mb-4 px-4 py-1.5 rounded-full bg-white/80 backdrop-blur text-[#D48347] font-bold text-sm shadow-sm">
+                                <ShieldCheckIcon className="w-4 h-4" />
+                                <span>安全保障</span>
+                            </div>
+                            <h3 className="text-2xl md:text-3xl font-bold text-[#4B4036] mb-6">
+                                您的數據安全是我們的首要任務
+                            </h3>
+
+                            <div className="flex flex-wrap gap-4 justify-center">
+                                {[
+                                    { label: 'ISO 27001 認證', icon: '🔒' },
+                                    { label: '數據加密', icon: '🛡️' },
+                                    { label: '定期備份', icon: '💾' },
+                                    { label: '隱私保護', icon: '🔐' },
+                                ].map((item, index) => (
+                                    <motion.div
+                                        key={index}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.9 + index * 0.1 }}
+                                        className="bg-white/80 backdrop-blur p-4 rounded-2xl shadow-lg text-center min-w-[140px]"
+                                    >
+                                        <div className="text-2xl mb-2">{item.icon}</div>
+                                        <div className="text-sm font-bold text-[#4B4036]">{item.label}</div>
+                                    </motion.div>
+                                ))}
+                            </div>
                         </div>
                     </motion.div>
 
@@ -489,19 +684,20 @@ export default function StudentPricingPage() {
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={() => handleSelectPlan('seed')}
-                                className="px-8 py-4 bg-white text-[#4B4036] font-bold rounded-xl shadow-lg hover:shadow-xl transition-all inline-flex items-center justify-center gap-2"
+                                onClick={() => router.push('/aihome/teacher-link/create/subscription-checkout')}
+                                className="px-8 py-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] font-bold rounded-xl shadow-lg hover:shadow-xl transition-all inline-flex items-center justify-center gap-2"
                             >
-                                <SparklesIcon className="w-5 h-5" />
-                                免費開始使用
+                                <CreditCardIcon className="w-5 h-5" />
+                                開始訂閱
                             </motion.button>
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                className="px-8 py-4 bg-transparent border-2 border-white/30 text-white font-bold rounded-xl hover:bg-white/10 transition-all inline-flex items-center justify-center gap-2"
+                                onClick={() => router.push('/aihome/teacher-link/create/subscription-checkout?plan=seed')}
+                                className="px-8 py-4 bg-white text-[#4B4036] font-bold rounded-xl shadow-lg hover:shadow-xl transition-all inline-flex items-center justify-center gap-2"
                             >
-                                聯繫銷售團隊
-                                <ArrowRightIcon className="w-5 h-5" />
+                                <SparklesIcon className="w-5 h-5" />
+                                免費開始使用
                             </motion.button>
                         </div>
                     </motion.div>

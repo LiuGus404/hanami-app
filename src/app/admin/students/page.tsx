@@ -42,6 +42,7 @@ type NavigationOverrides = Partial<{
 
 type StudentManagementPageProps = {
   navigationOverrides?: NavigationOverrides;
+  isSubscriptionReadOnly?: boolean; // When true, disable add/edit operations
 };
 
 // 新增一個 hook：useStudentRemainingLessons
@@ -80,6 +81,7 @@ const fetchStudentsWithLessons = async (body: any) => {
 
 export default function StudentManagementPage({
   navigationOverrides,
+  isSubscriptionReadOnly = false,
 }: StudentManagementPageProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1948,8 +1950,10 @@ export default function StudentManagementPage({
           <div className="flex items-center gap-2">
             {/* 新增學生按鈕 */}
             <button
-              className="hanami-btn flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-[#A64B2A] to-[#C17817] hover:from-[#8B3A1F] hover:to-[#A66514] transition-all duration-300 hover:shadow-md rounded-lg"
-              onClick={() => setShowStudentTypeSelector(true)}
+              className={`hanami-btn flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-[#A64B2A] to-[#C17817] hover:from-[#8B3A1F] hover:to-[#A66514] transition-all duration-300 hover:shadow-md rounded-lg ${isSubscriptionReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={() => !isSubscriptionReadOnly && setShowStudentTypeSelector(true)}
+              disabled={isSubscriptionReadOnly}
+              title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '新增學生'}
             >
               <Plus className="w-4 h-4" />
               <span>新增學生</span>
@@ -2106,13 +2110,15 @@ export default function StudentManagementPage({
                     >
                       {!isInactiveStudent && (
                         <div
-                          className="absolute top-2 left-2 z-10"
+                          className={`absolute top-2 left-2 z-10 ${isSubscriptionReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isSubscriptionReadOnly) return;
                             // 對於停用學生，使用 inactive_student_list 的 ID
                             const studentId = isInactiveStudent ? student.id : student.id;
                             handleNavigateToStudent(studentId);
                           }}
+                          title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '編輯學生'}
                         >
                           <img
                             alt="編輯"
@@ -2457,13 +2463,16 @@ export default function StudentManagementPage({
                                 <span>{student.full_name || '未命名學生'}</span>
                                 {!student.is_inactive && (
                                   <button
-                                    className="hanami-btn-soft p-1 transition-all duration-200 hover:scale-110"
+                                    className={`hanami-btn-soft p-1 transition-all duration-200 ${isSubscriptionReadOnly ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'}`}
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (isSubscriptionReadOnly) return;
                                       // 對於停用學生，使用 inactive_student_list 的 ID
                                       const studentId = student.is_inactive ? student.id : student.id;
                                       handleNavigateToStudent(studentId);
                                     }}
+                                    disabled={isSubscriptionReadOnly}
+                                    title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '編輯學生'}
                                   >
                                     <img
                                       alt="編輯"

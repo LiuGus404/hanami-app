@@ -23,7 +23,7 @@ export default function ParentNavigation({ className = '' }: ParentNavigationPro
       icon: UsersIcon,
       label: '家長連結',
       href: '/aihome/parent/bound-students',
-      description: '查看孩子的學習和成長',
+      description: '查看學習記錄',
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-50',
       iconColor: 'text-green-600'

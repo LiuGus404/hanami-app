@@ -15,6 +15,9 @@ import { supabase } from '@/lib/supabase';
 import { useTeacherLinkOrganization, TeacherLinkShell } from '../../TeacherLinkShell';
 import { toast } from 'react-hot-toast';
 import { WithPermissionCheck } from '@/components/teacher-link/withPermissionCheck';
+import { useSubscriptionLimit } from '@/hooks/useSubscriptionLimit';
+import { ExclamationTriangleIcon, ArrowUpCircleIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
 
 const PREMIUM_AI_ORG_ID = 'f8d269ec-b682-45d1-a796-3b74c2bf3eec';
 
@@ -40,6 +43,10 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
   const [courseUpdateTrigger, setCourseUpdateTrigger] = useState(0);
   const [activeTab, setActiveTab] = useState<'basic' | 'lessons' | 'avatar' | 'media' | 'phone'>('basic');
   const [showTooltip, setShowTooltip] = useState<string | null>(null);
+
+  // Check subscription limit for edit permissions
+  const { canEdit: subscriptionCanEdit, maxStudents, currentCount, status: subscriptionStatus, loading: limitLoading } = useSubscriptionLimit(orgId);
+  const isReadOnly = !subscriptionCanEdit && !limitLoading;
 
   const handleTabChange = (tabKey: 'basic' | 'lessons' | 'avatar' | 'media' | 'phone') => {
     // 檢查是否為需要 premium 的功能
@@ -333,6 +340,34 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
           </div>
         )}
 
+        {/* Read-only warning when over limit or subscription suspended */}
+        {isReadOnly && !isInactiveStudent && (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-800">
+                    {subscriptionStatus === 'suspended' ? '訂閱已暫停' : '已超出學生上限'}
+                  </h3>
+                  <p className="text-xs text-amber-700">
+                    {subscriptionStatus === 'suspended'
+                      ? '您的訂閱已暫停，學生資料處於只讀模式。請更新付款方式以恢復編輯功能。'
+                      : `目前學生數量 (${currentCount}) 已超過方案上限 (${maxStudents})，學生資料處於只讀模式。`
+                    }
+                  </p>
+                </div>
+              </div>
+              <Link href="/aihome/teacher-link/create/student-pricing">
+                <button className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] text-[#4B4036] font-bold text-sm rounded-xl shadow hover:shadow-md transition-all">
+                  <ArrowUpCircleIcon className="w-4 h-4" />
+                  {subscriptionStatus === 'suspended' ? '恢復訂閱' : '升級方案'}
+                </button>
+              </Link>
+            </div>
+          </div>
+        )}
+
         <div className="mb-6">
           <div className="flex space-x-1 rounded-xl bg-[#EADBC8]/30 p-1">
             {[
@@ -394,6 +429,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
           {activeTab === 'basic' && (
             <StudentBasicInfo
               isInactive={isInactiveStudent}
+              isSubscriptionReadOnly={isReadOnly}
               student={student}
               orgId={orgId || student?.org_id || null}
               onUpdate={(next) => {
@@ -418,6 +454,7 @@ function TeacherStudentDetailContent({ studentId }: { studentId: string }) {
               showAIMessageButton={true}
               orgId={orgId}
               organizationName={organizationNameForLessons}
+              isSubscriptionReadOnly={isReadOnly}
             />
           )}
 

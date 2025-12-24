@@ -516,6 +516,7 @@ function SaasAuthProvider({ children }: { children: ReactNode }) {
       return { success: true };
     } catch (error) {
       console.error('登入錯誤:', error);
+      setLoading(false);
       return { success: false, error: '登入過程中發生錯誤' };
     }
   };

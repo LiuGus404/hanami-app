@@ -279,18 +279,6 @@ CREATE TABLE public.hanami_children (
   CONSTRAINT hanami_children_pkey PRIMARY KEY (id),
   CONSTRAINT hanami_children_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.saas_users(id)
 );
-CREATE TABLE public.hanami_organizations (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  org_name text NOT NULL,
-  org_slug text NOT NULL UNIQUE,
-  status text DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text, 'suspended'::text])),
-  contact_email text,
-  contact_phone text,
-  settings jsonb DEFAULT '{}'::jsonb,
-  created_at timestamp with time zone NOT NULL DEFAULT now(),
-  updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT hanami_organizations_pkey PRIMARY KEY (id)
-);
 CREATE TABLE public.hanami_payme_fps_accounts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   institution_name text NOT NULL,
@@ -436,8 +424,7 @@ CREATE TABLE public.hanami_user_organizations (
   is_primary boolean DEFAULT false,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
-  CONSTRAINT hanami_user_organizations_pkey PRIMARY KEY (id),
-  CONSTRAINT hanami_user_organizations_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.hanami_organizations(id)
+  CONSTRAINT hanami_user_organizations_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.memory_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -610,6 +597,58 @@ CREATE TABLE public.model_pricing_history (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT model_pricing_history_pkey PRIMARY KEY (id),
   CONSTRAINT model_pricing_history_model_config_id_fkey FOREIGN KEY (model_config_id) REFERENCES public.model_configs(id)
+);
+CREATE TABLE public.org_subscription_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  subscription_id uuid,
+  org_id uuid NOT NULL,
+  event_type text NOT NULL CHECK (event_type = ANY (ARRAY['created'::text, 'upgraded'::text, 'downgraded'::text, 'renewed'::text, 'payment_failed'::text, 'payment_retry'::text, 'payment_success'::text, 'suspended'::text, 'reactivated'::text, 'cancelled'::text])),
+  old_plan_id text,
+  new_plan_id text,
+  payment_amount numeric,
+  billing_type text,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT org_subscription_history_pkey PRIMARY KEY (id),
+  CONSTRAINT org_subscription_history_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.org_subscriptions(id)
+);
+CREATE TABLE public.org_subscription_plans (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  plan_id text NOT NULL UNIQUE,
+  plan_name text NOT NULL,
+  max_students integer NOT NULL,
+  price_monthly_hkd numeric NOT NULL DEFAULT 0,
+  price_yearly_hkd numeric NOT NULL DEFAULT 0,
+  features jsonb DEFAULT '{}'::jsonb,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT org_subscription_plans_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.org_subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL UNIQUE,
+  plan_id text NOT NULL,
+  billing_type text NOT NULL DEFAULT 'monthly'::text CHECK (billing_type = ANY (ARRAY['monthly'::text, 'yearly'::text])),
+  auto_renew boolean NOT NULL DEFAULT true,
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'past_due'::text, 'grace_period'::text, 'suspended'::text, 'cancelled'::text])),
+  current_period_start date NOT NULL,
+  current_period_end date NOT NULL,
+  retry_count integer DEFAULT 0,
+  last_retry_at timestamp with time zone,
+  grace_period_ends_at timestamp with time zone,
+  last_payment_at timestamp with time zone,
+  last_payment_amount numeric,
+  payment_method text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  airwallex_subscription_id text,
+  airwallex_customer_id text,
+  next_billing_date timestamp with time zone,
+  last_payment_date timestamp with time zone,
+  payment_method_type text,
+  billing_cycle text DEFAULT 'monthly'::text CHECK (billing_cycle = ANY (ARRAY['monthly'::text, 'yearly'::text])),
+  CONSTRAINT org_subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT org_subscriptions_plan_id_fkey FOREIGN KEY (plan_id) REFERENCES public.org_subscription_plans(plan_id)
 );
 CREATE TABLE public.parent_student_bindings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

@@ -45,7 +45,7 @@ export default function BoundStudentsPage() {
   const [boundStudents, setBoundStudents] = useState<BoundStudent[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
 
-  // 載入已綁定的學習者
+  // 載入已綁定的學習記錄
   useEffect(() => {
     const loadBoundStudents = async () => {
       try {
@@ -68,7 +68,7 @@ export default function BoundStudentsPage() {
           setBoundStudents([]);
         }
       } catch (error) {
-        console.error('載入綁定孩子失敗:', error);
+        console.error('載入綁定學習記錄失敗:', error);
         toast.error('載入學生資料失敗');
         setBoundStudents([]);
       } finally {
@@ -172,9 +172,9 @@ export default function BoundStudentsPage() {
           <div className="w-20 h-20 bg-[#FFF9F2] rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-[#EADBC8]">
             <Users className="w-10 h-10 text-[#FFD59A]" />
           </div>
-          <h3 className="text-xl font-bold text-[#4B4036] mb-3">還沒有綁定的孩子</h3>
+          <h3 className="text-xl font-bold text-[#4B4036] mb-3">還沒有綁定的學習記錄</h3>
           <p className="text-[#2B3A3B]/70 mb-8 max-w-md mx-auto">
-            綁定您的孩子後，您將能夠查看他們的學習進度、課程記錄以及 AI 學習夥伴的互動情況。
+            綁定學習記錄後，您將能夠查看學習進度、課程記錄以及 AI 學習夥伴的互動情況。
           </p>
           <motion.button
             onClick={() => router.push('/aihome/parent/connect')}
@@ -183,7 +183,7 @@ export default function BoundStudentsPage() {
             className="px-8 py-3 bg-[#FFD59A] text-[#4B4036] rounded-2xl hover:bg-[#EBC9A4] transition-all duration-200 shadow-sm hover:shadow-md font-semibold flex items-center gap-2 mx-auto"
           >
             <Plus className="w-5 h-5" />
-            綁定孩子
+            綁定學習記錄
           </motion.button>
         </div>
       ) : (
@@ -290,7 +290,7 @@ export default function BoundStudentsPage() {
             </div>
             <h3 className="text-2xl font-bold text-[#4B4036] mb-2">新增綁定</h3>
             <p className="text-[#4B4036]/70">
-              連結更多孩子帳號<br />一同參與學習旅程
+              連結更多學習記錄<br />一同參與學習旅程
             </p>
           </motion.button>
         </div>
@@ -301,8 +301,8 @@ export default function BoundStudentsPage() {
   return (
     <ParentShell
       currentPath="/aihome/parent/bound-students"
-      pageTitle="已綁定的學習者"
-      pageSubtitle="查看目前已經連結的學習者"
+      pageTitle="已綁定的學習記錄"
+      pageSubtitle="查看目前已經連結的學習記錄"
       action={action}
       user={user}
       onLogout={handleLogout}

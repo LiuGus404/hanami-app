@@ -37,6 +37,7 @@ import UsageStatsDisplay from '@/components/ai-companion/UsageStatsDisplay';
 import { useFoodDisplay } from '@/hooks/useFoodDisplay';
 import { getUserOrganizations, type UserOrganizationIdentity } from '@/lib/organizationUtils';
 import { supabase, getSaasSupabaseClient } from '@/lib/supabase';
+import OrgSubscriptionInfoPanel from '@/components/aihome/OrgSubscriptionInfoPanel';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -65,7 +66,7 @@ export default function ProfilePage() {
         setChildrenCount(data.children.length || 0);
       }
     } catch (error) {
-      console.error('載入孩子數量失敗:', error);
+      console.error('載入學習記錄數量失敗:', error);
     }
   }, [user?.id]);
 
@@ -321,7 +322,7 @@ export default function ProfilePage() {
                     <div className="text-2xl xl:text-3xl font-bold text-[#4B4036] drop-shadow-sm">
                       {childrenCount}
                     </div>
-                    <div className="text-[9px] font-bold text-[#8B7E74]/70 mt-1 uppercase">孩子</div>
+                    <div className="text-[9px] font-bold text-[#8B7E74]/70 mt-1 uppercase">學習記錄</div>
                   </div>
 
                   <div className="h-10 w-1.5 bg-[#FFF9F2] shadow-[1px_1px_2px_#E6D9C5,-1px_-1px_2px_#FFFFFF] rounded-full"></div>
@@ -350,7 +351,7 @@ export default function ProfilePage() {
                       }
                             `}
                   >
-                    {tab === 'overview' ? '總覽' : tab === 'children' ? '孩子' : '設定'}
+                    {tab === 'overview' ? '總覽' : tab === 'children' ? '學習記錄' : '設定'}
                   </button>
                 ))}
               </div>
@@ -408,7 +409,14 @@ export default function ProfilePage() {
                                 </div>
                               </div>
 
-                              <div className="flex gap-3">
+                              {/* Subscription Info - show org subscription status only for owner and admin */}
+                              {organizations.length > 0 && (displayOrg?.role === 'owner' || displayOrg?.role === 'admin') && (
+                                <div className="mt-4">
+                                  <OrgSubscriptionInfoPanel orgId={organizations.find(o => o.orgName === displayOrg?.name)?.orgId || null} />
+                                </div>
+                              )}
+
+                              <div className="flex gap-3 mt-4">
                                 <NeuButton className="flex-1 py-3 text-sm font-bold text-[#4B4036]" onClick={() => router.push('/aihome/teacher-link/create')}>
                                   管理學校
                                 </NeuButton>
@@ -531,7 +539,7 @@ export default function ProfilePage() {
 
                     {activeTab === 'children' && (
                       <div className="rounded-[2.5rem] p-8 bg-[#FFF9F2] shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF] min-h-[400px]">
-                        <h3 className="font-bold text-lg text-[#4B4036] mb-6">管理孩子與學生</h3>
+                        <h3 className="font-bold text-lg text-[#4B4036] mb-6">管理學習記錄</h3>
                         <ChildrenManagement />
                       </div>
                     )}

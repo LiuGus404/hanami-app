@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (existingBinding) {
       return NextResponse.json({
         success: false,
-        error: '此孩子已經綁定到您的帳戶'
+        error: '此學習記錄已經綁定到您的帳戶'
       });
     }
 
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError) {
-      console.error('綁定孩子錯誤:', insertError);
+      console.error('綁定學習記錄錯誤:', insertError);
       return NextResponse.json({
         error: '綁定失敗，請稍後再試'
       }, { status: 500 });
@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       binding,
-      message: '孩子綁定成功！'
+      message: '學習記錄綁定成功！'
     });
 
   } catch (error) {
-    console.error('綁定孩子 API 錯誤:', error);
+    console.error('綁定學習記錄 API 錯誤:', error);
     return NextResponse.json({
       error: '服務器錯誤'
     }, { status: 500 });
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     const saasSupabase = getSaasServerSupabaseClient();
     const mainSupabase = getServerSupabaseClient();
 
-    // 獲取已綁定的學習者列表
+    // 獲取已綁定的學習記錄列表
     const { data: bindings, error } = await saasSupabase
       .from('parent_student_bindings')
       .select('*')
@@ -106,9 +106,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (error) {
-      console.error('獲取綁定孩子錯誤:', error);
+      console.error('獲取綁定學習記錄錯誤:', error);
       return NextResponse.json({
-        error: '獲取綁定孩子失敗'
+        error: '獲取綁定學習記錄失敗'
       }, { status: 500 });
     }
 
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('獲取綁定孩子 API 錯誤:', error);
+    console.error('獲取綁定學習記錄 API 錯誤:', error);
     return NextResponse.json({
       error: '服務器錯誤'
     }, { status: 500 });

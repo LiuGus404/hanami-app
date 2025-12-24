@@ -63,6 +63,7 @@ interface StudentLessonPanelProps {
   organizationName?: string | null;
   onPendingClick?: () => void;
   isParentView?: boolean;
+  isSubscriptionReadOnly?: boolean; // 訂閱超額或暫停時禁用編輯/新增操作
 }
 
 interface LessonData {
@@ -116,6 +117,7 @@ export default function StudentLessonPanel({
   orgId,
   organizationName,
   isParentView = false,
+  isSubscriptionReadOnly = false,
 }: StudentLessonPanelProps) {
   const supabase = getSupabaseClient();
   const resolvedOrgName =
@@ -180,6 +182,11 @@ export default function StudentLessonPanel({
 
   // 家長預約相關狀態
   const [showParentBookingModal, setShowParentBookingModal] = useState(false);
+
+  // 編輯待確認/待安排堂數狀態
+  const [isEditingPendingCounts, setIsEditingPendingCounts] = useState(false);
+  const [editPendingConfirmation, setEditPendingConfirmation] = useState(0);
+  const [editApprovedNonscheduled, setEditApprovedNonscheduled] = useState(0);
 
   // 添加防抖機制
   const lessonsFetchedRef = useRef(false);
@@ -1140,9 +1147,10 @@ export default function StudentLessonPanel({
               </button>
             )}
             <button
-              onClick={exportToCSV}
-              className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
-              title="匯出CSV"
+              onClick={() => !isSubscriptionReadOnly && exportToCSV()}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${isSubscriptionReadOnly ? 'bg-[#F0ECE1] opacity-50 cursor-not-allowed' : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'}`}
+              title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '匯出CSV'}
+              disabled={isSubscriptionReadOnly}
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M12 16v-8m0 8l-3-3m3 3l3-3" strokeLinecap="round" strokeLinejoin="round" />
@@ -1151,9 +1159,10 @@ export default function StudentLessonPanel({
               <span className="text-[10px] sm:text-[11px] text-[#4B4036]">匯出</span>
             </button>
             <button
-              onClick={copyToWhatsApp}
-              className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
-              title="複製課堂記錄"
+              onClick={() => !isSubscriptionReadOnly && copyToWhatsApp()}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${isSubscriptionReadOnly ? 'bg-[#F0ECE1] opacity-50 cursor-not-allowed' : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'}`}
+              title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '複製課堂記錄'}
+              disabled={isSubscriptionReadOnly}
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -1162,13 +1171,13 @@ export default function StudentLessonPanel({
               <span className="text-[10px] sm:text-[11px] text-[#4B4036]">複製</span>
             </button>
             <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${loading
-                ? 'bg-[#F0ECE1] cursor-wait opacity-70'
+              onClick={() => !isSubscriptionReadOnly && handleRefresh()}
+              disabled={loading || isSubscriptionReadOnly}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${loading || isSubscriptionReadOnly
+                ? 'bg-[#F0ECE1] cursor-not-allowed opacity-50'
                 : 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
                 }`}
-              title="刷新課堂資料"
+              title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '刷新課堂資料'}
             >
               <svg
                 className={`w-5 h-5 sm:w-6 sm:h-6 mb-0.5 ${loading ? 'animate-spin' : ''}`}
@@ -1182,7 +1191,7 @@ export default function StudentLessonPanel({
               <span className="text-[10px] sm:text-[11px] text-[#4B4036]">刷新</span>
             </button>
             {showAIMessageButton && (
-              allowAiFeatures ? (
+              allowAiFeatures && !isSubscriptionReadOnly ? (
                 <button
                   onClick={() => setShowAIMessageModal(true)}
                   className="flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 bg-[#F8F5EC] rounded-xl shadow hover:bg-[#FDE6B8] transition"
@@ -1214,12 +1223,15 @@ export default function StudentLessonPanel({
               )
             )}
             <button
-              onClick={() => setCategorySelectOpen(true)}
-              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${categoryFilter.includes('all')
-                ? 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
-                : 'bg-[#FDE6B8] hover:bg-[#FCD58B] border-2 border-[#FCD58B]'
+              onClick={() => !isSubscriptionReadOnly && setCategorySelectOpen(true)}
+              className={`flex flex-col items-center min-w-[40px] sm:min-w-[48px] px-1.5 sm:px-2 py-1 rounded-xl shadow transition ${isSubscriptionReadOnly
+                ? 'bg-[#F0ECE1] opacity-50 cursor-not-allowed'
+                : categoryFilter.includes('all')
+                  ? 'bg-[#F8F5EC] hover:bg-[#FDE6B8]'
+                  : 'bg-[#FDE6B8] hover:bg-[#FCD58B] border-2 border-[#FCD58B]'
                 }`}
-              title={`類別${categoryFilter.includes('all') ? '' : ` (${categoryFilter.length} 項)`}`}
+              title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : `類別${categoryFilter.includes('all') ? '' : ` (${categoryFilter.length} 項)`}`}
+              disabled={isSubscriptionReadOnly}
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" />
@@ -1293,10 +1305,13 @@ export default function StudentLessonPanel({
 
                       <button
                         onClick={() => {
+                          if (isSubscriptionReadOnly) return;
                           setEditingLesson(null);
                           setIsModalOpen(true);
                         }}
-                        className="px-3 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-lg hover:bg-[#EBC9A4] transition-colors text-sm font-medium flex items-center"
+                        className={`px-3 py-1.5 bg-[#FFD59A] text-[#4B4036] rounded-lg transition-colors text-sm font-medium flex items-center ${isSubscriptionReadOnly ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#EBC9A4]'}`}
+                        disabled={isSubscriptionReadOnly}
+                        title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '新增課堂記錄'}
                       >
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1311,7 +1326,15 @@ export default function StudentLessonPanel({
               {/* 待確認堂數 */}
               <div className="text-center">
                 <div className="text-xs font-medium text-[#4B4036]/70 mb-1">待確認堂數</div>
-                {(studentData.pending_confirmation_count || 0) > 0 ? (
+                {isEditingPendingCounts && !isParentView ? (
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-16 px-2 py-1 text-center text-sm font-semibold border border-[#EADBC8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FCD58B]"
+                    value={editPendingConfirmation}
+                    onChange={(e) => setEditPendingConfirmation(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                ) : (studentData.pending_confirmation_count || 0) > 0 ? (
                   <button
                     onClick={() => {
                       if (onPendingClick) {
@@ -1332,7 +1355,7 @@ export default function StudentLessonPanel({
                   </button>
                 ) : (
                   <div className="font-semibold text-sm text-[#2B3A3B]">
-                    {studentData.non_approved_lesson || 0}
+                    {studentData.pending_confirmation_count || 0}
                   </div>
                 )}
               </div>
@@ -1340,18 +1363,82 @@ export default function StudentLessonPanel({
               {/* 待安排堂數 */}
               <div className="text-center">
                 <div className="text-xs font-medium text-[#4B4036]/70 mb-1">待安排堂數</div>
-                <button
-                  className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${(studentData.approved_lesson_nonscheduled || 0) > 0 && !isParentView
-                    ? 'bg-gradient-to-r from-[#E3F2FD] to-[#BBDEFB] text-[#1565C0] hover:from-[#BBDEFB] hover:to-[#90CAF9] hover:shadow-md'
-                    : 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed'
-                    }`}
-                  onClick={handlePendingLessonsClick}
-                  disabled={(studentData.approved_lesson_nonscheduled || 0) === 0 || isParentView}
-                  title={isParentView ? '家長視角暫不開放此功能' : ((studentData.approved_lesson_nonscheduled || 0) > 0 ? '點擊新增課堂' : '暫無待安排堂數')}
-                >
-                  {studentData.approved_lesson_nonscheduled || 0} 堂
-                </button>
+                {isEditingPendingCounts && !isParentView ? (
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-16 px-2 py-1 text-center text-sm font-semibold border border-[#EADBC8] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FCD58B]"
+                    value={editApprovedNonscheduled}
+                    onChange={(e) => setEditApprovedNonscheduled(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                ) : (
+                  <button
+                    className={`w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${(studentData.approved_lesson_nonscheduled || 0) > 0 && !isParentView
+                      ? 'bg-gradient-to-r from-[#E3F2FD] to-[#BBDEFB] text-[#1565C0] hover:from-[#BBDEFB] hover:to-[#90CAF9] hover:shadow-md'
+                      : 'bg-[#F5F5F5] text-[#999999] cursor-not-allowed'
+                      }`}
+                    onClick={handlePendingLessonsClick}
+                    disabled={(studentData.approved_lesson_nonscheduled || 0) === 0 || isParentView}
+                    title={isParentView ? '家長視角暫不開放此功能' : ((studentData.approved_lesson_nonscheduled || 0) > 0 ? '點擊新增課堂' : '暫無待安排堂數')}
+                  >
+                    {studentData.approved_lesson_nonscheduled || 0} 堂
+                  </button>
+                )}
               </div>
+
+              {/* 編輯/儲存按鈕 */}
+              {!isParentView && (
+                <div className="text-center">
+                  <div className="text-xs font-medium text-[#4B4036]/70 mb-1">&nbsp;</div>
+                  {isEditingPendingCounts ? (
+                    <div className="flex gap-1 justify-center">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const { error } = await (supabase as any)
+                              .from('Hanami_Students')
+                              .update({
+                                pending_confirmation_count: editPendingConfirmation,
+                                approved_lesson_nonscheduled: editApprovedNonscheduled,
+                              })
+                              .eq('id', studentData.id);
+                            if (error) throw error;
+                            toast.success('已儲存');
+                            setIsEditingPendingCounts(false);
+                            if (onCourseUpdate) onCourseUpdate();
+                          } catch (err) {
+                            console.error('儲存失敗:', err);
+                            toast.error('儲存失敗');
+                          }
+                        }}
+                        className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
+                      >
+                        儲存
+                      </button>
+                      <button
+                        onClick={() => setIsEditingPendingCounts(false)}
+                        className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (isSubscriptionReadOnly) return;
+                        setEditPendingConfirmation(studentData.pending_confirmation_count || 0);
+                        setEditApprovedNonscheduled(studentData.approved_lesson_nonscheduled || 0);
+                        setIsEditingPendingCounts(true);
+                      }}
+                      className={`px-2 py-1 text-xs border border-[#EADBC8] rounded ${isSubscriptionReadOnly ? 'bg-[#F0ECE1] text-[#8A7C70] opacity-50 cursor-not-allowed' : 'bg-[#FFF9F2] text-[#A68A64] hover:bg-[#F5EDE0]'}`}
+                      disabled={isSubscriptionReadOnly}
+                      title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '編輯堂數'}
+                    >
+                      編輯
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* 需要特別照顧 */}
               {!hideCareAlert && (
@@ -1594,8 +1681,10 @@ export default function StudentLessonPanel({
                       <td className="px-2 py-2">
                         {!hideActionButtons && (
                           <button
-                            className="text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52] text-sm"
-                            onClick={() => handleEdit(lesson)}
+                            className={`text-sm ${isSubscriptionReadOnly ? 'text-[#8A7C70] opacity-50 cursor-not-allowed' : 'text-[#4B4036] underline underline-offset-2 hover:text-[#7A6A52]'}`}
+                            onClick={() => !isSubscriptionReadOnly && handleEdit(lesson)}
+                            disabled={isSubscriptionReadOnly}
+                            title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '編輯課堂記錄'}
                           >
                             編輯
                           </button>
@@ -1624,11 +1713,14 @@ export default function StudentLessonPanel({
         <div className="flex gap-3 mt-4">
           {!hideActionButtons && (
             <button
-              className="rounded-full px-6 py-2 bg-[#F8F5EC] text-[#4B4036] text-[15px] font-semibold shadow-md hover:ring-1 hover:ring-[#CBBFA4] transition"
+              className={`rounded-full px-6 py-2 text-[15px] font-semibold shadow-md transition ${isSubscriptionReadOnly ? 'bg-[#F0ECE1] text-[#8A7C70] opacity-50 cursor-not-allowed' : 'bg-[#F8F5EC] text-[#4B4036] hover:ring-1 hover:ring-[#CBBFA4]'}`}
               onClick={() => {
+                if (isSubscriptionReadOnly) return;
                 setEditingLesson(null);
                 setIsModalOpen(true);
               }}
+              disabled={isSubscriptionReadOnly}
+              title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '新增課堂記錄'}
             >
               新增課堂
             </button>

@@ -37,16 +37,31 @@ export async function GET(request: NextRequest) {
 
         const maxStudents = plan?.max_students || 10;
 
-        // 3. Get current student count from AI-Student DB
+        // 3. Get current student count from AI-Student DB (excluding disabled students)
         const aiSupabase = getServerSupabaseClient() as any;
 
         const { count: studentCount } = await aiSupabase
             .from('Hanami_Students')
             .select('*', { count: 'exact', head: true })
-            .eq('org_id', orgId);
+            .eq('org_id', orgId)
+            .neq('student_type', '已停用');
 
         const currentCount = studentCount || 0;
         const isActive = status === 'active';
+        const isWithinLimit = currentCount <= maxStudents;
+
+        // Debug logging
+        console.log('[check-limit] Debug:', {
+            orgId,
+            planId,
+            plan,
+            maxStudents,
+            currentCount,
+            isActive,
+            isWithinLimit,
+            canAdd: isActive && currentCount < maxStudents,
+            canEdit: isActive && isWithinLimit,
+        });
 
         return NextResponse.json({
             planId,
@@ -54,7 +69,7 @@ export async function GET(request: NextRequest) {
             currentCount,
             remaining: Math.max(0, maxStudents - currentCount),
             canAdd: isActive && currentCount < maxStudents,
-            canEdit: isActive,
+            canEdit: isActive && isWithinLimit, // Block edit if over limit or suspended
             status,
         });
     } catch (error) {

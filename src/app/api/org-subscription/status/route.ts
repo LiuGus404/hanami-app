@@ -28,13 +28,14 @@ export async function GET(request: NextRequest) {
             .eq('org_id', orgId)
             .single();
 
-        // 2. Get student count from AI-Student DB
+        // 2. Get student count from AI-Student DB (excluding disabled students)
         const aiSupabase = getServerSupabaseClient() as any;
 
         const { count: studentCount, error: countError } = await aiSupabase
             .from('Hanami_Students')
             .select('*', { count: 'exact', head: true })
-            .eq('org_id', orgId);
+            .eq('org_id', orgId)
+            .neq('student_type', '已停用');
 
         if (countError) {
             console.error('Error counting students:', countError);
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
                 studentCount: currentCount,
                 maxStudents,
                 canAddStudents: currentCount < maxStudents,
-                canEditStudents: true,
+                canEditStudents: currentCount <= maxStudents, // Block edit if OVER limit
                 usagePercent: Math.round((currentCount / maxStudents) * 100),
             });
         }
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
         const plan = sub.plan as any;
         const maxStudents = plan?.max_students || 10;
         const isActive = sub.status === 'active';
+        const isWithinLimit = currentCount <= maxStudents;
 
         return NextResponse.json({
             hasSubscription: true,
@@ -97,7 +99,7 @@ export async function GET(request: NextRequest) {
             studentCount: currentCount,
             maxStudents,
             canAddStudents: isActive && currentCount < maxStudents,
-            canEditStudents: isActive,
+            canEditStudents: isActive && isWithinLimit, // Block edit if over limit or suspended
             usagePercent: Math.round((currentCount / maxStudents) * 100),
         });
     } catch (error) {

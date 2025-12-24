@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from 'react';
-import { ArrowLeftIcon, ChartBarIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ChartBarIcon, CalendarIcon, ExclamationTriangleIcon, ArrowUpCircleIcon } from '@heroicons/react/24/outline';
 
 // 延迟加载非关键组件
 const HanamiCalendar = lazy(() => import('@/components/ui/HanamiCalendar').then(mod => ({ default: mod.default })));
@@ -16,6 +16,8 @@ import CuteLoadingSpinner from '@/components/ui/CuteLoadingSpinner';
 import { useTeacherLinkPermissions } from '@/hooks/useTeacherLinkPermissions';
 import type { PageKey } from '@/lib/permissions';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useSubscriptionLimit } from '@/hooks/useSubscriptionLimit';
+import Link from 'next/link';
 
 function CreatePageContent() {
   const router = useRouter();
@@ -44,6 +46,10 @@ function CreatePageContent() {
   );
 
   const { studentCount, trialStudentCount, lastLessonCount, weeklyTrialCounts } = dashboardData;
+
+  // Check subscription limit for add/edit permissions
+  const { canEdit, currentCount, maxStudents, loading: limitLoading } = useSubscriptionLimit(orgId);
+  const isSubscriptionReadOnly = !canEdit && !limitLoading;
 
   const displayName =
     (saasUser?.full_name && saasUser.full_name.trim()) ||
@@ -340,6 +346,36 @@ function CreatePageContent() {
               </div>
             )}
 
+            {/* 訂閱限制警告 */}
+            {isSubscriptionReadOnly && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-md mb-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <ExclamationTriangleIcon className="w-6 h-6 text-amber-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-amber-800 font-semibold text-lg flex items-center gap-2">
+                      已超出學生上限
+                    </h3>
+                    <p className="text-amber-700 text-sm mt-1">
+                      目前學生數量 ({currentCount}) 已超過方案上限 ({maxStudents})，學生資料處於只讀模式。
+                    </p>
+                    <Link
+                      href="/aihome/teacher-link/create/student-pricing"
+                      className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-medium rounded-xl hover:from-amber-600 hover:to-orange-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <ArrowUpCircleIcon className="w-5 h-5" />
+                      升級方案
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* 學校狀況總覽區 */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -373,8 +409,8 @@ function CreatePageContent() {
                     whileHover={{ y: -4, scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!hasPermission('students')
-                        ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
-                        : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
+                      ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                      : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
                       }`}
                     onClick={() => {
                       if (!hasPermission('students')) {
@@ -404,8 +440,8 @@ function CreatePageContent() {
                       whileHover={{ y: -4, scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!hasPermission('students')
-                          ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
-                          : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
+                        ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                        : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
                         }`}
                       onClick={() => {
                         if (!hasPermission('students')) {
@@ -459,8 +495,8 @@ function CreatePageContent() {
                     whileHover={{ y: -4, scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!hasPermission('students')
-                        ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
-                        : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
+                      ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                      : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
                       }`}
                     onClick={() => {
                       if (!hasPermission('students')) {
@@ -630,8 +666,8 @@ function CreatePageContent() {
                       whileHover={!isRestricted ? { x: -4, scale: 1.02 } : {}}
                       whileTap={!isRestricted ? { scale: 0.98 } : {}}
                       className={`relative ${isRestricted
-                          ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
-                          : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
+                        ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
+                        : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
                         } p-4 rounded-2xl text-left transition-colors transition-shadow duration-500 w-full flex flex-row items-center gap-4 overflow-hidden group`}
                       onClick={() => {
                         if (isRestricted) {
@@ -712,8 +748,8 @@ function CreatePageContent() {
                     whileHover={!isRestricted ? { y: -6, scale: 1.03, rotateX: 2 } : {}}
                     whileTap={!isRestricted ? { scale: 0.97 } : {}}
                     className={`relative ${isRestricted
-                        ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
-                        : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
+                      ? 'bg-gray-200 border-2 border-gray-300 opacity-60 cursor-not-allowed'
+                      : 'bg-gradient-to-br from-white/90 to-white/70 backdrop-blur-md border-2 border-[#EADBC8] hover:border-[#FFD59A] shadow-lg hover:shadow-2xl'
                       } p-4 rounded-3xl text-center transition-colors transition-shadow duration-500 h-full w-full flex flex-col items-center justify-center overflow-hidden group`}
                     onClick={() => {
                       if (isRestricted) {
