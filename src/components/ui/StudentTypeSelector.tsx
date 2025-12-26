@@ -32,9 +32,17 @@ export default function StudentTypeSelector({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-hidden"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-y-auto"
           onClick={onClose}
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: '16px',
+            boxSizing: 'border-box'
+          }}
         >
           {/* 彈窗內容 */}
           <motion.div
@@ -42,9 +50,14 @@ export default function StudentTypeSelector({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="relative bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto"
+            className="relative bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
             onClick={(e) => e.stopPropagation()}
-            style={{ margin: 'auto' }}
+            style={{
+              margin: 'auto',
+              maxHeight: 'calc(100vh - 32px)',
+              overflowY: 'auto',
+              minWidth: '280px'
+            }}
           >
             {/* 關閉按鈕 */}
             <button

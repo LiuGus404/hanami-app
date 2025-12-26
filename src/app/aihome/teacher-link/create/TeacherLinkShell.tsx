@@ -626,16 +626,16 @@ export function TeacherLinkShell({
 
   return (
     <TeacherLinkShellContext.Provider value={contextValue}>
-      <div className="h-screen overflow-hidden bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A]">
-        <div className="flex h-full">
+      <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFFDF8] to-[#FFD59A] overflow-x-hidden">
+        <div className="flex min-h-screen min-w-0">
           <AppSidebar
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             currentPath={currentPath}
           />
 
-          <div className="flex-1 flex flex-col h-full">
-            <main className="flex-1 overflow-y-auto">
+          <div className="flex-1 flex flex-col min-w-0">
+            <main className="flex-1">
               {/* Navbar 和組織欄放在可滾動區域內，使用 sticky 定位 */}
               <div className="sticky top-0 z-50">
                 <UnifiedNavbar

@@ -106,7 +106,7 @@ function TeacherLinkStudentsContent() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1 }}
-          className="bg-white/80 backdrop-blur-md border border-[#EADBC8] rounded-3xl shadow-xl overflow-hidden"
+          className="bg-white/80 backdrop-blur-md border border-[#EADBC8] rounded-3xl shadow-xl overflow-x-auto"
         >
           <div className="px-4 py-6 sm:px-6 lg:px-8">
             <StudentsPage
