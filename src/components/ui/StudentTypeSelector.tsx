@@ -36,6 +36,7 @@ export default function StudentTypeSelector({
         document.body.style.overflow = '';
       };
     }
+    return undefined;
   }, [isOpen]);
 
   // 處理 ESC 鍵關閉
