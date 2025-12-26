@@ -76,11 +76,15 @@ export default function StudentTypeSelector({
             {/* 選項 */}
             <div className="space-y-4">
               {/* 常規學生選項 */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <button
+                type="button"
                 onClick={() => handleSelectType('regular')}
-                className="w-full p-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-xl border border-[#EADBC8] hover:shadow-lg transition-all duration-300 group"
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  handleSelectType('regular');
+                }}
+                className="w-full p-4 bg-gradient-to-r from-[#FFD59A] to-[#EBC9A4] rounded-xl border border-[#EADBC8] hover:shadow-lg active:scale-[0.98] transition-all duration-300 group"
+                style={{ touchAction: 'manipulation' }}
               >
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
@@ -91,14 +95,18 @@ export default function StudentTypeSelector({
                     <p className="text-[#4B4036] text-sm">新增正式註冊的常規學生</p>
                   </div>
                 </div>
-              </motion.button>
+              </button>
 
               {/* 試堂學生選項 */}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <button
+                type="button"
                 onClick={() => handleSelectType('trial')}
-                className="w-full p-4 bg-gradient-to-r from-[#FFB6C1] to-[#EBC9A4] rounded-xl border border-[#EADBC8] hover:shadow-lg transition-all duration-300 group"
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  handleSelectType('trial');
+                }}
+                className="w-full p-4 bg-gradient-to-r from-[#FFB6C1] to-[#EBC9A4] rounded-xl border border-[#EADBC8] hover:shadow-lg active:scale-[0.98] transition-all duration-300 group"
+                style={{ touchAction: 'manipulation' }}
               >
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
@@ -109,7 +117,7 @@ export default function StudentTypeSelector({
                     <p className="text-[#4B4036] text-sm">新增試聽課程的學生</p>
                   </div>
                 </div>
-              </motion.button>
+              </button>
             </div>
 
             {/* 取消按鈕 */}
