@@ -11,6 +11,7 @@ import SaasProviderWrapper from '@/components/SaasProviderWrapper';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import DisableConsole from '@/components/DisableConsole';
 import MusicPlayerWrapper from '@/components/MusicPlayerWrapper';
+import PWAInstallPrompt from '@/components/ui/PWAInstallPrompt';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -164,6 +165,7 @@ export default async function RootLayout({
       >
         <SessionProviderWrapper initialSession={userSession}>
           <SaasProviderWrapper>
+            <PWAInstallPrompt />
             <LoadingScreen />
             <DisableConsole />
             <MusicPlayerWrapper>

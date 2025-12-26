@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     CreditCardIcon,
     CalendarDaysIcon,
@@ -10,6 +10,7 @@ import {
     ArrowUpCircleIcon,
     CheckCircleIcon,
     ExclamationTriangleIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 interface SubscriptionInfo {
@@ -59,6 +60,8 @@ function formatDate(dateStr: string | null): string {
 export default function OrgSubscriptionInfoPanel({ orgId }: OrgSubscriptionInfoPanelProps) {
     const [info, setInfo] = useState<SubscriptionInfo | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     useEffect(() => {
         if (!orgId) {
@@ -82,6 +85,50 @@ export default function OrgSubscriptionInfoPanel({ orgId }: OrgSubscriptionInfoP
 
         fetchInfo();
     }, [orgId]);
+
+    // Handle auto-renew toggle
+    const handleAutoRenewToggle = useCallback(async (newValue: boolean) => {
+        if (!orgId || !info) return;
+
+        // If turning OFF, show confirmation dialog first
+        if (!newValue) {
+            setShowCancelConfirm(true);
+            return;
+        }
+
+        // If turning ON, proceed directly
+        await updateAutoRenew(true);
+    }, [orgId, info]);
+
+    // Execute the auto-renew update
+    const updateAutoRenew = async (newValue: boolean) => {
+        if (!orgId) return;
+
+        setIsUpdating(true);
+        try {
+            const res = await fetch('/api/org-subscription/update-auto-renew', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orgId, autoRenew: newValue }),
+            });
+
+            if (res.ok) {
+                setInfo(prev => prev ? { ...prev, autoRenew: newValue } : null);
+            } else {
+                console.error('Failed to update auto-renew status');
+            }
+        } catch (error) {
+            console.error('Error updating auto-renew:', error);
+        } finally {
+            setIsUpdating(false);
+            setShowCancelConfirm(false);
+        }
+    };
+
+    // Confirm cancel auto-renew
+    const confirmCancelAutoRenew = () => {
+        updateAutoRenew(false);
+    };
 
     if (loading) {
         return (
@@ -182,11 +229,32 @@ export default function OrgSubscriptionInfoPanel({ orgId }: OrgSubscriptionInfoP
                     </div>
                 )}
 
-                {/* Billing Info */}
+                {/* Billing Info with Toggle Switch */}
                 {info.hasSubscription && (
                     <div className="flex items-center justify-between text-[10px] text-[#8B7E74] mb-4 px-1">
                         <span>{info.billingType === 'yearly' ? '年繳 (8折)' : '月繳'}</span>
-                        <span>自動續費：{info.autoRenew ? '開啟' : '關閉'}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-[#4B4036] font-medium">自動續費</span>
+                            <button
+                                onClick={() => handleAutoRenewToggle(!info.autoRenew)}
+                                disabled={isUpdating}
+                                className={`relative w-10 h-5 rounded-full transition-all duration-300 ease-in-out ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                    } ${info.autoRenew
+                                        ? 'bg-gradient-to-r from-emerald-400 to-emerald-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]'
+                                        : 'bg-[#E6D9C5] shadow-[inset_2px_2px_4px_#D0C4B0,inset_-2px_-2px_4px_#FFFFFF]'
+                                    }`}
+                                aria-label={info.autoRenew ? '關閉自動續費' : '開啟自動續費'}
+                            >
+                                <motion.div
+                                    layout
+                                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                    className={`absolute top-0.5 w-4 h-4 rounded-full shadow-md ${info.autoRenew
+                                            ? 'left-[22px] bg-white'
+                                            : 'left-0.5 bg-white shadow-[1px_1px_2px_#D0C4B0,-1px_-1px_2px_#FFFFFF]'
+                                        }`}
+                                />
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -202,6 +270,59 @@ export default function OrgSubscriptionInfoPanel({ orgId }: OrgSubscriptionInfoP
                     </motion.button>
                 </Link>
             </div>
+
+            {/* Confirmation Dialog for Cancel Auto-Renew */}
+            <AnimatePresence>
+                {showCancelConfirm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setShowCancelConfirm(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            className="bg-[#FFF9F2] rounded-2xl p-6 max-w-sm w-full shadow-xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                    <ExclamationTriangleIcon className="w-5 h-5 text-amber-600" />
+                                </div>
+                                <h3 className="text-lg font-bold text-[#4B4036]">確認取消自動續費？</h3>
+                            </div>
+
+                            <p className="text-sm text-[#8B7E74] mb-6 leading-relaxed">
+                                取消自動續費後，您的訂閱將在當前計費週期結束時終止。您仍可在到期前隨時重新開啟自動續費。
+                            </p>
+
+                            <div className="flex gap-3">
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setShowCancelConfirm(false)}
+                                    className="flex-1 py-2.5 rounded-xl bg-[#FFF9F2] shadow-[3px_3px_6px_#E6D9C5,-3px_-3px_6px_#FFFFFF] text-sm font-semibold text-[#4B4036] transition-all hover:shadow-[4px_4px_8px_#E6D9C5,-4px_-4px_8px_#FFFFFF]"
+                                >
+                                    取消
+                                </motion.button>
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={confirmCancelAutoRenew}
+                                    disabled={isUpdating}
+                                    className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-400 to-red-500 text-white text-sm font-semibold shadow-md transition-all hover:from-red-500 hover:to-red-600 disabled:opacity-50"
+                                >
+                                    {isUpdating ? '處理中...' : '確認取消'}
+                                </motion.button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }

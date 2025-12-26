@@ -38,6 +38,7 @@ import { useFoodDisplay } from '@/hooks/useFoodDisplay';
 import { getUserOrganizations, type UserOrganizationIdentity } from '@/lib/organizationUtils';
 import { supabase, getSaasSupabaseClient } from '@/lib/supabase';
 import OrgSubscriptionInfoPanel from '@/components/aihome/OrgSubscriptionInfoPanel';
+import { PWAInstallButton } from '@/components/ui/PWAInstallPrompt';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -564,6 +565,14 @@ export default function ProfilePage() {
                             />
                           </div>
                         </div>
+
+                        {/* PWA 安裝按鈕區塊 */}
+                        <div className="md:col-span-2 rounded-[2.5rem] p-8 bg-[#FFF9F2] shadow-[8px_8px_16px_#E6D9C5,-8px_-8px_16px_#FFFFFF]">
+                          <h3 className="font-bold text-lg text-[#4B4036] mb-4">安裝應用程式</h3>
+                          <p className="text-sm text-[#8B7E74] mb-4">將 HanamiEcho 安裝到您的裝置，享受更快速的體驗</p>
+                          <PWAInstallButton />
+                        </div>
+
                         <NeuButton onClick={logout} className="md:col-span-2 p-6 rounded-[2rem] text-red-500 font-bold flex items-center justify-center gap-2 hover:bg-red-50">
                           <LogOut className="w-5 h-5" /> 安全登出
                         </NeuButton>
