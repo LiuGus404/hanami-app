@@ -38,6 +38,8 @@ function CreatePageContent() {
   const isMember = role === 'member';
   const [adminName, setAdminName] = useState('管理員');
   const [showTrialDetails, setShowTrialDetails] = useState(false);
+  const [showDeactivatedDetails, setShowDeactivatedDetails] = useState(false);
+  const [showLastLessonDetails, setShowLastLessonDetails] = useState(false);
 
   // 使用 SWR 缓存的数据
   const { data: dashboardData, isLoading, error } = useDashboardData(
@@ -45,7 +47,7 @@ function CreatePageContent() {
     saasUser?.email || ''
   );
 
-  const { studentCount, trialStudentCount, lastLessonCount, weeklyTrialCounts } = dashboardData;
+  const { studentCount, trialStudentCount, lastLessonCount, lastLessonStudents, weeklyTrialCounts, weeklyDeactivatedStudents } = dashboardData;
 
   // Check subscription limit for add/edit permissions
   const { canEdit, currentCount, maxStudents, loading: limitLoading } = useSubscriptionLimit(orgId);
@@ -402,36 +404,62 @@ function CreatePageContent() {
                   學校狀況一覽
                 </motion.h2>
                 <div className="flex flex-row justify-center gap-6 mb-2">
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.4 }}
-                    whileHover={{ y: -4, scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!hasPermission('students')
-                      ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
-                      : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
-                      }`}
-                    onClick={() => {
-                      if (!hasPermission('students')) {
-                        toast.error('權限不足，未能進入');
-                        return;
-                      }
-                      router.push(
-                        buildOrgPath('/aihome/teacher-link/create/students', { filter: 'regular' }),
-                      );
-                    }}
-                    disabled={!hasPermission('students')}
-                  >
-                    <motion.div
-                      animate={hasPermission('students') ? { y: [0, -3, 0] } : {}}
-                      transition={{ duration: 2, repeat: Infinity }}
+                  <div className="flex flex-col items-center">
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.4 }}
+                      whileHover={{ y: -4, scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!hasPermission('students')
+                        ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                        : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
+                        }`}
+                      onClick={() => {
+                        if (!hasPermission('students')) {
+                          toast.error('權限不足，未能進入');
+                          return;
+                        }
+                        router.push(
+                          buildOrgPath('/aihome/teacher-link/create/students', { filter: 'regular' }),
+                        );
+                      }}
+                      disabled={!hasPermission('students')}
                     >
-                      <img alt="學生" src="/icons/bear-face.PNG" className="w-10 h-10 object-contain mb-2" />
-                    </motion.div>
-                    <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : studentCount}</p>
-                    <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>常規學生人數</p>
-                  </motion.button>
+                      <motion.div
+                        animate={hasPermission('students') ? { y: [0, -3, 0] } : {}}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <img alt="學生" src="/icons/bear-face.PNG" className="w-10 h-10 object-contain mb-2" />
+                      </motion.div>
+                      <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : studentCount}</p>
+                      <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>常規學生人數</p>
+                    </motion.button>
+                    {hasPermission('students') && (
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.5 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowDeactivatedDetails(!showDeactivatedDetails)}
+                        className="mt-2 px-3 py-1 text-xs text-[#8A7C70] hover:text-[#2B3A3B] flex items-center gap-1 transition-colors bg-white/60 rounded-full border border-[#EADBC8]"
+                      >
+                        <span>{showDeactivatedDetails ? '收起停用' : '停用記錄'}</span>
+                        <motion.svg
+                          animate={{ rotate: showDeactivatedDetails ? 180 : 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </motion.svg>
+                      </motion.button>
+                    )}
+                  </div>
                   <div className="flex flex-col items-center">
                     <motion.button
                       initial={{ opacity: 0, scale: 0.9 }}
@@ -488,39 +516,159 @@ function CreatePageContent() {
                       </motion.button>
                     )}
                   </div>
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.6 }}
-                    whileHover={{ y: -4, scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!hasPermission('students')
-                      ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
-                      : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
-                      }`}
-                    onClick={() => {
-                      if (!hasPermission('students')) {
-                        toast.error('權限不足，未能進入');
-                        return;
-                      }
-                      router.push(
-                        buildOrgPath('/aihome/teacher-link/create/students', {
-                          filter: 'lastLesson',
-                        }),
-                      );
-                    }}
-                    disabled={!hasPermission('students')}
-                  >
-                    <motion.div
-                      animate={hasPermission('students') ? { y: [0, -3, 0] } : {}}
-                      transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                  <div className="flex flex-col items-center">
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.6 }}
+                      whileHover={{ y: -4, scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-300 ${!hasPermission('students')
+                        ? 'bg-gray-100 border-2 border-gray-300 cursor-not-allowed'
+                        : 'bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] hover:border-[#FFD59A] hover:shadow-lg'
+                        }`}
+                      onClick={() => {
+                        if (!hasPermission('students')) {
+                          toast.error('權限不足，未能進入');
+                          return;
+                        }
+                        router.push(
+                          buildOrgPath('/aihome/teacher-link/create/students', {
+                            filter: 'lastLesson',
+                          }),
+                        );
+                      }}
+                      disabled={!hasPermission('students')}
                     >
-                      <img alt="最後一堂" src="/icons/clock.PNG" className="w-10 h-10 object-contain mb-2" />
-                    </motion.div>
-                    <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : lastLessonCount}</p>
-                    <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>最後一堂人數</p>
-                  </motion.button>
+                      <motion.div
+                        animate={hasPermission('students') ? { y: [0, -3, 0] } : {}}
+                        transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                      >
+                        <img alt="最後一堂" src="/icons/clock.PNG" className="w-10 h-10 object-contain mb-2" />
+                      </motion.div>
+                      <p className={`text-2xl font-bold ${!hasPermission('students') ? 'text-gray-400' : 'text-[#2B3A3B]'}`}>{!hasPermission('students') ? '-' : lastLessonCount}</p>
+                      <p className={`text-sm ${!hasPermission('students') ? 'text-gray-400' : 'text-[#555]'}`}>最後一堂人數</p>
+                    </motion.button>
+                    {hasPermission('students') && (
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.7 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowLastLessonDetails(!showLastLessonDetails)}
+                        className="mt-2 px-3 py-1 text-xs text-[#8A7C70] hover:text-[#2B3A3B] flex items-center gap-1 transition-colors bg-white/60 rounded-full border border-[#EADBC8]"
+                      >
+                        <span>{showLastLessonDetails ? '收起' : '按星期'}</span>
+                        <motion.svg
+                          animate={{ rotate: showLastLessonDetails ? 180 : 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="w-3 h-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </motion.svg>
+                      </motion.button>
+                    )}
+                  </div>
                 </div>
+
+                {/* 最後一堂學生詳情（按星期分組） */}
+                {showLastLessonDetails && hasPermission('students') && (
+                  <div className="mt-4 pt-4 border-t-2 border-[#EADBC8] relative z-10">
+                    <motion.h3
+                      className="text-sm font-semibold text-[#2B3A3B] mb-3 flex items-center gap-2"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="w-2 h-2 bg-gradient-to-r from-[#FF6B6B] to-[#FFD59A] rounded-full"
+                      />
+                      未來7天最後一堂學生
+                    </motion.h3>
+                    {(() => {
+                      // 計算未來7天各星期的學生
+                      const weekdayMap: { [key: string]: string } = {
+                        '0': '日', '1': '一', '2': '二', '3': '三',
+                        '4': '四', '5': '五', '6': '六'
+                      };
+
+                      // 獲取未來7天的日期和星期
+                      const next7Days = [];
+                      const today = new Date();
+                      for (let i = 0; i < 7; i++) {
+                        const date = new Date(today);
+                        date.setDate(today.getDate() + i);
+                        const weekday = date.getDay().toString();
+                        const dateStr = date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
+                        next7Days.push({ weekday, dateStr, dayName: weekdayMap[weekday] });
+                      }
+
+                      // 根據學生的 regular_weekday 分組
+                      console.log('最後一堂學生列表:', lastLessonStudents);
+                      const groupedByWeekday = next7Days.map(day => {
+                        const studentsForDay = lastLessonStudents.filter(
+                          s => String(s.regular_weekday) === String(day.weekday)
+                        );
+                        return { ...day, students: studentsForDay, count: studentsForDay.length };
+                      }).filter(day => day.count > 0); // 只顯示有學生的日期
+
+                      if (groupedByWeekday.length === 0) {
+                        return (
+                          <motion.div
+                            className="text-center py-4 text-sm text-[#8A7C70]"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                          >
+                            未來7天沒有最後一堂的學生
+                          </motion.div>
+                        );
+                      }
+
+                      return (
+                        <div className="space-y-3">
+                          {groupedByWeekday.map((day, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              transition={{ delay: 0.2 + index * 0.1, duration: 0.3 }}
+                              className="relative bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] rounded-xl p-3 hover:border-[#FFD59A] hover:shadow-md transition-all duration-300 overflow-hidden"
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xs font-medium text-[#8A7C70]">
+                                  {day.dateStr} (週{day.dayName})
+                                </span>
+                                <span className="px-2 py-0.5 bg-gradient-to-r from-[#FF6B6B]/10 to-[#FFD59A]/10 rounded-full text-xs font-bold text-[#2B3A3B]">
+                                  {day.count} 人
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {day.students.map((student) => (
+                                  <span
+                                    key={student.id}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/80 border border-[#EADBC8] rounded-full text-xs text-[#2B3A3B]"
+                                  >
+                                    <span className="font-medium">{student.full_name}</span>
+                                    {student.regular_timeslot && (
+                                      <span className="text-[#8A7C70]">({student.regular_timeslot})</span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
 
                 {/* 未來4週試堂人數詳情 */}
                 {showTrialDetails && hasPermission('students') && (
@@ -590,6 +738,88 @@ function CreatePageContent() {
                           className="w-6 h-6 border-2 border-[#FFD59A] border-t-transparent rounded-full mx-auto mb-2"
                         />
                         載入中...
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {/* 停用學生詳情 */}
+                {showDeactivatedDetails && hasPermission('students') && (
+                  <div className="mt-4 pt-4 border-t-2 border-[#EADBC8] relative z-10">
+                    <motion.h3
+                      className="text-sm font-semibold text-[#2B3A3B] mb-3 flex items-center gap-2"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="w-2 h-2 bg-gradient-to-r from-[#F87171] to-[#FBBF24] rounded-full"
+                      />
+                      近三週停用學生
+                    </motion.h3>
+                    {weeklyDeactivatedStudents.length > 0 ? (
+                      <div className="space-y-3">
+                        {weeklyDeactivatedStudents.map((week, index) => (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ delay: 0.2 + index * 0.1, duration: 0.3 }}
+                            className="relative bg-gradient-to-br from-[#FFFDF8] to-[#F8F5EC] border-2 border-[#EADBC8] rounded-xl p-3 hover:border-[#FFD59A] hover:shadow-md transition-all duration-300 overflow-hidden"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-[#8A7C70]">{week.week}</span>
+                              <span className="px-2 py-0.5 bg-gradient-to-r from-[#F87171]/10 to-[#FBBF24]/10 rounded-full text-xs font-bold text-[#2B3A3B]">
+                                {week.count} 人
+                              </span>
+                              <span className="text-[10px] text-[#8A7C70]">
+                                {week.endDate
+                                  ? `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} - ${new Date(week.endDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}`
+                                  : `${new Date(week.startDate).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })} 起`}
+                              </span>
+                            </div>
+                            {week.students.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {week.students.map((student, sIndex) => {
+                                  // 轉換星期數字為中文
+                                  const weekdayMap: { [key: string]: string } = {
+                                    '0': '日', '1': '一', '2': '二', '3': '三',
+                                    '4': '四', '5': '五', '6': '六'
+                                  };
+                                  const weekdayText = student.regular_weekday
+                                    ? `週${weekdayMap[student.regular_weekday] || student.regular_weekday}`
+                                    : '';
+                                  const timeslotText = student.regular_timeslot || '';
+                                  const scheduleInfo = [weekdayText, timeslotText].filter(Boolean).join(' ');
+
+                                  return (
+                                    <span
+                                      key={student.id}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/80 border border-[#EADBC8] rounded-full text-xs text-[#2B3A3B]"
+                                    >
+                                      <span className="font-medium">{student.full_name}</span>
+                                      {scheduleInfo && (
+                                        <span className="text-[#8A7C70]">({scheduleInfo})</span>
+                                      )}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[#8A7C70] italic">{week.week}無停用學生</p>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    ) : (
+                      <motion.div
+                        className="text-center py-4 text-sm text-[#8A7C70]"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        近三週無停用學生
                       </motion.div>
                     )}
                   </div>

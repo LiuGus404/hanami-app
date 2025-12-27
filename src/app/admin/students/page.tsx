@@ -599,6 +599,7 @@ export default function StudentManagementPage({
         student_remarks: s.student_remarks,
         inactive_date: new Date().toISOString(),
         inactive_reason: '管理員停用',
+        org_id: s.org_id || effectiveOrgId, // 添加機構 ID
       }));
 
       // 插入 inactive_student_list 表
