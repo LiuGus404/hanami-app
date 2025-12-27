@@ -9,7 +9,7 @@ import { calculateRemainingLessonsBatch } from '@/lib/utils';
 import { TrialLesson } from '@/types';
 import { useContactDays } from '@/hooks/useContactDays';
 import { useBatchContactDays } from '@/hooks/useBatchContactDays';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ChevronLeft, ChevronRight, RotateCw, Users } from 'lucide-react';
 import { ContactChatDialog } from './ContactChatDialog';
 import toast from 'react-hot-toast';
 import Calendarui from './Calendarui';
@@ -54,9 +54,9 @@ interface GroupedDetail {
   course: string;
   names: {
     name: string;
-  student_id: string;
+    student_id: string;
     age: string;
-  is_trial?: boolean;
+    is_trial?: boolean;
     remaining_lessons?: number | null;
   }[];
 }
@@ -127,16 +127,18 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
   const [isModalOpen, setIsModalOpen] = useState(false);
   // 添加 loading 狀態
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedDateTeachers, setSelectedDateTeachers] = useState<{name: string, start: string, end: string}[]>([]);
+  const [selectedDateTeachers, setSelectedDateTeachers] = useState<{ name: string, start: string, end: string }[]>([]);
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [dateInputValue, setDateInputValue] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // 座位容量資料
+  const [scheduleCapacity, setScheduleCapacity] = useState<Record<string, { max_students: number; assigned_count: number }>>({});
 
   const effectiveOrgId =
     !forceEmpty &&
-    organizationId &&
-    organizationId !== 'default-org' &&
-    organizationId !== fallbackOrganization.id
+      organizationId &&
+      organizationId !== 'default-org' &&
+      organizationId !== fallbackOrganization.id
       ? organizationId
       : null;
   const disableData = forceEmpty || !effectiveOrgId;
@@ -177,7 +179,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
 
     const fetchHolidays = async () => {
       let query = supabase.from('hanami_holidays').select('date, title, org_id');
-      
+
       // 根據 org_id 過濾假期
       if (effectiveOrgId) {
         query = query.eq('org_id', effectiveOrgId);
@@ -187,7 +189,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         query = query.eq('org_id', '00000000-0000-0000-0000-000000000000');
         console.warn('⚠️ [HanamiCalendar] effectiveOrgId 為 null，假期查詢將返回空結果');
       }
-      
+
       const { data, error } = await query;
       if (!error && data) {
         console.log('📊 [HanamiCalendar] 載入的假期數量:', data.length, 'effectiveOrgId:', effectiveOrgId);
@@ -236,7 +238,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           const response = await fetch(
             `/api/students/list?orgId=${encodeURIComponent(effectiveOrgId)}&userEmail=${encodeURIComponent(userEmail)}`
           );
-          
+
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             console.error('載入學生數據錯誤:', errorData);
@@ -322,25 +324,25 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
     const dateStr = getDateString(currentDate);
     const viewKey = `${view}_${dateStr}`;
     if (currentViewRef.current === viewKey && lessonsFetchedRef.current) return;
-    
+
     // 防止重複載入
     if (loadingRef.current) return;
-    
+
     // 設置 loading 狀態
     loadingRef.current = true;
     setIsLoading(true);
-    
+
     // 更新當前 view 和 date
     currentViewRef.current = viewKey;
     currentDateRef.current = dateStr;
-    
+
     if (view === 'day') {
       // 查詢當天課堂
       const fetchDay = async () => {
         try {
           const dateStr = getDateString(currentDate);
           console.log('查詢日期:', dateStr);
-          
+
           // 獲取常規學生的課堂
           let regularLessonsData: any[] = [];
           let regularLessonsError: any = null;
@@ -355,7 +357,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
               if (lessonsResponse.ok) {
                 const lessonsData = await lessonsResponse.json();
                 regularLessonsData = lessonsData.data || [];
-                
+
                 // API 端點已經返回關聯的學生資料，無需手動關聯
               } else {
                 const errorData = await lessonsResponse.json().catch(() => ({}));
@@ -418,7 +420,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           const regularStudentIds = typedRegularLessonsData
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
-          
+
           const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
             organizationId: effectiveOrgId || undefined,
           });
@@ -490,6 +492,67 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             hasContactNumber: !!(l as any).Hanami_Students?.contact_number
           })));
           setLessons(allLessons);
+
+          // 獲取當天星期的座位容量資料
+          const dayOfWeek = currentDate.getDay();
+          const { data: scheduleData, error: scheduleError } = await supabase
+            .from('hanami_schedule')
+            .select('timeslot, course_type, max_students, assigned_student_ids')
+            .eq('weekday', dayOfWeek)
+            .eq('org_id', effectiveOrgId);
+
+          if (!scheduleError && scheduleData) {
+            // 收集所有 assigned_student_ids
+            const allStudentIds: string[] = [];
+            scheduleData.forEach((slot: any) => {
+              if (slot.assigned_student_ids) {
+                allStudentIds.push(...slot.assigned_student_ids);
+              }
+            });
+
+            // 查詢學生資料，過濾已停用的學生
+            let activeStudentIds = new Set<string>();
+            let querySuccess = false;
+
+            if (allStudentIds.length > 0) {
+              try {
+                // 使用 API 端點繞過 RLS
+                const apiUrl = `/api/students/list?orgId=${encodeURIComponent(effectiveOrgId)}${userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : ''}`;
+                const response = await fetch(apiUrl, { credentials: 'include' });
+
+                if (response.ok) {
+                  const result = await response.json();
+                  const allStudents = result.students || [];
+                  // 找出活躍學生（不是已停用）
+                  const activeStudents = allStudents.filter((s: any) =>
+                    allStudentIds.includes(s.id) && s.student_type !== '已停用'
+                  );
+                  activeStudentIds = new Set(activeStudents.map((s: any) => s.id));
+                  querySuccess = true;
+                  console.log('活躍學生數量:', activeStudentIds.size, '總分配數:', allStudentIds.length);
+                }
+              } catch (err) {
+                console.error('查詢學生資料失敗:', err);
+              }
+            }
+
+            const capacityMap: Record<string, { max_students: number; assigned_count: number }> = {};
+            scheduleData.forEach((slot: any) => {
+              const key = `${slot.timeslot}_${slot.course_type}`;
+              const assignedIds = slot.assigned_student_ids || [];
+              // 如果查詢成功，只計算活躍學生；否則使用原始數量
+              const activeCount = querySuccess
+                ? assignedIds.filter((id: string) => activeStudentIds.has(id)).length
+                : assignedIds.length;
+              capacityMap[key] = {
+                max_students: slot.max_students || 0,
+                assigned_count: activeCount
+              };
+            });
+            setScheduleCapacity(capacityMap);
+            console.log('座位容量資料:', capacityMap);
+          }
+
           lessonsFetchedRef.current = true;
         } catch (error) {
           console.error('Error fetching day lessons:', error);
@@ -550,7 +613,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           const regularStudentIds = typedRegularLessonsData
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
-          
+
           const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
             organizationId: effectiveOrgId || undefined,
           });
@@ -674,7 +737,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           const regularStudentIds = typedRegularLessonsData
             .filter(lesson => lesson.student_id)
             .map(lesson => lesson.student_id!);
-          
+
           const remainingLessonsMap = await calculateRemainingLessonsBatch(regularStudentIds, new Date(), {
             organizationId: effectiveOrgId || undefined,
           });
@@ -807,24 +870,24 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       console.log(`找不到學生 ID: ${studentId}`);
       return '';
     }
-    
+
     if (student.student_age === null || student.student_age === undefined) {
       console.log(`學生 ${student.full_name} 沒有年齡數據`);
       return '';
     }
-    
+
     // student_age 欄位存儲的是月份數
     const months = typeof student.student_age === 'string' ? parseInt(student.student_age) : student.student_age;
     const years = Math.floor(months / 12);
     const remainingMonths = months % 12;
-    
+
     if (!years && !remainingMonths) return '';
-    
+
     // 格式：1歲3月
     let ageText = '';
     if (years > 0) ageText += `${years}歲`;
     if (remainingMonths > 0) ageText += `${remainingMonths}月`;
-    
+
     console.log(`學生 ${student.full_name} 年齡: ${ageText} (${months}個月)`);
     return ageText;
   };
@@ -850,12 +913,12 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         )
       `)
       .eq('lesson_date', dateStr);
-    
+
     // 如果有 org_id，根據 org_id 過濾
     if (effectiveOrgId) {
       regularLessonsQuery = regularLessonsQuery.eq('org_id', effectiveOrgId);
     }
-    
+
     const { data: regularLessonsData, error: regularLessonsError } = await regularLessonsQuery;
 
     // 獲取試堂學生的課堂
@@ -863,12 +926,12 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       .from('hanami_trial_students')
       .select('*')
       .eq('lesson_date', dateStr);
-    
+
     // 如果有 org_id，根據 org_id 過濾
     if (effectiveOrgId) {
       trialLessonsQuery = trialLessonsQuery.eq('org_id', effectiveOrgId);
     }
-    
+
     const { data: trialLessonsData, error: trialLessonsError } = await trialLessonsQuery;
 
     if (regularLessonsError || trialLessonsError) {
@@ -911,12 +974,12 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         studentAge = typeof trial.student_age === 'string' ? parseInt(trial.student_age) : trial.student_age;
         const years = Math.floor(studentAge / 12);
         const remainingMonths = studentAge % 12;
-        
+
         // 格式：1歲3月
         let ageText = '';
         if (years > 0) ageText += `${years}歲`;
         if (remainingMonths > 0) ageText += `${remainingMonths}月`;
-        
+
         ageDisplay = ageText;
       }
       return {
@@ -962,7 +1025,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
 
     const groupedArray: GroupedLesson[] = Object.values(grouped);
     groupedArray.sort((a, b) => (a as { time: string }).time.localeCompare((b as { time: string }).time));
-    
+
     // 設置選中的詳細資訊
     setSelectedDetail({
       date,
@@ -1018,7 +1081,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
 
       // 3. 更新本地狀態
       if (updatedLesson) {
-        setLessons(prevLessons => 
+        setLessons(prevLessons =>
           prevLessons.map(lesson =>
             lesson.id === lessonId
               ? { ...lesson, ...(updatedLesson as any) }
@@ -1079,7 +1142,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       });
       return;
     }
-    
+
     setSelectedPhoneNumber(phoneNumber);
     setSelectedContactDays(contactDays);
     setChatDialogOpen(true);
@@ -1099,12 +1162,12 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
     // 從批量載入結果中獲取數據
     const contactDays = batchContactResults[phoneNumber];
     const loading = batchLoading;
-    
+
     // 僅在顯式開啟除錯旗標時輸出詳盡日誌，避免汙染瀏覽器主控台
     if (process.env.NEXT_PUBLIC_ENABLE_CONTACTDAY_DEBUG === 'true') {
       console.log('ContactDaysIcon - phoneNumber:', phoneNumber, 'contactDays:', contactDays, 'loading:', loading);
     }
-    
+
     if (loading) {
       return (
         <div className="flex items-center px-1.5 py-0.5 bg-gray-100 rounded-full text-xs font-medium text-gray-600 border border-white">
@@ -1113,16 +1176,15 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         </div>
       );
     }
-    
+
     if (!contactDays || contactDays.daysSinceContact === null) {
       return (
         <button
           onClick={() => handleContactIconClick(phoneNumber, null)}
-          className={`flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium border border-white transition-colors cursor-pointer ${
-            isFeatureEnabled
-              ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              : 'bg-gray-400 text-gray-500 hover:bg-gray-500 opacity-60'
-          }`}
+          className={`flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium border border-white transition-colors cursor-pointer ${isFeatureEnabled
+            ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            : 'bg-gray-400 text-gray-500 hover:bg-gray-500 opacity-60'
+            }`}
           title={isFeatureEnabled ? '點擊聯繫家長' : '功能未開放'}
         >
           <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
@@ -1130,7 +1192,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         </button>
       );
     }
-    
+
     const days = contactDays.daysSinceContact;
     const getDisplayText = () => {
       if (days === 0) return '今天';
@@ -1138,7 +1200,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       if (days <= 7) return `${days}天`;
       return `${days}天`;
     };
-    
+
     const getBgColor = () => {
       if (!isFeatureEnabled) {
         return 'from-gray-400 to-gray-500';
@@ -1148,15 +1210,14 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       if (days <= 7) return 'from-yellow-100 to-yellow-200';
       return 'from-red-100 to-red-200';
     };
-    
+
     return (
       <button
         onClick={() => handleContactIconClick(phoneNumber, days)}
-        className={`flex items-center px-1.5 py-0.5 bg-gradient-to-r ${getBgColor()} rounded-full text-xs font-medium shadow-sm border border-white transition-all cursor-pointer ${
-          isFeatureEnabled
-            ? 'text-[#2B3A3B] hover:shadow-md'
-            : 'text-gray-500 opacity-60 hover:opacity-70'
-        }`}
+        className={`flex items-center px-1.5 py-0.5 bg-gradient-to-r ${getBgColor()} rounded-full text-xs font-medium shadow-sm border border-white transition-all cursor-pointer ${isFeatureEnabled
+          ? 'text-[#2B3A3B] hover:shadow-md'
+          : 'text-gray-500 opacity-60 hover:opacity-70'
+          }`}
         title={isFeatureEnabled ? '點擊聯繫家長' : '功能未開放'}
       >
         <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
@@ -1168,7 +1229,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
   // 修改渲染部分，為試堂學生添加特殊標記
   const renderStudentButton = (nameObj: StudentNameObj, lesson?: Lesson) => {
     const lessonIsTodayOrPast = lesson ? isPastOrToday(lesson.lesson_date) : false;
-    
+
     // 根據剩餘堂數決定背景顏色
     let bgColor = nameObj.is_trial ? '#FFF7D6' : '#F5E7D4';
     if (!nameObj.is_trial && lesson?.remaining_lessons !== undefined && lesson?.remaining_lessons !== null) {
@@ -1187,7 +1248,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
       <div className="flex items-center gap-1 flex-wrap">
         <button
           className={baseBtnClass}
-          style={{ 
+          style={{
             minWidth: '60px',
             backgroundColor: bgColor,
           }}
@@ -1207,18 +1268,17 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         </button>
         {/* 聯繫天數圖標 */}
         <ContactDaysIcon phoneNumber={
-          lesson?.is_trial 
-            ? lesson?.contact_number || null 
+          lesson?.is_trial
+            ? lesson?.contact_number || null
             : lesson?.Hanami_Students?.contact_number || null
         } />
         {lessonIsTodayOrPast && lesson?.lesson_status && (
           <button
             className={
-              `${statusBtnClass} ${  
-                lesson.lesson_status === '出席' ? 'bg-[#DFFFD6] text-green-800' :
-                  lesson.lesson_status === '缺席' ? 'bg-[#FFC1C1] text-red-700' :
-                    (lesson.lesson_status === '病假' || lesson.lesson_status === '事假') ? 'bg-[#FFE5B4] text-yellow-700' :
-                      'bg-gray-200 text-gray-600'}`
+              `${statusBtnClass} ${lesson.lesson_status === '出席' ? 'bg-[#DFFFD6] text-green-800' :
+                lesson.lesson_status === '缺席' ? 'bg-[#FFC1C1] text-red-700' :
+                  (lesson.lesson_status === '病假' || lesson.lesson_status === '事假') ? 'bg-[#FFE5B4] text-yellow-700' :
+                    'bg-gray-200 text-gray-600'}`
             }
             onClick={() => setPopupInfo({ lessonId: lesson.id })}
           >
@@ -1276,7 +1336,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
           hanami_employee:teacher_id (teacher_nickname)
         `)
         .eq('scheduled_date', selectedDateStr);
-      
+
       // 根據 org_id 過濾排班記錄
       if (effectiveOrgId) {
         query = query.eq('org_id', effectiveOrgId);
@@ -1286,19 +1346,19 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         query = query.eq('org_id', '00000000-0000-0000-0000-000000000000');
         console.warn('⚠️ [HanamiCalendar] effectiveOrgId 為 null，排班記錄查詢將返回空結果');
       }
-      
+
       const { data, error } = await query;
       if (!error && data) {
         console.log('📊 [HanamiCalendar] 載入的排班記錄數量:', data.length, 'effectiveOrgId:', effectiveOrgId);
         // 使用 Map 來去重，key 為老師名稱
-        const teacherMap = new Map<string, {name: string, start: string, end: string}>();
-        
+        const teacherMap = new Map<string, { name: string, start: string, end: string }>();
+
         data.forEach((row: any) => {
           if (row.hanami_employee?.teacher_nickname && row.start_time && row.end_time) {
             const teacherName = row.hanami_employee.teacher_nickname;
             const startTime = row.start_time;
             const endTime = row.end_time;
-            
+
             // 如果該老師已存在，合併時間段（取最早開始時間和最晚結束時間）
             if (teacherMap.has(teacherName)) {
               const existing = teacherMap.get(teacherName)!;
@@ -1311,15 +1371,15 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
               }
             } else {
               // 新老師，直接添加
-              teacherMap.set(teacherName, { 
-                name: teacherName, 
-                start: startTime, 
-                end: endTime 
+              teacherMap.set(teacherName, {
+                name: teacherName,
+                start: startTime,
+                end: endTime
               });
             }
           }
         });
-        
+
         // 轉換為數組
         const list = Array.from(teacherMap.values());
         console.log('📊 [HanamiCalendar] 載入的老師列表（已去重）:', list.map(t => ({ name: t.name, start: t.start, end: t.end })));
@@ -1337,9 +1397,11 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
         {/* 第一行：日期導航 */}
         <div className="flex flex-wrap gap-2 items-center overflow-x-auto">
           <button
-            className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
+            className="w-10 h-10 bg-[#FFD59A]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#FFD59A]/60 hover:scale-105 active:scale-95 shadow-sm"
             onClick={handlePrev}
-          >{'◀'}
+            title="上一個"
+          >
+            <ChevronLeft className="w-5 h-5 text-[#C17817]" strokeWidth={2} />
           </button>
           <div className="relative">
             {isEditingDate ? (
@@ -1354,7 +1416,7 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
                     const day = parseInt(dateParts[0], 10);
                     const month = parseInt(dateParts[1], 10) - 1; // 月份從 0 開始
                     const year = parseInt(dateParts[2], 10);
-                    
+
                     if (!isNaN(day) && !isNaN(month) && !isNaN(year) && month >= 0 && month <= 11) {
                       const newDate = getHongKongDate(new Date(year, month, day));
                       if (!isNaN(newDate.getTime())) {
@@ -1394,12 +1456,12 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             {showDatePicker && (
               <>
                 {/* 背景遮罩 */}
-                <div 
+                <div
                   className="fixed inset-0 z-[9998] bg-black/20"
                   onClick={() => setShowDatePicker(false)}
                 />
                 {/* 日曆彈出窗口 - 使用 fixed 定位確保不被遮蓋 */}
-                <div 
+                <div
                   className="fixed z-[9999]"
                   style={{
                     top: '50%',
@@ -1435,29 +1497,31 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
             )}
           </div>
           <button
-            className="hanami-btn-cute w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden"
+            className="w-10 h-10 bg-[#FFD59A]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#FFD59A]/60 hover:scale-105 active:scale-95 shadow-sm"
             onClick={handleNext}
-          >{'▶'}
+            title="下一個"
+          >
+            <ChevronRight className="w-5 h-5 text-[#C17817]" strokeWidth={2} />
           </button>
           <button
-            className="hanami-btn-soft w-fit min-w-0 max-w-[56px] sm:max-w-[80px] sm:px-3 px-2 sm:text-base text-sm flex-shrink-0 overflow-hidden ml-2"
+            className="w-10 h-10 bg-[#EBC9A4]/30 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#EBC9A4]/50 hover:scale-105 active:scale-95 shadow-sm ml-2"
             id="refresh-btn"
             title="刷新資料"
             onClick={async () => {
               lessonsFetchedRef.current = false;
               loadingRef.current = false;
               setIsLoading(true);
-            const newDate = new Date(currentDate);
-            setCurrentDate(newDate);
-            const btn = document.getElementById('refresh-btn');
-            if (btn) {
-              btn.classList.add('animate-spin');
-              setTimeout(() => btn.classList.remove('animate-spin'), 1000);
-            }
-          }}
-        >
-          <img alt="Refresh" className="w-4 h-4" src="/refresh.png" />
-        </button>
+              const newDate = new Date(currentDate);
+              setCurrentDate(newDate);
+              const btn = document.getElementById('refresh-btn');
+              if (btn) {
+                btn.classList.add('animate-spin');
+                setTimeout(() => btn.classList.remove('animate-spin'), 1000);
+              }
+            }}
+          >
+            <RotateCw className="w-5 h-5 text-[#8B7355]" strokeWidth={1.5} />
+          </button>
         </div>
         {/* 第二行：視圖切換按鈕 */}
         <div className="flex flex-wrap gap-2 items-center overflow-x-auto">
@@ -1551,8 +1615,32 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
                     })();
                     return (
                       <div key={`${g.time}-${g.course}-${i}`} className="border-l-2 pl-4">
-                        <div className="text-[#4B4036] font-bold">
-                          {g.time.slice(0, 5)}-{endTime} {g.course} ({g.lessons.length})
+                        <div className="text-[#4B4036] font-bold flex items-center gap-2 flex-wrap">
+                          <span>{g.time.slice(0, 5)}-{endTime} {g.course} ({g.lessons.length})</span>
+                          {/* 座位容量顯示 */}
+                          {(() => {
+                            const capacityKey = `${g.time}_${g.course}`;
+                            const capacity = scheduleCapacity[capacityKey];
+                            if (capacity && capacity.max_students > 0) {
+                              const current = capacity.assigned_count; // 使用常規時段的分配學生數
+                              const max = capacity.max_students;
+                              const ratio = current / max;
+                              // 顏色編碼：綠色 < 80%、橙色 80-99%、紅色 100%
+                              let bgColor = 'bg-green-100 text-green-700';
+                              if (ratio >= 1) {
+                                bgColor = 'bg-red-100 text-red-600';
+                              } else if (ratio >= 0.8) {
+                                bgColor = 'bg-orange-100 text-orange-600';
+                              }
+                              return (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${bgColor}`}>
+                                  <Users className="w-3 h-3" />
+                                  {current}/{max}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <div className="ml-4 text-sm text-[#4B4036]">
                           {g.lessons.map((lesson: Lesson, j: number) => {
@@ -1597,8 +1685,8 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
                 const dayLessons = lessons.filter(l => {
                   const lessonDate = getHongKongDate(new Date(l.lesson_date));
                   return lessonDate.getFullYear() === date.getFullYear() &&
-                         lessonDate.getMonth() === date.getMonth() &&
-                         lessonDate.getDate() === date.getDate();
+                    lessonDate.getMonth() === date.getMonth() &&
+                    lessonDate.getDate() === date.getDate();
                 });
                 // group by time+course
                 const grouped = dayLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {
@@ -1698,8 +1786,8 @@ const HanamiCalendar = ({ organizationId = null, forceEmpty = false, userEmail =
                   const dayLessons = lessons.filter(l => {
                     const lessonDate = getHongKongDate(new Date(l.lesson_date));
                     return lessonDate.getFullYear() === date.getFullYear() &&
-                           lessonDate.getMonth() === date.getMonth() &&
-                           lessonDate.getDate() === date.getDate();
+                      lessonDate.getMonth() === date.getMonth() &&
+                      lessonDate.getDate() === date.getDate();
                   });
                   // group by time+course
                   const grouped = dayLessons.reduce((acc: Record<string, GroupedLesson>, l: Lesson) => {

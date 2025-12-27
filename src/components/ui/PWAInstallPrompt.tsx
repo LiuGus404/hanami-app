@@ -57,6 +57,53 @@ export default function PWAInstallPrompt() {
     const [deviceType, setDeviceType] = useState<DeviceType>('unknown');
     const [showIOSInstructionsModal, setShowIOSInstructionsModal] = useState(false);
     const [isInstalled, setIsInstalled] = useState(false);
+    const [hasNavbar, setHasNavbar] = useState(false);
+    const [isScrolledDown, setIsScrolledDown] = useState(false);
+
+    // 檢測頁面是否有導航欄
+    useEffect(() => {
+        const checkNavbar = () => {
+            // 檢查是否存在 sticky 的 nav 元素（UnifiedNavbar 使用 sticky top-0）
+            const navbar = document.querySelector('nav.sticky');
+            setHasNavbar(!!navbar);
+        };
+
+        // 初始檢查
+        checkNavbar();
+
+        // 使用 MutationObserver 監聯 DOM 變化
+        const observer = new MutationObserver(checkNavbar);
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        return () => observer.disconnect();
+    }, []);
+
+    // 滾動偵測 - 向下滑動時隱藏 PWA 提示
+    useEffect(() => {
+        let lastScrollY = window.scrollY;
+        let ticking = false;
+
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const currentScrollY = window.scrollY;
+                    // 向下滑動超過 50px 且已經離開頂部時隱藏
+                    if (currentScrollY > lastScrollY && currentScrollY > 50) {
+                        setIsScrolledDown(true);
+                    } else if (currentScrollY < lastScrollY || currentScrollY <= 50) {
+                        // 向上滑動或接近頂部時顯示
+                        setIsScrolledDown(false);
+                    }
+                    lastScrollY = currentScrollY;
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     // 檢測設備類型
     const detectDeviceType = useCallback((): DeviceType => {
@@ -249,10 +296,13 @@ export default function PWAInstallPrompt() {
                     <motion.div
                         key="pwa-install-prompt"
                         initial={{ y: -100, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
+                        animate={{
+                            y: isScrolledDown ? -100 : 0,
+                            opacity: isScrolledDown ? 0 : 1
+                        }}
                         exit={{ y: -100, opacity: 0 }}
-                        transition={{ duration: 0.4, type: "spring", bounce: 0.3 }}
-                        className="fixed top-0 left-0 right-0 z-[9999] pointer-events-auto"
+                        transition={{ duration: 0.3, type: "spring", bounce: 0.2 }}
+                        className={`fixed ${hasNavbar ? 'top-16' : 'top-0'} left-0 right-0 z-[9999] pointer-events-auto`}
                     >
                         <div className="bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-lg">
                             <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">

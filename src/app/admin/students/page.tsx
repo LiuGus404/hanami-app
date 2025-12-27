@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { BookOpen, CalendarClock, Star, LayoutGrid, List, ChevronLeft, ChevronRight, Settings2, Trash2, UserX, RotateCcw, BarChart3, TreePine, TrendingUp, Gamepad2, FileText, Users, MessageSquare, X, Plus } from 'lucide-react';
-import { AcademicCapIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon, VideoCameraIcon, FunnelIcon, CalendarDaysIcon, HashtagIcon, TableCellsIcon } from '@heroicons/react/24/outline';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import useSWR from 'swr';
@@ -1520,38 +1520,53 @@ export default function StudentManagementPage({
 
         {/* 操作按鈕區域 */}
         {selectedStudents.length > 0 && (
-          <div className="mb-4 p-4 bg-white rounded-xl border border-[#EADBC8] shadow-sm">
+          <div className="mb-4 p-3 bg-white/80 backdrop-blur-sm rounded-2xl border border-[#EADBC8] shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-[#2B3A3B]">
-                  已選中 {selectedStudents.length} 位學生
-                </span>
-                <button
-                  className="text-xs text-[#A68A64] hover:text-[#8B7355] underline"
+                {/* 已選中數量 - 圓形標籤 */}
+                <div className="w-8 h-8 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center shadow-sm">
+                  <span className="text-xs font-bold text-white">{selectedStudents.length}</span>
+                </div>
+                <span className="text-xs sm:text-sm text-[#4B4036] font-medium">已選</span>
+                {/* 取消選擇 - X 按鈕 */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="w-6 h-6 bg-[#EBC9A4]/40 rounded-full flex items-center justify-center hover:bg-[#EBC9A4]/60 transition-all"
                   onClick={() => setSelectedStudents([])}
                 >
-                  取消選擇
-                </button>
+                  <X className="w-3.5 h-3.5 text-[#8B7355]" />
+                </motion.button>
               </div>
               <div className="flex gap-2">
                 {isShowingInactiveStudents ? (
                   <div className="flex gap-2">
-                    <button
-                      className="hanami-btn-success flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    {/* 回復學生按鈕 */}
+                    <motion.button
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex flex-col items-center gap-1 px-2 py-1"
                       disabled={actionLoading}
                       onClick={handleRestoreStudents}
                     >
-                      <RotateCcw className="w-4 h-4" />
-                      <span>回復學生</span>
-                    </button>
-                    <button
-                      className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      <div className={`w-10 h-10 bg-green-100 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-green-200 ${actionLoading ? 'opacity-50' : ''}`}>
+                        <RotateCcw className="w-5 h-5 text-green-600" strokeWidth={1.5} />
+                      </div>
+                      <span className="text-[10px] text-[#4B4036] font-medium">回復</span>
+                    </motion.button>
+                    {/* 刪除學生按鈕 */}
+                    <motion.button
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="flex flex-col items-center gap-1 px-2 py-1"
                       disabled={actionLoading}
                       onClick={handleDeleteInactiveStudents}
                     >
-                      <Trash2 className="w-4 h-4" />
-                      <span>刪除學生</span>
-                    </button>
+                      <div className={`w-10 h-10 bg-red-100 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-red-200 ${actionLoading ? 'opacity-50' : ''}`}>
+                        <Trash2 className="w-5 h-5 text-red-500" strokeWidth={1.5} />
+                      </div>
+                      <span className="text-[10px] text-[#4B4036] font-medium">刪除</span>
+                    </motion.button>
                   </div>
                 ) : (
                   <>
@@ -1564,19 +1579,25 @@ export default function StudentManagementPage({
                       return (
                         <>
                           {/* 停用學生按鈕 */}
-                          <button
-                            className="hanami-btn-danger flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          <motion.button
+                            whileHover={{ scale: 1.08 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex flex-col items-center gap-1 px-2 py-1"
                             disabled={actionLoading}
                             onClick={handleDeleteStudents}
                           >
-                            <UserX className="w-4 h-4" />
-                            <span>停用學生</span>
-                          </button>
+                            <div className={`w-10 h-10 bg-red-100 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-red-200 ${actionLoading ? 'opacity-50' : ''}`}>
+                              <UserX className="w-5 h-5 text-red-500" strokeWidth={1.5} />
+                            </div>
+                            <span className="text-[10px] text-[#4B4036] font-medium">停用</span>
+                          </motion.button>
                           {/* AI 訊息按鈕 - 允許多選 */}
                           {selectedStudents.length > 0 && (
                             allowAiFeatures ? (
-                              <button
-                                className="hanami-btn flex items-center gap-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                              <motion.button
+                                whileHover={{ scale: 1.08 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="flex flex-col items-center gap-1 px-2 py-1"
                                 disabled={actionLoading}
                                 onClick={() => {
                                   const selected = students.filter((s: any) => selectedStudents.includes(s.id));
@@ -1586,11 +1607,15 @@ export default function StudentManagementPage({
                                   }
                                 }}
                               >
-                                <MessageSquare className="w-4 h-4" />
-                                <span>AI 訊息</span>
-                              </button>
+                                <div className={`w-10 h-10 bg-[#FFD59A]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#FFD59A]/60 ${actionLoading ? 'opacity-50' : ''}`}>
+                                  <MessageSquare className="w-5 h-5 text-[#C17817]" strokeWidth={1.5} />
+                                </div>
+                                <span className="text-[10px] text-[#4B4036] font-medium">AI訊息</span>
+                              </motion.button>
                             ) : (
-                              <button
+                              <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                className="flex flex-col items-center gap-1 px-2 py-1 cursor-not-allowed"
                                 onClick={() => toast(aiFeatureMessage, {
                                   duration: 3000,
                                   style: {
@@ -1602,14 +1627,13 @@ export default function StudentManagementPage({
                                     fontWeight: '500',
                                   },
                                 })}
-                                className="flex items-center gap-2 px-4 py-2 bg-[#F0ECE1] text-[#8A7C70] rounded-full shadow-sm cursor-not-allowed hover:bg-[#E8E0D5] transition-colors"
-                                type="button"
                                 title={aiFeatureMessage}
-                                disabled
                               >
-                                <MessageSquare className="w-4 h-4 opacity-50" />
-                                <span className="opacity-75">AI 訊息</span>
-                              </button>
+                                <div className="w-10 h-10 bg-[#F0ECE1] rounded-full flex items-center justify-center opacity-50">
+                                  <MessageSquare className="w-5 h-5 text-[#8A7C70]" strokeWidth={1.5} />
+                                </div>
+                                <span className="text-[10px] text-[#8A7C70] font-medium">AI訊息</span>
+                              </motion.button>
                             )
                           )}
                         </>
@@ -1662,17 +1686,22 @@ export default function StudentManagementPage({
         <div className="flex justify-between items-center mb-4">
           <div className="flex overflow-x-auto gap-2 pb-3">
             <div className="mb-4">
-              <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex flex-col items-center gap-1.5 px-3 py-2"
                 onClick={() => setDropdownOpen(true)}
               >
-                <span>篩選課程</span>
+                <div className="w-10 h-10 bg-[#FFD59A]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#FFD59A]/60">
+                  <BookOpen className="w-5 h-5 text-[#C17817]" strokeWidth={1.5} />
+                </div>
+                <span className="text-xs text-[#4B4036] font-medium">課程</span>
                 {selectedCourses.length > 0 && (
-                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FFB6C1] text-white text-xs rounded-full flex items-center justify-center">
                     {selectedCourses.length}
                   </span>
                 )}
-              </button>
+              </motion.button>
               {dropdownOpen && (
                 <PopupSelect
                   mode="multi"
@@ -1703,17 +1732,22 @@ export default function StudentManagementPage({
 
 
             <div className="mb-4">
-              <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex flex-col items-center gap-1.5 px-3 py-2 relative"
                 onClick={() => setWeekdayDropdownOpen(true)}
               >
-                <span>篩選星期</span>
+                <div className="w-10 h-10 bg-[#EBC9A4]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#EBC9A4]/60">
+                  <CalendarDaysIcon className="w-5 h-5 text-[#8B7355]" strokeWidth={1.5} />
+                </div>
+                <span className="text-xs text-[#4B4036] font-medium">星期</span>
                 {selectedWeekdays.length > 0 && (
-                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#FFB6C1] text-white text-xs rounded-full flex items-center justify-center">
                     {selectedWeekdays.length}
                   </span>
                 )}
-              </button>
+              </motion.button>
               {weekdayDropdownOpen && (
                 <PopupSelect
                   mode="multi"
@@ -1736,17 +1770,22 @@ export default function StudentManagementPage({
             </div>
 
             <div className="mb-4">
-              <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex flex-col items-center gap-1.5 px-3 py-2 relative"
                 onClick={() => setLessonDropdownOpen(true)}
               >
-                <span>篩選堂數</span>
+                <div className="w-10 h-10 bg-[#FFD59A]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#FFD59A]/60">
+                  <HashtagIcon className="w-5 h-5 text-[#C17817]" strokeWidth={1.5} />
+                </div>
+                <span className="text-xs text-[#4B4036] font-medium">堂數</span>
                 {(selectedLessonFilter !== 'all' || isCustomLessonFilterActive(selectedLessonFilter, customLessonCount)) && (
-                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
-                    {selectedLessonFilter === 'custom' && customLessonCount !== '' ? customLessonCount : '✓'}
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#C17817] text-white text-xs rounded-full flex items-center justify-center">
+                    ✓
                   </span>
                 )}
-              </button>
+              </motion.button>
               {lessonDropdownOpen && (
                 <PopupSelect
                   mode="single"
@@ -1766,7 +1805,7 @@ export default function StudentManagementPage({
               )}
               {selectedLessonFilter === 'custom' && (
                 <input
-                  className="ml-2 border border-[#EADBC8] rounded px-2 py-1 text-sm w-20 mt-2"
+                  className="mt-2 border border-[#EADBC8] rounded-full px-3 py-1 text-sm w-16 bg-white/80 text-center focus:ring-2 focus:ring-[#FFD59A]/50 focus:border-[#FFD59A] outline-none"
                   placeholder="數字"
                   type="number"
                   value={customLessonCount}
@@ -1776,18 +1815,22 @@ export default function StudentManagementPage({
             </div>
 
             <div className="mb-4">
-              <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex flex-col items-center gap-1.5 px-3 py-2 relative"
                 onClick={() => setShowDateFilter(true)}
               >
-                <CalendarClock className="w-4 h-4" />
-                <span>篩選日期</span>
+                <div className="w-10 h-10 bg-[#FFD59A]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#FFD59A]/60">
+                  <CalendarClock className="w-5 h-5 text-[#C17817]" strokeWidth={1.5} />
+                </div>
+                <span className="text-xs text-[#4B4036] font-medium">日期</span>
                 {selectedDates.length > 0 && (
-                  <span className="bg-[#A64B2A] text-white text-xs px-2 py-1 rounded-full min-w-[20px] flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#C17817] text-white text-xs rounded-full flex items-center justify-center">
                     {selectedDates.length}
                   </span>
                 )}
-              </button>
+              </motion.button>
               {/* 日曆彈窗 */}
               {showDateFilter && (
                 <Calendarui
@@ -1800,22 +1843,23 @@ export default function StudentManagementPage({
             </div>
 
             <div className="mb-4">
-              <button
-                className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex flex-col items-center gap-1.5 px-3 py-2"
                 onClick={() => handleDisplayModeChange(displayMode === 'grid' ? 'list' : 'grid')}
               >
-                {displayMode === 'grid' ? (
-                  <>
-                    <LayoutGrid className="w-4 h-4" />
-                    <span>圖卡顯示</span>
-                  </>
-                ) : (
-                  <>
-                    <List className="w-4 h-4" />
-                    <span>列表顯示</span>
-                  </>
-                )}
-              </button>
+                <div className="w-10 h-10 bg-[#EBC9A4]/30 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#EBC9A4]/50">
+                  {displayMode === 'grid' ? (
+                    <LayoutGrid className="w-5 h-5 text-[#4B4036]" strokeWidth={1.5} />
+                  ) : (
+                    <List className="w-5 h-5 text-[#4B4036]" strokeWidth={1.5} />
+                  )}
+                </div>
+                <span className="text-xs text-[#4B4036] font-medium">
+                  {displayMode === 'grid' ? '圖卡' : '列表'}
+                </span>
+              </motion.button>
             </div>
 
             {(selectedCourses.length > 0 ||
@@ -1921,14 +1965,18 @@ export default function StudentManagementPage({
         </div>
 
         <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[#2B3A3B]">每頁顯示：</span>
-            <button
-              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+          <div className="flex items-center gap-1">
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex flex-col items-center gap-1 px-2 py-1"
               onClick={() => setPageSizeDropdownOpen(true)}
             >
-              <span>{pageSize === Infinity ? '全部' : pageSize}</span>
-            </button>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#EBC9A4]/30 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#EBC9A4]/50">
+                <span className="text-xs sm:text-sm font-medium text-[#4B4036]">{pageSize === Infinity ? '∞' : pageSize}</span>
+              </div>
+              <span className="text-[10px] sm:text-xs text-[#4B4036] font-medium hidden sm:block">每頁</span>
+            </motion.button>
             {pageSizeDropdownOpen && (
               <PopupSelect
                 mode="single"
@@ -1950,22 +1998,30 @@ export default function StudentManagementPage({
           </div>
           <div className="flex items-center gap-2">
             {/* 新增學生按鈕 */}
-            <button
-              className={`hanami-btn flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-[#A64B2A] to-[#C17817] hover:from-[#8B3A1F] hover:to-[#A66514] transition-all duration-300 hover:shadow-md rounded-lg ${isSubscriptionReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.95 }}
+              className={`flex flex-col items-center gap-1.5 px-3 py-2 ${isSubscriptionReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={() => !isSubscriptionReadOnly && setShowStudentTypeSelector(true)}
               disabled={isSubscriptionReadOnly}
               title={isSubscriptionReadOnly ? '已超出學生上限，請升級方案' : '新增學生'}
             >
-              <Plus className="w-4 h-4" />
-              <span>新增學生</span>
-            </button>
-            <button
-              className="hanami-btn-soft text-sm px-4 py-2 text-[#2B3A3B] flex items-center gap-2 transition-all duration-300 hover:shadow-md"
+              <div className="w-10 h-10 bg-gradient-to-br from-[#FFB6C1] to-[#FFD59A] rounded-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md">
+                <Plus className="w-5 h-5 text-white" strokeWidth={2} />
+              </div>
+              <span className="text-xs text-[#4B4036] font-medium">新增</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.95 }}
+              className="flex flex-col items-center gap-1.5 px-3 py-2"
               onClick={() => setColumnSelectorOpen(true)}
             >
-              <Settings2 className="w-4 h-4" />
-              <span>顯示欄位</span>
-            </button>
+              <div className="w-10 h-10 bg-[#EBC9A4]/40 rounded-full flex items-center justify-center transition-all duration-200 hover:bg-[#EBC9A4]/60">
+                <Settings2 className="w-5 h-5 text-[#8B7355]" strokeWidth={1.5} />
+              </div>
+              <span className="text-xs text-[#4B4036] font-medium">欄位</span>
+            </motion.button>
             {columnSelectorOpen && (
               <PopupSelect
                 mode="multi"
@@ -1996,8 +2052,8 @@ export default function StudentManagementPage({
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <span className="text-sm text-[#2B3A3B]">
-                  第 {currentPage} 頁，共 {totalPages} 頁
+                <span className="text-xs sm:text-sm text-[#4B4036] font-medium min-w-[40px] text-center">
+                  {currentPage}/{totalPages}
                 </span>
                 <button
                   className={`p-2 rounded-full ${currentPage === totalPages

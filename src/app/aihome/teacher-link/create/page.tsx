@@ -590,7 +590,7 @@ function CreatePageContent() {
                         transition={{ duration: 2, repeat: Infinity }}
                         className="w-2 h-2 bg-gradient-to-r from-[#FF6B6B] to-[#FFD59A] rounded-full"
                       />
-                      未來7天最後一堂學生
+                      最後一堂學生
                     </motion.h3>
                     {(() => {
                       // 計算未來7天各星期的學生
