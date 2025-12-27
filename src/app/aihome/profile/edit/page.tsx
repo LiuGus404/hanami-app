@@ -161,7 +161,13 @@ export default function ProfileEditPage() {
             // 3. Update Profile Data
             const fullPhone = `+${formData.phoneCode}${formData.phoneNumber}`;
 
-            const { error: profileError } = await supabase
+            console.log('🔄 [Profile Update] 開始更新用戶資料:', {
+                userId: user.id,
+                full_name: formData.full_name,
+                phone: fullPhone,
+            });
+
+            const { data: updateData, error: profileError } = await supabase
                 .from('saas_users')
                 .update({
                     full_name: formData.full_name,
@@ -169,9 +175,24 @@ export default function ProfileEditPage() {
                     phone: fullPhone,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', user.id);
+                .eq('id', user.id)
+                .select();
 
-            if (profileError) throw profileError;
+            console.log('🔄 [Profile Update] 更新結果:', {
+                data: updateData,
+                error: profileError,
+                rowsAffected: updateData?.length || 0
+            });
+
+            if (profileError) {
+                console.error('❌ [Profile Update] RLS 或資料庫錯誤:', profileError);
+                throw profileError;
+            }
+
+            if (!updateData || updateData.length === 0) {
+                console.error('❌ [Profile Update] 沒有更新任何記錄 - 可能是 RLS 政策問題');
+                throw new Error('更新失敗：沒有權限更新此資料。請聯繫管理員。');
+            }
 
             // 4. Cleanup Old Avatar (if changed and existed in our storage)
             if (avatarFile && user.avatar_url && user.avatar_url !== finalAvatarUrl) {
@@ -197,10 +218,17 @@ export default function ProfileEditPage() {
             setMessage({ type: 'success', text: '個人資料更新成功！' });
             setFormData(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' })); // Clear sensitive fields
 
-            // Refresh user session data locally if needed or rely on SWR re-fetch
-            // Redirect back after delay
+            // 清除 localStorage 中的用戶會話緩存，讓 profile 頁面強制從資料庫重新載入最新資料
+            try {
+                localStorage.removeItem('saas_user_session');
+                console.log('✅ [Profile Update] localStorage 緩存已清除，將從資料庫重新載入');
+            } catch (e) {
+                console.warn('無法清除 localStorage:', e);
+            }
+
+            // Redirect back after delay with hard refresh
             setTimeout(() => {
-                router.push('/aihome/profile');
+                window.location.href = '/aihome/profile'; // 使用 window.location 強制刷新頁面
             }, 1500);
 
         } catch (error: any) {
